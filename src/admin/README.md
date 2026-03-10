@@ -23,7 +23,31 @@ Essas configurações são utilizadas posteriormente pelo gateway durante o proc
 
 # Estrutura Interna
 
-O admin segue os mesmos princípios arquiteturais adotados no gateway.
+O admin segue os mesmos princípios arquiteturais adotados no gateway, com a diferença que a API administrativa se aproxima mais do padrão REST.
+
+```
+admin/
+├─ application/
+│  ├─ dtos/               # Objetos de transferência de dados entre camadas ( se aplicável )
+│  └─ use_cases/          # Casos de uso responsáveis pela orquestração das camadas inferiores
+│
+├─ domain/
+│  ├─ models/             # Modelos centrais e entidades de negócio do domínio do gateway
+│  └─ services/           # Serviços de domínio com regras de negócio e validações centrais
+│
+├─ infrastructure/
+│  ├─ observability/      # Instrumentação de métricas, tracing e monitoramento
+│  ├─ persistence/        # Implementações de persistência e acesso a dados
+│  ├─ proxy/              # Componentes responsáveis pelo encaminhamento das requisições
+│  └─ pubsub/             # Mecanismos de mensageria e comunicação assíncrona
+│
+├─ interface/
+│  ├─ http/               # Camada de entrada HTTP do admin plane
+│  │  └─ routers/         # Definição e organização das rotas expostas
+│  └─ schema/             # Esquemas de validação e serialização de dados do Pydantic
+│
+└─ README.md              # Documentação específica da estrutura do módulo admin
+```
 
 ---
 
