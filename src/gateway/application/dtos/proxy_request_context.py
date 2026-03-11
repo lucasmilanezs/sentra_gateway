@@ -7,13 +7,13 @@ class ProxyRequestContext:
     """
     Contexto de uma requisição já parseada pela interface.
     
-    A camada de interface é responsável por extrair e popular isso.
-    O use case não sabe nada sobre FastAPI, HTTP ou Request objects.
+    Body deliberadamente ausente — é opaco ao domínio e à aplicação.
+    Não há regra, entidade ou decisão que dependa dele.
+    Ele vive na interface e desce direto para o proxy.
     """
 
     tenant_slug: str
     upstream_path: str
     method: str
     headers: Dict[str, str]
-    body: bytes
     query_params: Dict[str, str]

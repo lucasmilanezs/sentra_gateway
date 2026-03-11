@@ -18,17 +18,24 @@ async def gateway_entrypoint(
 ) -> Response:
     use_case: ForwardRequest = request.app.state.forward_request
 
+    # Strip — único momento que manipulamos o body
+    raw_body = await request.body()
+
     context = ProxyRequestContext(
         tenant_slug=tenant_slug,
         upstream_path=path,
         method=request.method,
         headers=dict(request.headers),
-        body=await request.body(),
         query_params=dict(request.query_params),
     )
 
     try:
-        proxy_response = await use_case.execute(context)
+        # raw_body desce junto mas separado do contexto —
+        # orquestração pura, sem decisão de domínio sobre ele
+        proxy_response = await use_case.execute(
+            context=context,
+            raw_body=raw_body,
+        )
     except RouteNotFoundError:
         raise HTTPException(
             status_code=404,
