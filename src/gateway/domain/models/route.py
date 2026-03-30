@@ -1,27 +1,62 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Tuple
+
+from src.gateway.domain.value_objects.http_method import HttpMethod
 
 
 @dataclass(frozen=True)
 class Route:
     """
-    Entidade central do gateway.
-    Relaciona um tenant_slug ao seu backend upstream.
-    Imutável por design — não muda em runtime.
+    Maps an incoming request path to a backend Domain.
+
+    Registered and managed by the admin plane.
+    The gateway resolves routes at request time using longest-prefix matching:
+    the route whose path_prefix best (most specifically) matches the incoming
+    path wins. Ties in length are broken by insertion order.
+
+    Single-tenant design: there is no tenant_slug in the URL. Routing is
+    purely path-based against all registered routes.
     """
 
-    tenant_slug: str
-    backend_url: str
+    id: str
+    path_prefix: str
+    domain_id: str
+    methods: Tuple[HttpMethod, ...] = field(default_factory=tuple)
 
-    def build_upstream_url(self, path: str) -> str:
+    def matches(self, path: str, method: str) -> bool:
         """
-        Constrói a URL completa para encaminhamento.
-        O path já chega sem o prefixo do tenant.
+        Returns True if this route matches the given path and HTTP method.
 
-        Exemplo:
-            backend_url = "http://localhost:9000"
-            path        = "usuarios/42"
-            resultado   = "http://localhost:9000/usuarios/42"
+        Path matching rules:
+          - Exact match: path == path_prefix
+          - Prefix match: path starts with path_prefix followed by "/"
+          - Wildcard: path_prefix == "/" matches everything
         """
-        clean_path = path.lstrip("/")
-        base = self.backend_url.rstrip("/")
-        return f"{base}/{clean_path}" if clean_path else base
+        prefix = self.path_prefix.rstrip("/")
+        path_ok = (
+            path == self.path_prefix
+            or path.startswith(prefix + "/")
+            or self.path_prefix == "/"
+        )
+        method_ok = (
+            not self.methods
+            or HttpMethod(method.upper()) in self.methods
+        )
+        return path_ok and method_ok
+
+    def strip_prefix(self, path: str) -> str:
+        """
+        Returns the path with this route's prefix stripped.
+
+        The result is the upstream-relative path passed to the backend.
+        Always returns at least "/" so the backend receives a valid path.
+
+        Example:
+            Route(path_prefix="/api").strip_prefix("/api/users/42") → "/users/42"
+            Route(path_prefix="/api").strip_prefix("/api")          → "/"
+        """
+        prefix = self.path_prefix.rstrip("/")
+        if path.startswith(prefix):
+            remainder = path[len(prefix):]
+            return remainder if remainder else "/"
+        return path
