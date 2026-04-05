@@ -6,7 +6,7 @@ from src.admin.application.use_cases.manage_tenant import ManageTenant
 from src.admin.interface.http.dependencies import get_current_claims, get_manage_tenant
 from src.admin.interface.schema.tenant_schema import TenantCreate, TenantResponse, TenantUpdate
 
-router = APIRouter(prefix="/tenants", tags=["tenants"])
+router = APIRouter(tags=["tenants"])
 
 
 def _to_response(t) -> TenantResponse:

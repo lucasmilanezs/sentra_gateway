@@ -32,7 +32,7 @@ from src.admin.interface.schema.auth_schema import (
     UserPublic,
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -83,7 +83,7 @@ async def forgot_password(
     body: ForgotPasswordBody,
     uc: Annotated[RequestPasswordReset, Depends(get_request_password_reset)],
 ):
-    """Envia e-mail com código (em dev, o código aparece nos logs se ADMIN_EMAIL_USE_CONSOLE=true)."""
+    
     await uc.execute(body.email)
     return {"detail": "se o e-mail existir, você receberá um código em breve"}
 

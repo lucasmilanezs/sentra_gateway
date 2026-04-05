@@ -10,7 +10,7 @@ from src.admin.interface.schema.route_schema import (
     AdminRouteUpdate,
 )
 
-router = APIRouter(prefix="/routes", tags=["routes"])
+router = APIRouter(tags=["routes"])
 
 
 def _to_response(r) -> AdminRouteResponse:
