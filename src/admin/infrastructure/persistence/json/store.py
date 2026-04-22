@@ -16,7 +16,7 @@ def _serialize_dt(value: datetime) -> str:
     return value.isoformat()
 
 
-class JsonDocumentStore:
+class DocumentStore:
     """Armazenamento transacional simples em um único arquivo JSON (dev / sem Postgres)."""
 
     def __init__(self, path: str | Path) -> None:
@@ -70,4 +70,4 @@ class JsonDocumentStore:
         await asyncio.to_thread(self.mutate, fn)
 
 
-__all__ = ["JsonDocumentStore", "_parse_dt", "_serialize_dt"]
+__all__ = ["DocumentStore", "_parse_dt", "_serialize_dt"]

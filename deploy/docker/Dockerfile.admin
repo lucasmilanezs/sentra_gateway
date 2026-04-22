@@ -1,0 +1,31 @@
+FROM python:3.11-slim AS base
+
+# Variáveis de ambiente para Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Instalar dependências de sistema para psycopg e bcrypt
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copiar apenas requirements primeiro (cache de camada Docker)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código-fonte
+COPY src/ src/
+COPY migrations/ migrations/
+COPY alembic.ini .
+
+# Expor porta do admin
+EXPOSE 8001
+
+# Entrypoint: rodar migrations e subir o admin
+COPY deploy/docker/entrypoint-admin.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

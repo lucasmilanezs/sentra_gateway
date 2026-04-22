@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,45 +8,43 @@ from fastapi import FastAPI
 from src.gateway.application.use_cases.forward_request import ForwardRequest
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
 from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
+from src.gateway.infrastructure.config.settings import GatewaySettings
 from src.gateway.infrastructure.observability.file_log_writer import FileLogWriter
-from src.gateway.infrastructure.persistence.in_memory_domain_repository import (
-    InMemoryDomainRepository,
-)
-from src.gateway.infrastructure.persistence.in_memory_policy_repository import (
-    InMemoryPolicyRepository,
-)
-from src.gateway.infrastructure.persistence.in_memory_route_repository import (
-    InMemoryRouteRepository,
+from src.gateway.infrastructure.persistence.postgres_snapshot import (
+    PostgresSnapshotRepository,
 )
 from src.gateway.infrastructure.proxy.httpx_upstream_proxy import HttpxUpstreamProxy
 from src.gateway.interface.http.routers.gateway_router import router
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Composition root — wires all dependencies and manages their lifecycle.
+    settings = GatewaySettings()
 
-    Infrastructure instances are created once at startup and injected into
-    use cases via constructor injection. FastAPI app.state is the single
-    handoff point between the lifespan context and the request handlers.
+    # Carrega snapshot de rotas do Postgres
+    snapshot = PostgresSnapshotRepository()
+    await snapshot.load(settings.database_url)
 
-    Shutdown: the shared httpx.AsyncClient is closed gracefully, releasing
-    all pooled connections before the process exits.
-    """
     http_client = httpx.AsyncClient()
 
     forward_request = ForwardRequest(
-        route_repository=InMemoryRouteRepository(),
-        domain_repository=InMemoryDomainRepository(),
-        policy_repository=InMemoryPolicyRepository(),
+        route_repository=snapshot,
+        domain_repository=snapshot,
+        policy_repository=snapshot,
         proxy=HttpxUpstreamProxy(client=http_client),
-        log_port=FileLogWriter(log_path=Path("logs/gateway.log")),
+        log_port=FileLogWriter(log_path=Path(settings.log_path)),
         policy_evaluator=PolicyEvaluator(),
         log_event_builder=LogEventBuilder(),
     )
 
     app.state.forward_request = forward_request
+
+    logger.info(
+        "Gateway iniciado. DB: %s:%s", settings.postgres_host, settings.postgres_port
+    )
 
     yield
 

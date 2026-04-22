@@ -2,11 +2,11 @@ from src.admin.domain.ports.password_reset_repository import (
     PasswordResetRecord,
     PasswordResetRepositoryPort,
 )
-from src.admin.infrastructure.persistence.json.json_document_store import JsonDocumentStore, _parse_dt, _serialize_dt
+from src.admin.infrastructure.persistence.json.store import DocumentStore, _parse_dt, _serialize_dt
 
 
-class JsonPasswordResetRepository(PasswordResetRepositoryPort):
-    def __init__(self, store: JsonDocumentStore) -> None:
+class PasswordResetRepository(PasswordResetRepositoryPort):
+    def __init__(self, store: DocumentStore) -> None:
         self._store = store
 
     async def save(self, record: PasswordResetRecord) -> None:

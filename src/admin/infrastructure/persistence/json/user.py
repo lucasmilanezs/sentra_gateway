@@ -1,7 +1,7 @@
 from src.admin.domain.entities.user import User
 from src.admin.domain.ports.user_repository import UserRepositoryPort
-from src.admin.infrastructure.persistence.json.json_document_store import (
-    JsonDocumentStore,
+from src.admin.infrastructure.persistence.json.store import (
+    DocumentStore,
     _parse_dt,
     _serialize_dt,
 )
@@ -29,8 +29,8 @@ def _user_to_row(u: User) -> dict:
     }
 
 
-class JsonUserRepository(UserRepositoryPort):
-    def __init__(self, store: JsonDocumentStore) -> None:
+class UserRepository(UserRepositoryPort):
+    def __init__(self, store: DocumentStore) -> None:
         self._store = store
 
     async def get_by_id(self, user_id: str) -> User | None:

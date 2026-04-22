@@ -1,7 +1,7 @@
 from src.admin.domain.entities.tenant import Tenant
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
-from src.admin.infrastructure.persistence.json.json_document_store import (
-    JsonDocumentStore,
+from src.admin.infrastructure.persistence.json.store import (
+    DocumentStore,
     _parse_dt,
     _serialize_dt,
 )
@@ -29,8 +29,8 @@ def _tenant_to_row(t: Tenant) -> dict:
     }
 
 
-class JsonTenantRepository(TenantRepositoryPort):
-    def __init__(self, store: JsonDocumentStore) -> None:
+class TenantRepository(TenantRepositoryPort):
+    def __init__(self, store: DocumentStore) -> None:
         self._store = store
 
     async def list_all(self) -> list[Tenant]:

@@ -1,7 +1,9 @@
+from collections.abc import AsyncGenerator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.admin.domain.exceptions import AuthError
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
@@ -17,32 +19,67 @@ def get_wiring(request: Request) -> AdminWiring:
     return w
 
 
-def get_manage_tenant(request: Request) -> object:
-    return get_wiring(request).manage_tenant
+async def get_request_wiring(
+    request: Request,
+) -> AsyncGenerator[AdminWiring, None]:
+    """
+    Dependency principal que resolve o wiring correto por request.
+
+    - Modo JSON: retorna o wiring global diretamente (sem sessão).
+    - Modo Postgres: abre uma AsyncSession, constrói wiring com repositórios
+      transacionais, faz commit/rollback ao fim do request e fecha a sessão.
+    """
+    wiring: AdminWiring = get_wiring(request)
+
+    if not wiring.use_postgres:
+        yield wiring
+        return
+
+    async with wiring._session_factory() as session:
+        async with session.begin():
+            yield wiring.build_use_cases_postgres(session)
 
 
-def get_manage_route(request: Request) -> object:
-    return get_wiring(request).manage_route
+def get_manage_tenant(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_tenant
 
 
-def get_authenticate_user(request: Request) -> object:
-    return get_wiring(request).authenticate_user
+def get_manage_route(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_route
 
 
-def get_register_user(request: Request) -> object:
-    return get_wiring(request).register_user
+def get_authenticate_user(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.authenticate_user
 
 
-def get_change_password(request: Request) -> object:
-    return get_wiring(request).change_password
+def get_register_user(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.register_user
 
 
-def get_request_password_reset(request: Request) -> object:
-    return get_wiring(request).request_password_reset
+def get_change_password(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.change_password
 
 
-def get_reset_password(request: Request) -> object:
-    return get_wiring(request).reset_password_with_code
+def get_request_password_reset(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.request_password_reset
+
+
+def get_reset_password(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.reset_password_with_code
 
 
 async def get_current_claims(
@@ -56,9 +93,8 @@ async def get_current_claims(
             headers={"WWW-Authenticate": "Bearer"},
         )
     wiring = get_wiring(request)
-    token_svc = wiring.token_service
     try:
-        return token_svc.decode_and_validate(cred.credentials)
+        return wiring.token_service.decode_and_validate(cred.credentials)
     except AuthError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -1,14 +1,17 @@
-from passlib.context import CryptContext
+import bcrypt
 
 from src.admin.domain.services.password_hasher import PasswordHasherPort
 
 
 class BcryptPasswordHasher(PasswordHasherPort):
-    def __init__(self) -> None:
-        self._ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
     def hash(self, plain_password: str) -> str:
-        return self._ctx.hash(plain_password)
+        return bcrypt.hashpw(
+            plain_password.encode("utf-8"),
+            bcrypt.gensalt(),
+        ).decode("utf-8")
 
     def verify(self, plain_password: str, password_hash: str) -> bool:
-        return self._ctx.verify(plain_password, password_hash)
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            password_hash.encode("utf-8"),
+        )

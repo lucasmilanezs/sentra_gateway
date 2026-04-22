@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,11 +10,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    POSTGRES_HOST: str = "postgres"
+    POSTGRES_USER: str = "sentra"
+    POSTGRES_PASSWORD: str = "sentra_secret"
+    POSTGRES_DB: str = "sentra_db"
+    POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
 
     @property
@@ -23,4 +24,6 @@ class Settings(BaseSettings):
         )
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

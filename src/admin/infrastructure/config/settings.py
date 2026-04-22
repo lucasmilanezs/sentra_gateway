@@ -1,24 +1,48 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AdminSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ADMIN_", env_file=".env", extra="ignore")
-
-    jwt_secret: str = Field(default="change-me-in-production-use-long-random-secret")
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24
-
-    database_url: str = Field(
-        default="postgresql+psycopg2://sentra:sentra@localhost:5432/sentra_admin",
-        description="URL SQLAlchemy para Postgres (futuro); arquivo JSON usado até lá.",
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+        populate_by_name=True,
     )
 
-    json_data_path: str = Field(default="data/admin_local.json")
+    # JWT
+    jwt_secret: str = Field(
+        default="change-me-in-production-use-long-random-secret",
+        alias="ADMIN_JWT_SECRET",
+    )
+    jwt_algorithm: str = Field(default="HS256", alias="ADMIN_JWT_ALGORITHM")
+    jwt_expire_minutes: int = Field(default=60 * 24, alias="ADMIN_JWT_EXPIRE_MINUTES")
 
-    smtp_host: str | None = None
-    smtp_port: int = 587
-    smtp_user: str | None = None
-    smtp_password: str | None = None
-    smtp_from: str | None = None
-    email_use_console: bool = Field(default=True, description="Se true, apenas loga o código.")
+    # Persistência
+    use_postgres: bool = Field(default=False, alias="ADMIN_USE_POSTGRES")
+    database_url: str = Field(default="", alias="ADMIN_DATABASE_URL")
+    json_data_path: str = Field(default="data/admin_local.json", alias="ADMIN_JSON_DATA_PATH")
+
+    # Postgres — variáveis compartilhadas (sem prefixo ADMIN_)
+    postgres_user: str = Field(default="sentra", alias="POSTGRES_USER")
+    postgres_password: str = Field(default="sentra_secret", alias="POSTGRES_PASSWORD")
+    postgres_host: str = Field(default="127.0.0.1", alias="POSTGRES_HOST")
+    postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
+    postgres_db: str = Field(default="sentra_db", alias="POSTGRES_DB")
+
+    # Email
+    smtp_host: str | None = Field(default=None, alias="ADMIN_SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="ADMIN_SMTP_PORT")
+    smtp_user: str | None = Field(default=None, alias="ADMIN_SMTP_USER")
+    smtp_password: str | None = Field(default=None, alias="ADMIN_SMTP_PASSWORD")
+    smtp_from: str | None = Field(default=None, alias="ADMIN_SMTP_FROM")
+    email_use_console: bool = Field(default=True, alias="ADMIN_EMAIL_USE_CONSOLE")
+
+    @model_validator(mode="after")
+    def _build_database_url(self) -> "AdminSettings":
+        """Constrói database_url a partir das vars POSTGRES_* se não definida explicitamente."""
+        if not self.database_url:
+            self.database_url = (
+                f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+                f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            )
+        return self

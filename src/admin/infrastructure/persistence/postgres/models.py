@@ -1,16 +1,15 @@
 """
-Modelos ORM para migração futura para Postgres (Alembic).
-Não utilizados pelo armazenamento JSON atual.
+Modelos ORM do plano Admin — mapeados para Postgres via Alembic.
+Herdam de src.shared.db.Base para que o Alembic enxergue todas as
+tabelas ao inspecionar o metadata centralizado.
 """
 
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
-class Base(DeclarativeBase):
-    pass
+from src.shared.db import Base
 
 
 class TenantORM(Base):
@@ -50,7 +49,9 @@ class UserORM(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    tenant_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("admin_tenants.id"), nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("admin_tenants.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

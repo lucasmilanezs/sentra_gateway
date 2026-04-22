@@ -1,8 +1,8 @@
 from src.admin.domain.entities.admin_route import AdminRoute
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.value_objects.http_method import HttpMethod
-from src.admin.infrastructure.persistence.json.json_document_store import (
-    JsonDocumentStore,
+from src.admin.infrastructure.persistence.json.store import (
+    DocumentStore,
     _parse_dt,
     _serialize_dt,
 )
@@ -32,8 +32,8 @@ def _route_to_row(r: AdminRoute) -> dict:
     }
 
 
-class JsonAdminRouteRepository(AdminRouteRepositoryPort):
-    def __init__(self, store: JsonDocumentStore) -> None:
+class RouteRepository(AdminRouteRepositoryPort):
+    def __init__(self, store: DocumentStore) -> None:
         self._store = store
 
     async def list_all(self, tenant_id: str | None = None) -> list[AdminRoute]:
