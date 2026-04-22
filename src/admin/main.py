@@ -4,6 +4,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from fastapi.staticfiles import StaticFiles
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -58,3 +61,4 @@ app.include_router(health_router.router, tags=["Health"])
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(tenant_router.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(admin_route_router.router, prefix="/api/v1/routes", tags=["Routes"])
+app.mount("/ui", StaticFiles(directory="src/admin/interface/web/static", html=True), name="ui")
