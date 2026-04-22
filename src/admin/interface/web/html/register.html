@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SENTRA – Login</title>
+  <title>SENTRA – Cadastro</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -24,12 +24,12 @@
 
   <main>
     <div class="card">
-      <h1 class="card-title">Login</h1>
+      <h1 class="card-title">Register</h1>
 
       <div class="field">
         <input
           type="text"
-          id="login-user"
+          id="reg-user"
           placeholder="user"
           autocomplete="username"
         />
@@ -38,19 +38,28 @@
       <div class="field">
         <input
           type="password"
-          id="login-pass"
+          id="reg-pass"
           placeholder="password"
-          autocomplete="current-password"
+          autocomplete="new-password"
         />
       </div>
 
-      <div class="link-row">
-        <a href="forgot-password.html">Esqueceu a senha ?</a>
+      <div class="field">
+        <input
+          type="password"
+          id="reg-confirm"
+          placeholder="confirm password"
+          autocomplete="new-password"
+        />
       </div>
 
-      <p class="msg" id="login-msg"></p>
+      <p class="msg" id="reg-msg"></p>
 
-      <button class="btn" onclick="handleLogin()">Entrar</button>
+      <button class="btn" onclick="handleRegister()">Registrar</button>
+
+      <div class="link-row" style="margin-top: 16px; text-align: center;">
+        <a href="index.html">Já tem conta? Entrar</a>
+      </div>
     </div>
   </main>
 
@@ -58,6 +67,6 @@
     <span>@2026</span>
   </footer>
 
-  <script src="js/login.js"></script>
+  <script src="js/register.js"></script>
 </body>
 </html>

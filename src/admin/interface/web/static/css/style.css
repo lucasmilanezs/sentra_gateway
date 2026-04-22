@@ -1,0 +1,230 @@
+/* ============================================================
+   SENTRA – Estilos Globais de Autenticação
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap');
+
+/* ── Variáveis ── */
+:root {
+  --navy:        #1a2c5b;
+  --navy-dark:   #152348;
+  --card-bg:     #f2ece8;
+  --card-border: #d8cfc9;
+  --text-main:   #1a2c5b;
+  --text-muted:  #6b7a9a;
+  --text-link:   #3a3fa8;
+  --input-line:  #9aa3bb;
+  --btn-bg:      #8a8f9e;
+  --btn-hover:   #6b7080;
+  --btn-text:    #f2ece8;
+  --error:       #b94040;
+  --success:     #3a7a50;
+}
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Body ── */
+body {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  background-color: var(--navy);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(100,130,200,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 110%, rgba(30,60,120,0.25) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Header ── */
+header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.logo-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.18em;
+  color: #dce4f5;
+  text-transform: uppercase;
+}
+
+/* ── Main ── */
+main {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  padding: 36px 36px 40px;
+  width: 100%;
+  max-width: 300px;
+  box-shadow:
+    0 8px 40px rgba(10, 20, 60, 0.45),
+    0 2px 8px rgba(10, 20, 60, 0.20);
+  animation: cardIn 0.45s cubic-bezier(0.22, 0.68, 0, 1.2) both;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Card título ── */
+.card-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 1.45rem;
+  color: var(--text-main);
+  text-align: center;
+  margin-bottom: 28px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Campos ── */
+.field {
+  margin-bottom: 22px;
+}
+
+.field input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--input-line);
+  padding: 6px 2px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+  color: var(--text-main);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+.field input:focus {
+  border-bottom-color: var(--navy);
+}
+
+/* ── Botão ── */
+.btn {
+  display: block;
+  margin: 10px 0 0 auto;
+  padding: 8px 26px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.btn:hover {
+  background: var(--btn-hover);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* ── Links ── */
+.link-row {
+  margin-top: 14px;
+}
+
+.link-row a {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem;
+  color: var(--text-link);
+  text-decoration: none;
+  font-style: italic;
+  transition: opacity 0.2s;
+}
+
+.link-row a:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+/* ── Mensagens de feedback ── */
+.msg {
+  font-size: 0.85rem;
+  margin-top: 10px;
+  text-align: center;
+  min-height: 18px;
+  font-style: italic;
+}
+
+.msg.error {
+  color: var(--error);
+}
+
+.msg.success {
+  color: var(--success);
+}
+
+/* ── Footer ── */
+footer {
+  position: relative;
+  z-index: 10;
+  padding: 12px 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+footer span {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.8rem;
+  color: rgba(180, 195, 230, 0.55);
+  font-style: italic;
+}
