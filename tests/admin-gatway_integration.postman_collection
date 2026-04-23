@@ -1,0 +1,1124 @@
+{
+	"info": {
+		"_postman_id": "b0f15c36-040c-4df6-ac7f-17a4bbcea645",
+		"name": "Sentra Gateway — Teste de Integração Completo",
+		"description": "Fluxo completo: Admin configura rotas → Gateway executa proxy.\n\nPré-requisito: docker compose up --build (Admin :8001, Gateway :8000)\n\nExecute em ordem — os IDs são salvos automaticamente via scripts.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "31674885"
+	},
+	"item": [
+		{
+			"name": "0 — Sanidade",
+			"item": [
+				{
+					"name": "Admin health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Admin ok', () => pm.response.to.have.status(200));",
+									"pm.test('postgres_connected true', () => {",
+									"  const b = pm.response.json();",
+									"  pm.expect(b.postgres_connected).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{admin_url}}/health"
+					},
+					"response": []
+				},
+				{
+					"name": "Gateway — rota inexistente retorna 404",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('404 ROUTE_NOT_FOUND antes de qualquer config', () => {",
+									"  pm.response.to.have.status(404);",
+									"  pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{gateway_url}}/qualquer/coisa"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "1 — Admin: autenticação",
+			"item": [
+				{
+					"name": "Registrar admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));",
+									"const b = pm.response.json();",
+									"pm.collectionVariables.set('token', b.access_token);",
+									"pm.test('token salvo', () => pm.expect(b.access_token).to.be.a('string'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@sentra.dev\",\n  \"password\": \"senha1234\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/auth/register"
+					},
+					"response": []
+				},
+				{
+					"name": "Registrar duplicado → 409",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('email duplicado rejeitado (409)', () => pm.response.to.have.status(409));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@sentra.dev\",\n  \"password\": \"senha1234\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/auth/register"
+					},
+					"response": []
+				},
+				{
+					"name": "Login → token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK', () => pm.response.to.have.status(200));",
+									"pm.collectionVariables.set('token', pm.response.json().access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@sentra.dev\",\n  \"password\": \"senha1234\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/auth/login"
+					},
+					"response": []
+				},
+				{
+					"name": "Login senha errada → 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('401 com senha errada', () => pm.response.to.have.status(401));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@sentra.dev\",\n  \"password\": \"errada\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/auth/login"
+					},
+					"response": []
+				},
+				{
+					"name": "GET /me autenticado",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 com email correto', () => {",
+									"  pm.response.to.have.status(200);",
+									"  pm.expect(pm.response.json().email).to.eql('admin@sentra.dev');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/auth/me"
+					},
+					"response": []
+				},
+				{
+					"name": "GET /me sem token → 401",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('401 sem token', () => pm.response.to.have.status(401));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{admin_url}}/api/v1/auth/me"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2 — Admin: tenants",
+			"item": [
+				{
+					"name": "Criar tenant acme",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));",
+									"const b = pm.response.json();",
+									"pm.collectionVariables.set('tenant_id', b.id);",
+									"pm.test('slug correto', () => pm.expect(b.slug).to.eql('acme'));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme\",\n  \"domain\": \"acme.com\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/tenants"
+					},
+					"response": []
+				},
+				{
+					"name": "Slug duplicado → 409",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('409 slug duplicado', () => pm.response.to.have.status(409));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Outro\",\n  \"slug\": \"acme\",\n  \"domain\": null\n}"
+						},
+						"url": "{{admin_url}}/api/v1/tenants"
+					},
+					"response": []
+				},
+				{
+					"name": "Slug com maiúsculas → 422",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('422 slug inválido', () => pm.response.to.have.status(422));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Bad\",\n  \"slug\": \"BadSlug\",\n  \"domain\": null\n}"
+						},
+						"url": "{{admin_url}}/api/v1/tenants"
+					},
+					"response": []
+				},
+				{
+					"name": "Listar tenants → 1 item",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('lista retorna ao menos 1 tenant', () => {",
+									"  pm.response.to.have.status(200);",
+									"  pm.expect(pm.response.json().length).to.be.at.least(1);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/tenants"
+					},
+					"response": []
+				},
+				{
+					"name": "GET tenant por ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 com ID correto', () => {",
+									"  pm.response.to.have.status(200);",
+									"  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('tenant_id'));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}"
+					},
+					"response": []
+				},
+				{
+					"name": "GET tenant inexistente → 404",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('404 tenant não encontrado', () => pm.response.to.have.status(404));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/tenants/00000000-0000-0000-0000-000000000000"
+					},
+					"response": []
+				},
+				{
+					"name": "PATCH tenant — atualizar nome",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 nome atualizado', () => {",
+									"  pm.response.to.have.status(200);",
+									"  pm.expect(pm.response.json().name).to.eql('Acme Corporation');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Acme Corporation\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3 — Admin: rotas (configuração do gateway)",
+			"item": [
+				{
+					"name": "Criar rota GET /echo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));",
+									"pm.collectionVariables.set('route_get_id', pm.response.json().id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/echo\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org/get\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar rota POST /enviar",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));",
+									"pm.collectionVariables.set('route_post_id', pm.response.json().id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/enviar\",\n  \"method\": \"POST\",\n  \"backend_url\": \"https://httpbin.org/post\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar rota GET /status/200",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));",
+									"pm.collectionVariables.set('route_any_id', pm.response.json().id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/status\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org/status/200\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Rota com backend_url inválida → 422",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('422 URL inválida', () => pm.response.to.have.status(422));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/teste\",\n  \"method\": \"GET\",\n  \"backend_url\": \"nao-e-url\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Rota sem barra inicial → 422",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('422 path sem /', () => pm.response.to.have.status(422));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"sem-barra\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org/get\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Rota com tenant inexistente → 404",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('404 tenant não encontrado', () => pm.response.to.have.status(404));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"path_pattern\": \"/qualquer\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org/get\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "Listar rotas → 3 itens",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('3 rotas criadas', () => {",
+									"  pm.response.to.have.status(200);",
+									"  pm.expect(pm.response.json().length).to.be.at.least(3);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4 — Gateway: reiniciar para carregar snapshot",
+			"item": [
+				{
+					"name": "⚠️ INSTRUÇÃO — reiniciar gateway",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('LEIA: execute docker compose restart gateway antes de continuar', () => {",
+									"  pm.expect(true).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{admin_url}}/health",
+						"description": "O gateway carrega as rotas ao subir. Após criar as rotas no Admin, execute:\n\n    docker compose restart gateway\n\nDepois continue para os próximos testes."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "5 — Gateway: proxy funcionando",
+			"item": [
+				{
+					"name": "GET /echo → httpbin responde 200",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK — proxy funcionou', () => pm.response.to.have.status(200));",
+									"pm.test('resposta tem url do httpbin', () => {",
+									"  const b = pm.response.json();",
+									"  pm.expect(b.url).to.include('httpbin.org');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{gateway_url}}/echo"
+					},
+					"response": []
+				},
+				{
+					"name": "GET /echo com header customizado — propagado upstream",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK', () => pm.response.to.have.status(200));",
+									"pm.test('header X-Custom propagado', () => {",
+									"  const headers = pm.response.json().headers;",
+									"  pm.expect(headers['X-Custom']).to.eql('sentra-test');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Custom",
+								"value": "sentra-test"
+							}
+						],
+						"url": "{{gateway_url}}/echo"
+					},
+					"response": []
+				},
+				{
+					"name": "POST /enviar com body JSON — propagado upstream",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK', () => pm.response.to.have.status(200));",
+									"pm.test('body propagado ao upstream', () => {",
+									"  const json = pm.response.json().json;",
+									"  pm.expect(json.mensagem).to.eql('teste gateway');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"mensagem\": \"teste gateway\",\n  \"origem\": \"postman\"\n}"
+						},
+						"url": "{{gateway_url}}/enviar"
+					},
+					"response": []
+				},
+				{
+					"name": "GET /status → upstream retorna 200",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK via proxy', () => pm.response.to.have.status(200));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{gateway_url}}/status"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "6 — Gateway: erros do gateway (não do upstream)",
+			"item": [
+				{
+					"name": "Path sem rota → 404 ROUTE_NOT_FOUND",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('404 com código ROUTE_NOT_FOUND', () => {",
+									"  pm.response.to.have.status(404);",
+									"  pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{gateway_url}}/rota-que-nao-existe"
+					},
+					"response": []
+				},
+				{
+					"name": "Método errado na rota → 404 ROUTE_NOT_FOUND",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('método errado resulta em 404', () => {",
+									"  pm.response.to.have.status(404);",
+									"  pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "{{gateway_url}}/echo"
+					},
+					"response": []
+				},
+				{
+					"name": "POST na rota de GET → 404 ROUTE_NOT_FOUND",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('POST em rota GET-only dá 404', () => {",
+									"  pm.response.to.have.status(404);",
+									"  pm.expect(pm.response.json().code).to.eql('ROUTE_NOT_FOUND');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": "{{gateway_url}}/echo"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "7 — Gateway: prefix matching",
+			"item": [
+				{
+					"name": "Criar rota prefixo /api",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('201 Created', () => pm.response.to.have.status(201));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/api\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org/get\"\n}"
+						},
+						"url": "{{admin_url}}/api/v1/routes"
+					},
+					"response": []
+				},
+				{
+					"name": "⚠️ INSTRUÇÃO — reiniciar gateway (prefix matching)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('execute docker compose restart gateway', () => pm.expect(true).to.be.true);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{admin_url}}/health"
+					},
+					"response": []
+				},
+				{
+					"name": "GET /api — match exato do prefixo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('200 OK match exato /api', () => pm.response.to.have.status(200));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{gateway_url}}/api"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "8 — Admin: limpeza (delete em ordem)",
+			"item": [
+				{
+					"name": "DELETE rota GET /echo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('204 No Content', () => pm.response.to.have.status(204));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/routes/{{route_get_id}}"
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE rota POST /enviar",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('204 No Content', () => pm.response.to.have.status(204));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/routes/{{route_post_id}}"
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE rota GET /echo já deletada → 404",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('404 — rota já removida', () => pm.response.to.have.status(404));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/routes/{{route_get_id}}"
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE tenant com rotas restantes → 409",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('409 — tenant tem rotas vinculadas', () => pm.response.to.have.status(409));"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "admin_url",
+			"value": "http://localhost:8001"
+		},
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "tenant_id",
+			"value": ""
+		},
+		{
+			"key": "route_get_id",
+			"value": ""
+		},
+		{
+			"key": "route_post_id",
+			"value": ""
+		},
+		{
+			"key": "route_any_id",
+			"value": ""
+		}
+	]
+}
