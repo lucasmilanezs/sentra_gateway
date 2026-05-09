@@ -1,5 +1,7 @@
 services:
 
+  # ── Infraestrutura ────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:16-alpine
     container_name: sentra_postgres
@@ -18,6 +20,20 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: sentra_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT_HOST:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Aplicação ─────────────────────────────────────────────────────────────
+
   admin:
     build:
       context: ../..
@@ -27,6 +43,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ADMIN_USE_POSTGRES: "true"
       POSTGRES_USER: ${POSTGRES_USER}
@@ -34,6 +52,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8001:8001"
 
@@ -46,15 +66,47 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       GATEWAY_LOG_PATH: logs/gateway.log
     ports:
       - "8000:8000"
+
+  # ── Ferramentas (profile: tools) ──────────────────────────────────────────
+  # Uso: docker compose --profile tools up
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: sentra_redisinsight
+    restart: unless-stopped
+    profiles: ["tools"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${REDISINSIGHT_PORT:-5540}:5540"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sentra_pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sentra.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
 
 volumes:
   sentra_postgres_data:

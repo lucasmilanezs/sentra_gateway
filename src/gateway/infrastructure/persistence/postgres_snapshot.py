@@ -1,18 +1,15 @@
 """
 PostgresSnapshotRepository
 
-Carrega todas as rotas registradas no plano Admin ao startup do Gateway
+Carrega rotas e políticas do plano Admin ao startup do Gateway
 e as serve a partir de um snapshot em memória.
 
 Design:
-  - O Gateway NUNCA escreve no banco — apenas lê ao inicializar.
-  - Cada AdminRoute gera um Route (domínio do Gateway) + um Domain sintético.
-    O Admin armazena backend_url diretamente na rota, então o Gateway sintetiza
-    um Domain com id = "domain-{route_id}" para honrar a separação de modelos.
-  - Sem refresh automático por enquanto — o container reinicia quando as rotas
-    mudam. Redis pub/sub entrará em seguida.
-  - PolicyRepository retorna None para todas as rotas (open by default),
-    até que o plano Admin exponha políticas.
+  - O Gateway NUNCA escreve no banco — apenas lê.
+  - Cada AdminRoute gera um Route + Domain sintético no modelo do Gateway.
+  - Políticas são carregadas da tabela admin_policies e indexadas por route_id.
+  - O snapshot é recarregado via Redis pub/sub quando o Admin publica
+    uma atualização de configuração, sem necessidade de restart.
 """
 
 import logging
@@ -38,39 +35,48 @@ class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyReposi
     Implementação única que satisfaz RouteRepository, DomainRepository e
     PolicyRepository a partir de um snapshot carregado do Postgres.
 
-    Injetada no ForwardRequest como as três portas ao mesmo tempo.
+    Injetada no ForwardRequest como as três portas simultaneamente.
     """
 
     def __init__(self) -> None:
-        # Sorted by path_prefix length desc — longest-prefix match
         self._routes: List[Route] = []
         self._domains: Dict[str, Domain] = {}
+        self._policies: Dict[str, Policy] = {}  # route_id → Policy
 
     async def load(self, database_url: str) -> None:
         """
-        Conecta ao Postgres, lê admin_routes e monta o snapshot em memória.
-        Chamado uma única vez no lifespan do Gateway.
+        Conecta ao Postgres, lê admin_routes + admin_policies e monta
+        o snapshot em memória. Chamado no lifespan e pelo reload().
         """
         engine = create_async_engine(database_url, echo=False)
         try:
             async with engine.connect() as conn:
-                result = await conn.execute(
+                routes_result = await conn.execute(
                     text(
                         "SELECT id, path_pattern, method, backend_url "
                         "FROM admin_routes "
                         "ORDER BY length(path_pattern) DESC"
                     )
                 )
-                rows = result.fetchall()
+                route_rows = routes_result.fetchall()
+
+                policies_result = await conn.execute(
+                    text(
+                        "SELECT id, route_id, requires_auth, "
+                        "rate_limit_per_minute, allowed_roles "
+                        "FROM admin_policies"
+                    )
+                )
+                policy_rows = policies_result.fetchall()
         finally:
             await engine.dispose()
 
         routes: List[Route] = []
         domains: Dict[str, Domain] = {}
+        policies: Dict[str, Policy] = {}
 
-        for row in rows:
+        for row in route_rows:
             route_id, path_pattern, method, backend_url = row
-
             domain_id = f"domain-{route_id}"
 
             try:
@@ -79,26 +85,46 @@ class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyReposi
                 logger.warning("Rota %s ignorada — método inválido: %s", route_id, method)
                 continue
 
-            route = Route(
+            routes.append(Route(
                 id=route_id,
                 path_prefix=path_pattern,
                 domain_id=domain_id,
                 methods=(http_method,),
-            )
-            domain = Domain(
+            ))
+            domains[domain_id] = Domain(
                 id=domain_id,
                 name=f"backend-{route_id}",
                 backend_url=BackendUrl(backend_url),
             )
-            routes.append(route)
-            domains[domain_id] = domain
 
+        for row in policy_rows:
+            policy_id, route_id, requires_auth, rate_limit_per_minute, allowed_roles = row
+            policies[route_id] = Policy(
+                id=policy_id,
+                route_id=route_id,
+                requires_auth=bool(requires_auth),
+                rate_limit_per_minute=rate_limit_per_minute,
+                allowed_roles=tuple(r for r in allowed_roles.split(",") if r) if allowed_roles else (),
+            )
+
+        # Atribuição atômica — requisições em flight usam versão anterior
+        # até a próxima iteração do event loop, comportamento correto
         self._routes = routes
         self._domains = domains
+        self._policies = policies
 
         logger.info(
-            "Gateway snapshot carregado: %d rota(s) do Postgres.", len(self._routes)
+            "Gateway snapshot carregado: %d rota(s), %d política(s) do Postgres.",
+            len(self._routes),
+            len(self._policies),
         )
+
+    async def reload(self, database_url: str) -> None:
+        """
+        Recarrega o snapshot em runtime sem derrubar o gateway.
+        Chamado pelo subscriber Redis quando o Admin publica uma atualização.
+        """
+        await self.load(database_url)
 
     # --- RouteRepository ---
 
@@ -119,6 +145,4 @@ class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyReposi
     # --- PolicyRepository ---
 
     async def get_by_route_id(self, route_id: str) -> Optional[Policy]:
-        # Sem políticas configuradas ainda — open by default.
-        # Quando o Admin expor políticas, este método as carregará no snapshot.
-        return None
+        return self._policies.get(route_id)

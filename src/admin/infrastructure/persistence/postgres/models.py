@@ -1,12 +1,6 @@
-"""
-Modelos ORM do plano Admin — mapeados para Postgres via Alembic.
-Herdam de src.shared.db.Base para que o Alembic enxergue todas as
-tabelas ao inspecionar o metadata centralizado.
-"""
-
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.shared.db import Base
@@ -41,6 +35,9 @@ class AdminRouteORM(Base):
     )
 
     tenant: Mapped[TenantORM] = relationship(back_populates="routes")
+    policy: Mapped["PolicyORM | None"] = relationship(
+        back_populates="route", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class UserORM(Base):
@@ -56,3 +53,21 @@ class UserORM(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class PolicyORM(Base):
+    __tablename__ = "admin_policies"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    route_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("admin_routes.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    requires_auth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    rate_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    allowed_roles: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    route: Mapped[AdminRouteORM] = relationship(back_populates="policy")

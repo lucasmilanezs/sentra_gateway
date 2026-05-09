@@ -7,6 +7,7 @@ from src.admin.domain.exceptions import NotFoundError, ValidationError
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.value_objects.http_method import HttpMethod
+from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
 
 
 def _utcnow() -> datetime:
@@ -24,9 +25,11 @@ class ManageAdminRoute:
         self,
         routes: AdminRouteRepositoryPort,
         tenants: TenantRepositoryPort,
+        publisher: RedisPublisher | None = None,
     ) -> None:
         self._routes = routes
         self._tenants = tenants
+        self._publisher = publisher
 
     async def list(self, tenant_id: str | None = None) -> list[AdminRoute]:
         return await self._routes.list_all(tenant_id=tenant_id)
@@ -61,6 +64,10 @@ class ManageAdminRoute:
             updated_at=now,
         )
         await self._routes.save(route)
+
+        if self._publisher:
+            await self._publisher.notify_config_updated()
+
         return route
 
     async def update(self, route_id: str, data: dict) -> AdminRoute:
@@ -87,8 +94,15 @@ class ManageAdminRoute:
             updated_at=_utcnow(),
         )
         await self._routes.save(updated)
+
+        if self._publisher:
+            await self._publisher.notify_config_updated()
+
         return updated
 
     async def delete(self, route_id: str) -> None:
         if not await self._routes.delete(route_id):
             raise NotFoundError("rota não encontrada")
+
+        if self._publisher:
+            await self._publisher.notify_config_updated()
