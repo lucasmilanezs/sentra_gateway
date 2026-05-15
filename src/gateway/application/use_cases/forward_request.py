@@ -2,6 +2,7 @@ import time
 
 from src.gateway.application.dtos.gateway_response import GatewayResponse
 from src.gateway.application.ports.gateway_request_port import GatewayRequestPort
+from src.gateway.application.use_cases.apply_policy_pipeline import ApplyPolicyPipeline
 from src.gateway.domain.models.request import Request
 from src.gateway.domain.ports.domain_repository import DomainRepository
 from src.gateway.domain.ports.log_port import LogPort
@@ -9,7 +10,6 @@ from src.gateway.domain.ports.policy_repository import PolicyRepository
 from src.gateway.domain.ports.route_repository import RouteRepository
 from src.gateway.domain.ports.upstream_proxy_port import UpstreamProxyPort
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
-from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
 
 
 class RouteNotFoundError(Exception):
@@ -34,15 +34,11 @@ class ForwardRequest(GatewayRequestPort):
     Core use case of the gateway data plane.
 
     Orchestrates the full request processing pipeline:
-      1. Route resolution — match path against registered routes
-      2. Domain resolution — retrieve the backend service for the route
-      3. Policy evaluation — apply security controls (auth, rate limit, RBAC)
-      4. Request forwarding — proxy the validated request upstream
-      5. Log recording — write an operational log event (non-blocking)
-
-    Contains no business logic. All decisions are delegated to domain
-    services; all I/O is performed via outbound ports. This makes the
-    pipeline independently testable without any infrastructure.
+      1. Route resolution
+      2. Domain resolution
+      3. Policy enforcement (delegated to ApplyPolicyPipeline)
+      4. Request forwarding
+      5. Log recording (best-effort)
     """
 
     def __init__(
@@ -52,7 +48,7 @@ class ForwardRequest(GatewayRequestPort):
         policy_repository: PolicyRepository,
         proxy: UpstreamProxyPort,
         log_port: LogPort,
-        policy_evaluator: PolicyEvaluator,
+        policy_pipeline: ApplyPolicyPipeline,
         log_event_builder: LogEventBuilder,
     ) -> None:
         self._routes = route_repository
@@ -60,7 +56,7 @@ class ForwardRequest(GatewayRequestPort):
         self._policies = policy_repository
         self._proxy = proxy
         self._log = log_port
-        self._policy_evaluator = policy_evaluator
+        self._pipeline = policy_pipeline
         self._log_event_builder = log_event_builder
 
     async def handle(self, request: Request, raw_body: bytes) -> GatewayResponse:
@@ -80,9 +76,9 @@ class ForwardRequest(GatewayRequestPort):
                 f"Domain '{route.domain_id}' referenced by route '{route.id}' is not configured."
             )
 
-        # 3. Policy evaluation
+        # 3. Policy enforcement
         policy = await self._policies.get_by_route_id(route.id)
-        result = self._policy_evaluator.evaluate(policy, request)
+        result = await self._pipeline.apply(policy, request)
         if not result.allowed:
             raise PolicyDeniedError(
                 reason=result.reason or "Request denied by policy.",
@@ -103,7 +99,7 @@ class ForwardRequest(GatewayRequestPort):
 
         latency_ms = (time.monotonic() - start) * 1000
 
-        # 5. Log (best-effort — must not affect the response)
+        # 5. Log (best-effort)
         log_event = self._log_event_builder.build(
             request=request,
             upstream_url=upstream_url,

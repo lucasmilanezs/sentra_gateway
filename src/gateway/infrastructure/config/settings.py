@@ -17,6 +17,14 @@ class GatewaySettings(BaseSettings):
     postgres_db: str = Field(default="sentra_db", alias="POSTGRES_DB")
     database_url: str = Field(default="", alias="GATEWAY_DATABASE_URL")
 
+    #Redis
+    redis_host: str = Field(default="redis", alias="REDIS_HOST")
+    redis_port: int = Field(default=6379, alias="REDIS_PORT")
+
+    @property
+    def redis_url(self) -> str:
+        return f"redis://{self.redis_host}:{self.redis_port}/0"
+
     # Observabilidade
     log_path: str = Field(default="logs/gateway.log", alias="GATEWAY_LOG_PATH")
 

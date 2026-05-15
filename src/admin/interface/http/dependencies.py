@@ -81,6 +81,10 @@ def get_reset_password(
 ) -> object:
     return w.reset_password_with_code
 
+def get_manage_policy(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_policy
 
 async def get_current_claims(
     request: Request,

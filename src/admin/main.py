@@ -33,6 +33,7 @@ from src.admin.interface.http.routers import (  # noqa: E402
     auth_router,
     health_router,
     tenant_router,
+    policy_router
 )
 from src.admin.interface.http.wiring import AdminWiring  # noqa: E402
 
@@ -62,3 +63,4 @@ app.include_router(health_router.router, tags=["Health"])
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(tenant_router.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(admin_route_router.router, prefix="/api/v1/routes", tags=["Routes"])
+app.include_router(policy_router.router, prefix="/api/v1/routes", tags=["Policies"])

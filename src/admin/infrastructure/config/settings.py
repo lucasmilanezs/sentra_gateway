@@ -22,12 +22,16 @@ class AdminSettings(BaseSettings):
     database_url: str = Field(default="", alias="ADMIN_DATABASE_URL")
     json_data_path: str = Field(default="data/admin_local.json", alias="ADMIN_JSON_DATA_PATH")
 
-    # Postgres — variáveis compartilhadas (sem prefixo ADMIN_)
+    # Postgres
     postgres_user: str = Field(default="sentra", alias="POSTGRES_USER")
     postgres_password: str = Field(default="sentra_secret", alias="POSTGRES_PASSWORD")
     postgres_host: str = Field(default="127.0.0.1", alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
     postgres_db: str = Field(default="sentra_db", alias="POSTGRES_DB")
+
+    # Redis
+    redis_host: str = Field(default="redis", alias="REDIS_HOST")
+    redis_port: int = Field(default=6379, alias="REDIS_PORT")
 
     # Email
     smtp_host: str | None = Field(default=None, alias="ADMIN_SMTP_HOST")
@@ -37,9 +41,12 @@ class AdminSettings(BaseSettings):
     smtp_from: str | None = Field(default=None, alias="ADMIN_SMTP_FROM")
     email_use_console: bool = Field(default=True, alias="ADMIN_EMAIL_USE_CONSOLE")
 
+    @property
+    def redis_url(self) -> str:
+        return f"redis://{self.redis_host}:{self.redis_port}/0"
+
     @model_validator(mode="after")
     def _build_database_url(self) -> "AdminSettings":
-        """Constrói database_url a partir das vars POSTGRES_* se não definida explicitamente."""
         if not self.database_url:
             self.database_url = (
                 f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
