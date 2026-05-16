@@ -8,3 +8,4 @@ class JwtClaims:
     sub: str
     email: str
     tenant_id: str | None = None
+    role: str | None = None

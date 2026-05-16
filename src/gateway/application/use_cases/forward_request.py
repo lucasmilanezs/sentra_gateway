@@ -8,8 +8,13 @@ from src.gateway.domain.ports.domain_repository import DomainRepository
 from src.gateway.domain.ports.log_port import LogPort
 from src.gateway.domain.ports.policy_repository import PolicyRepository
 from src.gateway.domain.ports.route_repository import RouteRepository
+from src.gateway.domain.ports.tenant_repository import TenantRepository
 from src.gateway.domain.ports.upstream_proxy_port import UpstreamProxyPort
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
+
+
+class TenantNotFoundError(Exception):
+    """No tenant registered for the incoming Host header."""
 
 
 class RouteNotFoundError(Exception):
@@ -21,7 +26,6 @@ class DomainNotFoundError(Exception):
 
 
 class PolicyDeniedError(Exception):
-    """The route policy denied the request."""
 
     def __init__(self, reason: str, status_code: int = 403) -> None:
         self.reason = reason
@@ -50,6 +54,7 @@ class ForwardRequest(GatewayRequestPort):
         log_port: LogPort,
         policy_pipeline: ApplyPolicyPipeline,
         log_event_builder: LogEventBuilder,
+        tenant_repository: TenantRepository,
     ) -> None:
         self._routes = route_repository
         self._domains = domain_repository
@@ -58,12 +63,23 @@ class ForwardRequest(GatewayRequestPort):
         self._log = log_port
         self._pipeline = policy_pipeline
         self._log_event_builder = log_event_builder
+        self._tenants = tenant_repository
 
     async def handle(self, request: Request, raw_body: bytes) -> GatewayResponse:
         start = time.monotonic()
 
+    async def handle(self, request: Request, raw_body: bytes) -> GatewayResponse:
+        start = time.monotonic()
+
+        # 0. Tenant resolution
+        tenant = await self._tenants.get_by_domain(request.host)
+        if tenant is None:
+            raise TenantNotFoundError(
+                f"No tenant registered for host '{request.host}'."
+            )
+
         # 1. Route resolution
-        route = await self._routes.get_by_path(request.path, request.method.value)
+        route = await self._routes.get_by_path(request.path, request.method.value, tenant.id)
         if route is None:
             raise RouteNotFoundError(
                 f"No route matched path '{request.path}' [{request.method.value}]."
@@ -76,14 +92,11 @@ class ForwardRequest(GatewayRequestPort):
                 f"Domain '{route.domain_id}' referenced by route '{route.id}' is not configured."
             )
 
-        # 3. Policy enforcement
+        # 3. Policy enforcement — rota individual, com fallback para política global do tenant
         policy = await self._policies.get_by_route_id(route.id)
+        if policy is None and hasattr(self._policies, "get_global_policy"):
+            policy = self._policies.get_global_policy(tenant.id)
         result = await self._pipeline.apply(policy, request)
-        if not result.allowed:
-            raise PolicyDeniedError(
-                reason=result.reason or "Request denied by policy.",
-                status_code=result.status_code,
-            )
 
         # 4. Forward
         upstream_path = route.strip_prefix(request.path)

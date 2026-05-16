@@ -5,7 +5,7 @@ from src.admin.domain.value_objects.jwt_claims import JwtClaims
 
 class TokenServicePort(ABC):
     @abstractmethod
-    def create_access_token(self, user_id: str, email: str, tenant_id: str | None) -> str:
+    def create_access_token(self, user_id: str, email: str, tenant_id: str | None, role: str | None = None) -> str:
         ...
 
     @abstractmethod

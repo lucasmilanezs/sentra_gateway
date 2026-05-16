@@ -33,7 +33,9 @@ class AuthenticateUser:
         user = await self._users.get_by_email(email_n)
         if not user or not self._hasher.verify(password, user.password_hash):
             raise AuthError("email ou senha inválidos")
-        access = self._tokens.create_access_token(user.id, user.email, user.tenant_id)
+        access = self._tokens.create_access_token(
+            user.id, user.email, user.tenant_id, user.role
+        )
         return access, user
 
 
@@ -66,6 +68,7 @@ class RegisterUser:
             tenant_id=tenant_id,
             created_at=now,
             updated_at=now,
+            role="admin",
         )
         await self._users.save(user)
         return user
@@ -95,6 +98,7 @@ class ChangePassword:
             tenant_id=user.tenant_id,
             created_at=user.created_at,
             updated_at=_utcnow(),
+            role=user.role,
         )
         await self._users.save(updated)
 
@@ -160,6 +164,7 @@ class ResetPasswordWithCode:
             tenant_id=user.tenant_id,
             created_at=user.created_at,
             updated_at=_utcnow(),
+            role=user.role,
         )
         await self._users.save(updated)
         await self._resets.clear(email_n)

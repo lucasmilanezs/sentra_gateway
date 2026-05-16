@@ -38,6 +38,7 @@ class RequestParser:
         headers = self._filter_headers(dict(fastapi_request.headers))
         query_params = dict(fastapi_request.query_params)
         params = self._extract_path_params(dict(fastapi_request.path_params))
+        host = fastapi_request.headers.get("host", "")
 
         return Request(
             method=method,
@@ -45,6 +46,7 @@ class RequestParser:
             headers=headers,
             query_params=query_params,
             params=params,
+            host=host,
         )
 
     def _filter_headers(self, headers: Dict[str, str]) -> Dict[str, str]:

@@ -1,78 +1,1003 @@
 <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SENTRA – Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <style>
+    /* ── Layout raiz ── */
+    .layout {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-          <button class="nav-item" data-page="routes">
-            Routes
-          </button>
+    /* ── Topbar ── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--topbar-height);
+      background: var(--navy-dark);
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      z-index: 100;
+    }
 
-          <button class="nav-item" data-page="tenants">
-            Tenants
-          </button>
-        </nav>
-      </div>
+    .topbar .logo-icon { width: 26px; height: 26px; flex-shrink: 0; }
+    .topbar .logo-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      color: var(--text-light);
+      text-transform: uppercase;
+    }
 
-      <button id="logout-btn" class="logout-btn">
-        Logout
-      </button>
-    </aside>
+    .topbar-tenant-badge {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-style: italic;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 3px;
+      padding: 2px 10px;
+      margin-left: 4px;
+    }
 
-    <main class="main-content">
-      <header class="topbar">
-        <h1 id="tenant-name">Tenant</h1>
-      </header>
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
 
-      <section id="overview" class="page-section active">
-        <div class="cards-grid">
-          <div class="info-card">
-            <h3>Status</h3>
-            <p id="health-status"></p>
-          </div>
+    .topbar-user {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
 
-          <div class="info-card">
-            <h3>Postgres</h3>
-            <p id="postgres-status"></p>
-          </div>
+    .btn-switch-tenant {
+      font-size: 0.78rem;
+      color: rgba(180, 200, 240, 0.55);
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      padding: 3px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-style: italic;
+      transition: background 0.2s, color 0.2s;
+    }
 
-          <div class="info-card">
-            <h3>Redis</h3>
-            <p id="redis-status"></p>
-          </div>
-        </div>
-      </section>
+    .btn-switch-tenant:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-light);
+    }
 
-      <section id="routes" class="page-section">
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Método</th>
-                <th>Path</th>
-                <th>Backend</th>
-              </tr>
-            </thead>
+    .topbar-logout {
+      font-size: 0.78rem;
+      color: rgba(180, 200, 240, 0.5);
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      padding: 3px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-style: italic;
+      transition: background 0.2s, color 0.2s;
+    }
 
-            <tbody id="routes-list"></tbody>
-          </table>
-        </div>
-      </section>
+    .topbar-logout:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-light);
+    }
 
-      <section id="tenants" class="page-section">
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Slug</th>
-                <th>Domain</th>
-              </tr>
-            </thead>
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+      display: flex;
+      flex-direction: column;
+      padding-top: var(--topbar-height);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
 
-            <tbody id="tenant-list"></tbody>
-          </table>
-        </div>
-      </section>
-    </main>
+    .nav-section-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(180, 200, 240, 0.28);
+      padding: 18px 18px 5px;
+    }
+
+    /* ── Conteúdo principal ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 36px;
+      margin-top: var(--topbar-height);
+      background: var(--content-bg);
+    }
+
+    /* ── Página ── */
+    .page { display: none; animation: fadeIn 0.25s ease both; }
+    .page.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .page-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.75rem;
+      font-weight: 400;
+      color: var(--text-main);
+      letter-spacing: 0.02em;
+    }
+
+    .context-badge {
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+
+    /* ── Botões ── */
+    .btn-primary {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.9rem;
+      background: var(--accent);
+      color: #f0eae5;
+      border: none;
+      padding: 7px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: var(--navy); }
+
+    .btn-icon {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      background: none;
+      border: 1px solid var(--card-border);
+      border-radius: 3px;
+      padding: 3px 10px;
+      cursor: pointer;
+      margin-left: 4px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { background: rgba(26,44,91,0.06); color: var(--text-main); }
+    .btn-icon.danger { color: #a03030; border-color: #d4a0a0; }
+    .btn-icon.danger:hover { background: rgba(160,48,48,0.07); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 22px 26px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 10px rgba(10,20,60,0.06);
+    }
+
+    /* ── Tabelas ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .data-table th {
+      text-align: left; padding: 8px 12px;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.72rem; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-sub);
+      font-weight: 500;
+    }
+    .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(26,44,91,0.05);
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(26,44,91,0.025); }
+
+    /* Badges de método HTTP */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 3px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;
+    }
+    .m-GET    { background: #e8f4e8; color: #2a6a2a; }
+    .m-POST   { background: #e8eef8; color: #1a3a8a; }
+    .m-PUT    { background: #f8f0e0; color: #8a5a0a; }
+    .m-PATCH  { background: #f0e8f8; color: #5a2a8a; }
+    .m-DELETE { background: #fce8e8; color: #8a2020; }
+    .m-OTHER  { background: #f0f0f0; color: #555; }
+
+    .policy-on  { font-size: 0.75rem; color: #2a6a50; font-style: italic; }
+    .policy-off { font-size: 0.75rem; color: var(--text-sub); font-style: italic; }
+
+    .tbl-empty {
+      font-style: italic; color: var(--text-sub);
+      font-size: 0.88rem; padding: 24px 0;
+    }
+
+    /* ── Métricas ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .metric-label {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-sub); margin-bottom: 8px;
+    }
+    .metric-value { font-size: 1.9rem; font-weight: 500; color: var(--text-main); line-height: 1; }
+    .metric-sub { font-size: 0.78rem; color: var(--text-sub); font-style: italic; margin-top: 4px; }
+
+    /* ── Conta ── */
+    .profile-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .profile-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); }
+    .profile-value { font-size: 1rem; color: var(--text-main); }
+
+    .form-field { margin-bottom: 18px; }
+    .form-field label { display: block; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); margin-bottom: 5px; }
+    .form-field input {
+      width: 100%; background: transparent; border: none;
+      border-bottom: 1px solid var(--card-border);
+      padding: 6px 0; font-family: 'Cormorant Garamond', serif;
+      font-size: 0.95rem; color: var(--text-main); outline: none;
+      transition: border-color 0.2s; max-width: 320px;
+    }
+    .form-field input:focus { border-bottom-color: var(--accent); }
+
+    .inline-msg { font-size: 0.82rem; font-style: italic; margin-top: 10px; }
+    .inline-msg.error   { color: #a03030; }
+    .inline-msg.success { color: #2a6a50; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(10,18,40,0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; backdrop-filter: blur(2px);
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 28px 32px;
+      width: 100%; max-width: 460px;
+      display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 20px 60px rgba(10,20,60,0.2);
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 500; color: var(--text-main); }
+    .modal-field label {
+      display: block; font-size: 0.7rem; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-sub); margin-bottom: 5px;
+    }
+    .modal-field input,
+    .modal-field select {
+      width: 100%; background: transparent; border: none;
+      border-bottom: 1px solid var(--card-border);
+      padding: 6px 0; font-family: 'Cormorant Garamond', serif;
+      font-size: 0.95rem; color: var(--text-main); outline: none;
+      transition: border-color 0.2s;
+    }
+    .modal-field input:focus, .modal-field select:focus {
+      border-bottom-color: var(--accent);
+    }
+    .modal-field select { cursor: pointer; }
+    .modal-check { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--text-main); cursor: pointer; }
+    .modal-check input[type=checkbox] { cursor: pointer; }
+    .modal-warning { font-size: 0.78rem; color: #8a5a0a; font-style: italic; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+    .btn-ghost {
+      font-family: inherit; font-size: 0.9rem; color: var(--text-sub);
+      background: none; border: none; cursor: pointer; padding: 6px 12px;
+      border-radius: 3px; transition: color 0.2s;
+    }
+    .btn-ghost:hover { color: var(--text-main); }
+    .btn-danger-ghost {
+      font-family: inherit; font-size: 0.85rem; color: #a03030;
+      background: none; border: 1px solid #d4a0a0; border-radius: 3px;
+      padding: 5px 14px; cursor: pointer; margin-right: auto;
+      transition: background 0.15s;
+    }
+    .btn-danger-ghost:hover { background: rgba(160,48,48,0.07); }
+    .modal-error { font-size: 0.82rem; color: #a03030; font-style: italic; }
+
+    /* Aviso wildcard */
+    .wildcard-warn {
+      font-size: 0.78rem; color: #8a5a0a; font-style: italic;
+      background: rgba(138,90,10,0.07); border: 1px solid rgba(138,90,10,0.2);
+      border-radius: 4px; padding: 6px 10px; display: none;
+    }
+    .wildcard-warn.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="topbar">
+  <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+    <path d="M16 2L4 7.5V15c0 6.5 5.1 12.6 12 14 6.9-1.4 12-7.5 12-14V7.5L16 2z"
+          fill="none" stroke="#dce4f5" stroke-width="1.5"/>
+    <line x1="11" y1="11" x2="21" y2="21" stroke="#dce4f5" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="21" y1="11" x2="11" y2="21" stroke="#dce4f5" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="11" cy="11" r="2" fill="#dce4f5"/>
+    <circle cx="21" cy="11" r="2" fill="#dce4f5"/>
+    <circle cx="11" cy="21" r="2" fill="#dce4f5"/>
+    <circle cx="21" cy="21" r="2" fill="#dce4f5"/>
+  </svg>
+  <span class="logo-text">Sentra</span>
+  <span class="topbar-tenant-badge" id="topbar-tenant"></span>
+
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbar-user"></span>
+    <button class="btn-switch-tenant" id="btn-switch" style="display:none">← Tenants</button>
+    <button class="topbar-logout" id="btn-logout">Sair</button>
   </div>
+</header>
 
-  <script type="module" src="./js/dashboard.js"></script>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <span class="nav-section-label">Visão geral</span>
+    <button class="nav-item" data-page="overview">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+        <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+      </svg>
+      Overview
+    </button>
+
+    <span class="nav-section-label">Configuração</span>
+    <button class="nav-item" id="nav-tenants" data-page="tenants" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="4" width="14" height="10" rx="1.5"/>
+        <path d="M5 4V3a3 3 0 016 0v1"/>
+      </svg>
+      Tenants
+    </button>
+    <button class="nav-item" data-page="routes">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M2 8h12M9 4l5 4-5 4"/>
+      </svg>
+      Rotas
+    </button>
+
+    <span class="nav-section-label">Observabilidade</span>
+    <button class="nav-item" data-page="audit">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M2 4h12M2 8h8M2 12h5"/>
+      </svg>
+      Auditoria
+    </button>
+    <button class="nav-item" data-page="metrics">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M1 13l4-5 3 3 3-6 4 2"/>
+      </svg>
+      Métricas
+    </button>
+
+    <span class="nav-section-label">Conta</span>
+    <button class="nav-item" data-page="conta">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="5" r="3"/><path d="M1 14c0-3.314 3.134-6 7-6s7 2.686 7 6"/>
+      </svg>
+      Meu perfil
+    </button>
+  </aside>
+
+  <!-- Conteúdo -->
+  <main class="content">
+
+    <!-- ── OVERVIEW ── -->
+    <section class="page" id="page-overview">
+      <div class="page-header">
+        <h1 class="page-title">Overview</h1>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Status</div>
+          <div class="metric-value" id="ov-status">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">PostgreSQL</div>
+          <div class="metric-value" id="ov-postgres">—</div>
+          <div class="metric-sub" id="ov-postgres-sub"></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Rotas ativas</div>
+          <div class="metric-value" id="ov-routes">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TENANTS ── -->
+    <section class="page" id="page-tenants">
+      <div class="page-header">
+        <h1 class="page-title">Tenants</h1>
+        <button class="btn-primary" id="btn-new-tenant">+ Novo tenant</button>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Nome</th><th>Slug</th><th>Domínio</th><th>Criado em</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-tenants"></tbody>
+        </table>
+        <p class="tbl-empty" id="tenants-empty" style="display:none">Nenhum tenant cadastrado.</p>
+      </div>
+    </section>
+
+    <!-- ── ROTAS ── -->
+    <section class="page" id="page-routes">
+      <div class="page-header">
+        <h1 class="page-title">Rotas</h1>
+        <button class="btn-primary" id="btn-new-route">+ Nova rota</button>
+      </div>
+      <p class="context-badge" id="routes-tenant-badge"></p>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Método</th><th>Path</th><th>Backend URL</th><th>Política</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-routes"></tbody>
+        </table>
+        <p class="tbl-empty" id="routes-empty" style="display:none">Nenhuma rota cadastrada.</p>
+      </div>
+    </section>
+
+    <!-- ── AUDITORIA ── -->
+    <section class="page" id="page-audit">
+      <div class="page-header">
+        <h1 class="page-title">Auditoria</h1>
+      </div>
+      <div class="card">
+        <p style="font-style:italic;color:var(--text-sub);font-size:.9rem">
+          Integração com endpoint de auditoria pendente de implementação no backend.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── MÉTRICAS ── -->
+    <section class="page" id="page-metrics">
+      <div class="page-header">
+        <h1 class="page-title">Métricas</h1>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Rotas configuradas</div>
+          <div class="metric-value" id="mt-routes">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Req. hoje</div>
+          <div class="metric-value">—</div>
+          <div class="metric-sub">pendente</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Bloqueadas</div>
+          <div class="metric-value">—</div>
+          <div class="metric-sub">pendente</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Latência média</div>
+          <div class="metric-value">—</div>
+          <div class="metric-sub">pendente</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CONTA ── -->
+    <section class="page" id="page-conta">
+      <div class="page-header">
+        <h1 class="page-title">Meu perfil</h1>
+      </div>
+      <div class="card">
+        <div class="profile-row">
+          <span class="profile-label">E-mail</span>
+          <span class="profile-value" id="profile-email">—</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Papel</span>
+          <span class="profile-value" id="profile-role">—</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Tenant</span>
+          <span class="profile-value" id="profile-tenant">—</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:18px">Alterar senha</div>
+        <div class="form-field">
+          <label for="pw-current">Senha atual</label>
+          <input type="password" id="pw-current" />
+        </div>
+        <div class="form-field">
+          <label for="pw-new">Nova senha</label>
+          <input type="password" id="pw-new" />
+        </div>
+        <div class="form-field">
+          <label for="pw-confirm">Confirmar nova senha</label>
+          <input type="password" id="pw-confirm" />
+        </div>
+        <p class="inline-msg" id="pw-msg"></p>
+        <button class="btn-primary" id="btn-change-pw" style="margin-top:8px">Alterar senha</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Modal: Tenant ── -->
+<div class="modal-overlay" id="modal-tenant" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-tenant-title">Novo tenant</h2>
+    <input type="hidden" id="tenant-edit-id" />
+    <div class="modal-field">
+      <label>Nome</label>
+      <input type="text" id="t-name" placeholder="Empresa XYZ" />
+    </div>
+    <div class="modal-field">
+      <label>Slug</label>
+      <input type="text" id="t-slug" placeholder="empresa-xyz" />
+    </div>
+    <div class="modal-field">
+      <label>Domínio <span style="opacity:.5">(opcional)</span></label>
+      <input type="text" id="t-domain" placeholder="api.empresa.com" />
+    </div>
+    <p class="modal-error" id="t-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="t-cancel">Cancelar</button>
+      <button class="btn-primary" id="t-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Rota ── -->
+<div class="modal-overlay" id="modal-route" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-route-title">Nova rota</h2>
+    <input type="hidden" id="r-edit-id" />
+    <div class="modal-field">
+      <label>Método</label>
+      <select id="r-method">
+        <option>GET</option><option>POST</option><option>PUT</option>
+        <option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Path pattern</label>
+      <input type="text" id="r-path" placeholder="/api/usuarios/*" />
+    </div>
+    <div class="wildcard-warn" id="r-wildcard">
+      ⚠ Usar /* aceita qualquer path. Não recomendado em produção.
+    </div>
+    <div class="modal-field">
+      <label>Backend URL</label>
+      <input type="text" id="r-backend" placeholder="http://servico:3000" />
+    </div>
+    <p class="modal-error" id="r-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="r-cancel">Cancelar</button>
+      <button class="btn-primary" id="r-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Política ── -->
+<div class="modal-overlay" id="modal-policy" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title">Política — <span id="p-route-path" style="font-style:italic;font-weight:400"></span></h2>
+    <input type="hidden" id="p-route-id" />
+    <div class="modal-field">
+      <label class="modal-check">
+        <input type="checkbox" id="p-requires-auth" />
+        Requer autenticação JWT
+      </label>
+    </div>
+    <div class="modal-field">
+      <label>Rate limit (req/min) <span style="opacity:.5">— deixe vazio para sem limite</span></label>
+      <input type="number" id="p-rate-limit" min="1" placeholder="ex: 60" />
+    </div>
+    <div class="modal-field">
+      <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
+      <input type="text" id="p-roles" placeholder="admin, user" />
+    </div>
+    <p class="modal-error" id="p-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="p-delete">Remover política</button>
+      <button class="btn-ghost" id="p-cancel">Cancelar</button>
+      <button class="btn-primary" id="p-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { authApi, tenantsApi, routesApi, policiesApi, healthApi } from './js/api.js';
+import { requireAuth, logout, currentTenant, isSuperUser } from './js/auth.js';
+
+if (!requireAuth()) throw new Error('not authenticated');
+
+// ── Estado global ───────────────────────────────────────────────────────
+const tenant = currentTenant();
+const superuser = isSuperUser();
+let _routeCache = []; // cache de rotas para modal de política
+
+// ── Topbar ──────────────────────────────────────────────────────────────
+document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.slug || '';
+document.getElementById('btn-logout').addEventListener('click', logout);
+
+if (superuser) {
+  document.getElementById('btn-switch').style.display = 'inline-block';
+  document.getElementById('nav-tenants').style.display = 'flex';
+}
+document.getElementById('btn-switch').addEventListener('click', () => {
+  sessionStorage.removeItem('sentra_tenant');
+  window.location.href = '/tenant-select.html';
+});
+
+authApi.me().then(me => {
+  document.getElementById('topbar-user').textContent = me.email;
+  document.getElementById('profile-email').textContent = me.email;
+  document.getElementById('profile-role').textContent = me.role || '—';
+}).catch(() => {});
+
+document.getElementById('profile-tenant').textContent =
+  tenant ? (tenant.name || tenant.id) : 'Superuser — sem tenant fixo';
+
+// ── Navegação ────────────────────────────────────────────────────────────
+const PAGE_LOADERS = {
+  overview: loadOverview,
+  tenants:  loadTenants,
+  routes:   loadRoutes,
+  metrics:  loadMetrics,
+  conta:    loadConta,
+  audit:    () => {},
+};
+
+document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.page));
+});
+
+function navigate(pageId) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+  const btn = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if (btn) btn.classList.add('active');
+
+  const page = document.getElementById('page-' + pageId);
+  if (page) page.classList.add('active');
+
+  PAGE_LOADERS[pageId]?.();
+}
+
+// Abre na página de rotas por padrão
+navigate('routes');
+
+// ── OVERVIEW ────────────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const h = await healthApi.check();
+    // Backend retorna: { status, postgres_connected }
+    document.getElementById('ov-status').textContent   = h.status === 'ok' ? '✓' : '✗';
+    document.getElementById('ov-postgres').textContent = h.postgres_connected ? '✓' : '✗';
+    document.getElementById('ov-postgres-sub').textContent = h.postgres_connected ? 'conectado' : 'offline';
+  } catch {
+    document.getElementById('ov-status').textContent = 'erro';
+  }
+
+  if (tenant) {
+    try {
+      const list = await routesApi.list(tenant.id);
+      document.getElementById('ov-routes').textContent = list.length;
+    } catch { document.getElementById('ov-routes').textContent = '—'; }
+  }
+}
+
+// ── TENANTS ─────────────────────────────────────────────────────────────
+async function loadTenants() {
+  const tbody = document.getElementById('tbody-tenants');
+  const empty = document.getElementById('tenants-empty');
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const list = await tenantsApi.list();
+    tbody.innerHTML = '';
+    if (!list.length) { empty.style.display = 'block'; return; }
+    list.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${t.name}</td>
+        <td style="font-style:italic;color:var(--text-sub)">${t.slug}</td>
+        <td style="font-size:.82rem;color:var(--text-sub)">${t.domain || '—'}</td>
+        <td style="font-size:.78rem;color:var(--text-sub)">${t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+        <td>
+          <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.slug)}','${esc(t.domain||'')}')">Editar</button>
+          <button class="btn-icon danger" onclick="_deleteTenant('${t.id}','${esc(t.name)}')">Excluir</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro'}</td></tr>`;
+  }
+}
+
+function _openTenantModal(id='', name='', slug='', domain='') {
+  document.getElementById('modal-tenant-title').textContent = id ? 'Editar tenant' : 'Novo tenant';
+  document.getElementById('tenant-edit-id').value = id;
+  document.getElementById('t-name').value = name;
+  document.getElementById('t-slug').value = slug;
+  document.getElementById('t-domain').value = domain;
+  document.getElementById('t-error').style.display = 'none';
+  document.getElementById('modal-tenant').style.display = 'flex';
+  document.getElementById('t-name').focus();
+}
+
+window._editTenant = _openTenantModal;
+
+document.getElementById('btn-new-tenant').addEventListener('click', () => _openTenantModal());
+document.getElementById('t-cancel').addEventListener('click', () => { document.getElementById('modal-tenant').style.display = 'none'; });
+document.getElementById('modal-tenant').addEventListener('click', e => { if (e.target.id === 'modal-tenant') document.getElementById('modal-tenant').style.display = 'none'; });
+
+document.getElementById('t-save').addEventListener('click', async () => {
+  const id     = document.getElementById('tenant-edit-id').value;
+  const name   = document.getElementById('t-name').value.trim();
+  const slug   = document.getElementById('t-slug').value.trim();
+  const domain = document.getElementById('t-domain').value.trim() || undefined;
+  const errEl  = document.getElementById('t-error');
+  errEl.style.display = 'none';
+
+  if (!name || !slug) { errEl.textContent = 'Nome e slug são obrigatórios.'; errEl.style.display = 'block'; return; }
+
+  try {
+    if (id) {
+      await tenantsApi.update(id, { name, slug, domain });
+    } else {
+      await tenantsApi.create({ name, slug, domain });
+    }
+    document.getElementById('modal-tenant').style.display = 'none';
+    loadTenants();
+  } catch (err) {
+    errEl.textContent = err.detail || 'Erro ao salvar tenant.';
+    errEl.style.display = 'block';
+  }
+});
+
+window._deleteTenant = async function(id, name) {
+  if (!confirm(`Excluir tenant "${name}"? Esta ação não pode ser desfeita.`)) return;
+  try {
+    await tenantsApi.delete(id);
+    loadTenants();
+  } catch (err) {
+    alert(err.detail || 'Erro ao excluir tenant.');
+  }
+};
+
+// ── ROTAS ────────────────────────────────────────────────────────────────
+async function loadRoutes() {
+  const tbody = document.getElementById('tbody-routes');
+  const empty = document.getElementById('routes-empty');
+  const badge = document.getElementById('routes-tenant-badge');
+
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.slug || tenant.id}` : '';
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const list = await routesApi.list(tenant?.id);
+    _routeCache = list;
+    tbody.innerHTML = '';
+    if (!list.length) { empty.style.display = 'block'; return; }
+
+    // Carrega policies em paralelo
+    const policies = await Promise.all(
+      list.map(r => policiesApi.get(r.id).catch(() => null))
+    );
+
+    list.forEach((r, i) => {
+      const p = policies[i];
+      const methodClass = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
+      const policyHtml = p
+        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}</span>`
+        : `<span class="policy-off">sem política</span>`;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="badge ${methodClass}">${r.method}</span></td>
+        <td style="font-family:monospace;font-size:.85rem">${r.path_pattern}</td>
+        <td style="font-size:.8rem;color:var(--text-sub)">${r.backend_url}</td>
+        <td>${policyHtml}</td>
+        <td>
+          <button class="btn-icon" onclick="_openPolicyModal('${r.id}','${esc(r.path_pattern)}')">Política</button>
+          <button class="btn-icon" onclick="_editRoute('${r.id}','${esc(r.method)}','${esc(r.path_pattern)}','${esc(r.backend_url)}')">Editar</button>
+          <button class="btn-icon danger" onclick="_deleteRoute('${r.id}','${esc(r.path_pattern)}')">Excluir</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro ao carregar rotas.'}</td></tr>`;
+  }
+}
+
+// Modal rota
+function _openRouteModal(id='', method='GET', path='', backend='') {
+  document.getElementById('modal-route-title').textContent = id ? 'Editar rota' : 'Nova rota';
+  document.getElementById('r-edit-id').value = id;
+  document.getElementById('r-method').value = method;
+  document.getElementById('r-path').value = path;
+  document.getElementById('r-backend').value = backend;
+  document.getElementById('r-error').style.display = 'none';
+  document.getElementById('r-wildcard').classList.toggle('visible', path.includes('/*'));
+  document.getElementById('modal-route').style.display = 'flex';
+  document.getElementById('r-path').focus();
+}
+
+document.getElementById('r-path').addEventListener('input', e => {
+  document.getElementById('r-wildcard').classList.toggle('visible', e.target.value.includes('/*'));
+});
+
+window._editRoute = _openRouteModal;
+document.getElementById('btn-new-route').addEventListener('click', () => _openRouteModal());
+document.getElementById('r-cancel').addEventListener('click', () => { document.getElementById('modal-route').style.display = 'none'; });
+document.getElementById('modal-route').addEventListener('click', e => { if (e.target.id === 'modal-route') document.getElementById('modal-route').style.display = 'none'; });
+
+document.getElementById('r-save').addEventListener('click', async () => {
+  const id      = document.getElementById('r-edit-id').value;
+  const method  = document.getElementById('r-method').value;
+  const path    = document.getElementById('r-path').value.trim();
+  const backend = document.getElementById('r-backend').value.trim();
+  const errEl   = document.getElementById('r-error');
+  errEl.style.display = 'none';
+
+  if (!path || !backend) { errEl.textContent = 'Path e backend URL são obrigatórios.'; errEl.style.display = 'block'; return; }
+
+  try {
+    if (id) {
+      await routesApi.update(id, { method, path_pattern: path, backend_url: backend });
+    } else {
+      await routesApi.create({ tenant_id: tenant?.id, method, path_pattern: path, backend_url: backend });
+    }
+    document.getElementById('modal-route').style.display = 'none';
+    loadRoutes();
+  } catch (err) {
+    errEl.textContent = err.detail || 'Erro ao salvar rota.';
+    errEl.style.display = 'block';
+  }
+});
+
+window._deleteRoute = async function(id, path) {
+  if (!confirm(`Excluir rota "${path}"?`)) return;
+  try {
+    await routesApi.delete(id);
+    loadRoutes();
+  } catch (err) {
+    alert(err.detail || 'Erro ao excluir rota.');
+  }
+};
+
+// Modal política
+window._openPolicyModal = async function(routeId, routePath) {
+  document.getElementById('p-route-id').value = routeId;
+  document.getElementById('p-route-path').textContent = routePath;
+  document.getElementById('p-error').style.display = 'none';
+  document.getElementById('p-requires-auth').checked = false;
+  document.getElementById('p-rate-limit').value = '';
+  document.getElementById('p-roles').value = '';
+  document.getElementById('modal-policy').style.display = 'flex';
+
+  try {
+    const p = await policiesApi.get(routeId);
+    if (p) {
+      document.getElementById('p-requires-auth').checked = p.requires_auth;
+      document.getElementById('p-rate-limit').value = p.rate_limit_per_minute || '';
+      document.getElementById('p-roles').value = (p.allowed_roles || []).join(', ');
+    }
+  } catch { /* sem política existente, tudo bem */ }
+};
+
+document.getElementById('p-cancel').addEventListener('click', () => { document.getElementById('modal-policy').style.display = 'none'; });
+document.getElementById('modal-policy').addEventListener('click', e => { if (e.target.id === 'modal-policy') document.getElementById('modal-policy').style.display = 'none'; });
+
+document.getElementById('p-save').addEventListener('click', async () => {
+  const routeId      = document.getElementById('p-route-id').value;
+  const requiresAuth = document.getElementById('p-requires-auth').checked;
+  const rateRaw      = document.getElementById('p-rate-limit').value.trim();
+  const rolesRaw     = document.getElementById('p-roles').value.trim();
+  const errEl        = document.getElementById('p-error');
+  errEl.style.display = 'none';
+
+  const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
+  const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  try {
+    await policiesApi.upsert(routeId, { requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles });
+    document.getElementById('modal-policy').style.display = 'none';
+    loadRoutes();
+  } catch (err) {
+    errEl.textContent = err.detail || 'Erro ao salvar política.';
+    errEl.style.display = 'block';
+  }
+});
+
+document.getElementById('p-delete').addEventListener('click', async () => {
+  const routeId = document.getElementById('p-route-id').value;
+  try {
+    await policiesApi.delete(routeId);
+    document.getElementById('modal-policy').style.display = 'none';
+    loadRoutes();
+  } catch (err) {
+    document.getElementById('p-error').textContent = err.detail || 'Erro ao remover política.';
+    document.getElementById('p-error').style.display = 'block';
+  }
+});
+
+// ── MÉTRICAS ────────────────────────────────────────────────────────────
+async function loadMetrics() {
+  if (!tenant) return;
+  try {
+    const list = await routesApi.list(tenant.id);
+    document.getElementById('mt-routes').textContent = list.length;
+  } catch { document.getElementById('mt-routes').textContent = '—'; }
+}
+
+// ── CONTA ────────────────────────────────────────────────────────────────
+function loadConta() {
+  document.getElementById('btn-change-pw').addEventListener('click', async () => {
+    const current = document.getElementById('pw-current').value;
+    const next    = document.getElementById('pw-new').value;
+    const confirm = document.getElementById('pw-confirm').value;
+    const msgEl   = document.getElementById('pw-msg');
+    msgEl.className = 'inline-msg';
+    msgEl.textContent = '';
+
+    if (!current || !next) { msgEl.className += ' error'; msgEl.textContent = 'Preencha todos os campos.'; return; }
+    if (next !== confirm)   { msgEl.className += ' error'; msgEl.textContent = 'As senhas não coincidem.'; return; }
+
+    try {
+      await authApi.changePassword(current, next);
+      msgEl.className += ' success';
+      msgEl.textContent = 'Senha alterada com sucesso.';
+      document.getElementById('pw-current').value = '';
+      document.getElementById('pw-new').value = '';
+      document.getElementById('pw-confirm').value = '';
+    } catch (err) {
+      msgEl.className += ' error';
+      msgEl.textContent = err.detail || 'Erro ao alterar senha.';
+    }
+  }, { once: true }); // { once } evita duplicar listener em re-navegação
+}
+
+// ── Utilitário ─────────────────────────────────────────────────────────
+function esc(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+</script>
+
 </body>
 </html>

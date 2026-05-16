@@ -10,3 +10,4 @@ class User:
     tenant_id: str | None
     created_at: datetime
     updated_at: datetime
+    role: str = "admin"

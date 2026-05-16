@@ -5,7 +5,6 @@ from src.admin.domain.entities.user import User
 from src.admin.domain.ports.user_repository import UserRepositoryPort
 from src.admin.infrastructure.persistence.postgres.models import UserORM
 
-
 def _orm_to_entity(row: UserORM) -> User:
     return User(
         id=row.id,
@@ -14,8 +13,8 @@ def _orm_to_entity(row: UserORM) -> User:
         tenant_id=row.tenant_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        role=row.role,
     )
-
 
 def _entity_to_orm(user: User) -> UserORM:
     return UserORM(
@@ -25,8 +24,8 @@ def _entity_to_orm(user: User) -> UserORM:
         tenant_id=user.tenant_id,
         created_at=user.created_at,
         updated_at=user.updated_at,
+        role=user.role,
     )
-
 
 class UserRepository(UserRepositoryPort):
     def __init__(self, session: AsyncSession) -> None:
@@ -52,6 +51,7 @@ class UserRepository(UserRepositoryPort):
             existing.email = user.email
             existing.password_hash = user.password_hash
             existing.tenant_id = user.tenant_id
+            existing.role = user.role
             existing.updated_at = user.updated_at
         else:
             self._session.add(_entity_to_orm(user))

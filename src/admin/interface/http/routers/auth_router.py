@@ -41,9 +41,11 @@ async def register(
     w: Annotated[AdminWiring, Depends(get_request_wiring)],
 ):
     user = await w.register_user.execute(body.email, body.password, body.tenant_id)
-    access = w.token_service.create_access_token(user.id, user.email, user.tenant_id)
+    access = w.token_service.create_access_token(
+        user.id, user.email, user.tenant_id, user.role
+    )
     return RegisterResponse(
-        user=UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id),
+        user=UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id, role=user.role),
         access_token=access,
     )
 
@@ -65,7 +67,7 @@ async def me(
     user = await w.user_repository.get_by_id(claims.sub)
     if not user:
         raise AuthError("usuário não encontrado")
-    return UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id)
+    return UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id, role=user.role)
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

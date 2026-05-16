@@ -5,6 +5,7 @@ from src.gateway.application.use_cases.forward_request import (
     DomainNotFoundError,
     PolicyDeniedError,
     RouteNotFoundError,
+    TenantNotFoundError,
 )
 from src.gateway.interface.http.instance_loader import InstanceLoader
 from src.gateway.interface.http.request_parser import RequestParser
@@ -45,6 +46,8 @@ async def _gateway_entrypoint(fastapi_request: FastAPIRequest) -> Response:
 
     try:
         gateway_response = await use_case.handle(domain_request, raw_body)
+    except TenantNotFoundError as exc:
+        return _error_response(404, "TENANT_NOT_FOUND", str(exc))
     except RouteNotFoundError as exc:
         return _error_response(404, "ROUTE_NOT_FOUND", str(exc))
     except DomainNotFoundError as exc:

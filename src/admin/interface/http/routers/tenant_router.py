@@ -3,7 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from src.admin.application.use_cases.manage_tenant import ManageTenant
-from src.admin.interface.http.dependencies import get_current_claims, get_manage_tenant
+from src.admin.domain.value_objects.jwt_claims import JwtClaims
+from src.admin.interface.http.dependencies import (
+    get_current_claims,
+    get_manage_tenant,
+    require_own_tenant,
+    require_superuser,
+)
 from src.admin.interface.schema.tenant_schema import TenantCreate, TenantResponse, TenantUpdate
 
 router = APIRouter(tags=["tenants"])
@@ -23,7 +29,7 @@ def _to_response(t) -> TenantResponse:
 @router.get("", response_model=list[TenantResponse])
 async def list_tenants(
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
-    _: Annotated[object, Depends(get_current_claims)],
+    _: Annotated[JwtClaims, Depends(require_superuser)],
 ):
     items = await uc.list()
     return [_to_response(t) for t in items]
@@ -33,7 +39,7 @@ async def list_tenants(
 async def create_tenant(
     body: TenantCreate,
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
-    _: Annotated[object, Depends(get_current_claims)],
+    _: Annotated[JwtClaims, Depends(get_current_claims)],
 ):
     t = await uc.create(body.name, body.slug, body.domain)
     return _to_response(t)
@@ -43,8 +49,9 @@ async def create_tenant(
 async def get_tenant(
     tenant_id: str,
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
-    _: Annotated[object, Depends(get_current_claims)],
+    claims: Annotated[JwtClaims, Depends(get_current_claims)],
 ):
+    require_own_tenant(claims, tenant_id)
     t = await uc.get(tenant_id)
     return _to_response(t)
 
@@ -54,8 +61,9 @@ async def patch_tenant(
     tenant_id: str,
     body: TenantUpdate,
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
-    _: Annotated[object, Depends(get_current_claims)],
+    claims: Annotated[JwtClaims, Depends(get_current_claims)],
 ):
+    require_own_tenant(claims, tenant_id)
     data = body.model_dump(exclude_unset=True)
     if not data:
         t = await uc.get(tenant_id)
@@ -68,6 +76,6 @@ async def patch_tenant(
 async def delete_tenant(
     tenant_id: str,
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
-    _: Annotated[object, Depends(get_current_claims)],
+    _: Annotated[JwtClaims, Depends(require_superuser)],
 ):
     await uc.delete(tenant_id)

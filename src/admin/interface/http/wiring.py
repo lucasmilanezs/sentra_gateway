@@ -26,6 +26,8 @@ from src.admin.infrastructure.persistence.postgres.route import RouteRepository 
 from src.admin.infrastructure.persistence.postgres.tenant import TenantRepository as PgTenantRepository
 from src.admin.infrastructure.persistence.postgres.user import UserRepository as PgUserRepository
 from src.admin.infrastructure.persistence.postgres.policy import PolicyRepository as PgPolicyRepository
+from src.admin.infrastructure.persistence.postgres.global_policy import GlobalPolicyRepository as PgGlobalPolicyRepository
+from src.admin.application.use_cases.manage_global_policy import ManageGlobalPolicy
 
 from src.admin.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
 from src.admin.infrastructure.security.jwt_token_service import JwtTokenService
@@ -115,6 +117,9 @@ class AdminWiring:
         self.reset_password_with_code = ResetPasswordWithCode(
             self.user_repository, self.reset_repository, self.hasher
         )
+        self.manage_global_policy = ManageGlobalPolicy(
+            None, self.tenant_repository, publisher=self.publisher  # JSON: sem persistência real
+        )
 
     def build_use_cases_postgres(self, session: AsyncSession) -> "AdminWiring":
         w = object.__new__(AdminWiring)
@@ -152,6 +157,9 @@ class AdminWiring:
         )
         w.reset_password_with_code = ResetPasswordWithCode(
             w.user_repository, w.reset_repository, w.hasher
+        )
+        w.manage_global_policy = ManageGlobalPolicy(
+            PgGlobalPolicyRepository(session), w.tenant_repository, publisher=w.publisher
         )
         return w
 

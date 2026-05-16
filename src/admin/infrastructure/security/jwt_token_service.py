@@ -13,7 +13,13 @@ class JwtTokenService(TokenServicePort):
         self._algorithm = algorithm
         self._expire_minutes = expire_minutes
 
-    def create_access_token(self, user_id: str, email: str, tenant_id: str | None) -> str:
+    def create_access_token(
+        self,
+        user_id: str,
+        email: str,
+        tenant_id: str | None,
+        role: str | None = None,
+    ) -> str:
         now = datetime.now(timezone.utc)
         exp = now + timedelta(minutes=self._expire_minutes)
         payload: dict = {
@@ -24,6 +30,8 @@ class JwtTokenService(TokenServicePort):
         }
         if tenant_id is not None:
             payload["tenant_id"] = tenant_id
+        if role is not None:
+            payload["role"] = role
         return jwt.encode(payload, self._secret, algorithm=self._algorithm)
 
     def decode_and_validate(self, token: str) -> JwtClaims:
@@ -36,4 +44,5 @@ class JwtTokenService(TokenServicePort):
         if not sub or not email:
             raise AuthError("token inválido")
         tenant_id = payload.get("tenant_id")
-        return JwtClaims(sub=str(sub), email=str(email), tenant_id=tenant_id)
+        role = payload.get("role")
+        return JwtClaims(sub=str(sub), email=str(email), tenant_id=tenant_id, role=role)

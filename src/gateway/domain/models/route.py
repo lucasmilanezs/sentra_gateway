@@ -19,6 +19,7 @@ class Route:
     """
 
     id: str
+    tenant_id: str
     path_prefix: str
     domain_id: str
     methods: Tuple[HttpMethod, ...] = field(default_factory=tuple)

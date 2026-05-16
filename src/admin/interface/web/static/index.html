@@ -3,8 +3,253 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SENTRA – Login</title>
+  <title>SENTRA – Gateway de Segurança</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* override do overflow: hidden do style.css para o layout de dois painéis */
+    body {
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* ── Landing layout ── */
+    .landing {
+      display: flex;
+      flex: 1;
+      align-items: stretch;
+      position: relative;
+      z-index: 10;
+      min-height: 0;
+    }
+
+    .landing-brand {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 56px;
+      gap: 20px;
+    }
+
+    .brand-tagline {
+      font-size: 2.4rem;
+      font-weight: 300;
+      color: #dce4f5;
+      line-height: 1.22;
+      letter-spacing: 0.01em;
+      max-width: 420px;
+    }
+
+    .brand-tagline strong { font-weight: 500; }
+
+    .brand-desc {
+      font-size: 1rem;
+      color: rgba(180, 200, 240, 0.6);
+      line-height: 1.65;
+      max-width: 360px;
+      font-style: italic;
+    }
+
+    .brand-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(180, 200, 240, 0.5);
+      border: 1px solid rgba(180, 200, 240, 0.18);
+      border-radius: 2px;
+      padding: 4px 12px;
+    }
+
+    .landing-divider {
+      width: 1px;
+      background: rgba(255,255,255,0.08);
+      align-self: stretch;
+      margin: 40px 0;
+    }
+
+    .landing-panel {
+      width: 400px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 44px;
+      overflow-y: auto;
+    }
+
+    /* ── Auth tabs ── */
+    .auth-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 32px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .auth-tab {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      color: rgba(180, 200, 240, 0.45);
+      background: none;
+      border: none;
+      padding: 8px 0;
+      margin-right: 24px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .auth-tab.active {
+      color: #dce4f5;
+      border-bottom-color: rgba(180, 200, 240, 0.5);
+    }
+
+    .auth-tab:hover:not(.active) { color: rgba(180, 200, 240, 0.7); }
+
+    /* ── Auth panels ── */
+    .auth-panel { display: none; }
+
+    .auth-panel.active {
+      display: block;
+      animation: panelIn 0.3s ease both;
+    }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-title {
+      font-size: 1.5rem;
+      font-weight: 400;
+      color: #dce4f5;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+    }
+
+    /* ── Form fields ── */
+    .auth-field { margin-bottom: 20px; }
+
+    .auth-field label {
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(180, 200, 240, 0.45);
+      margin-bottom: 6px;
+    }
+
+    .auth-field input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(180, 200, 240, 0.2);
+      padding: 7px 0;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem;
+      color: #dce4f5;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .auth-field input::placeholder {
+      color: rgba(180, 200, 240, 0.2);
+      font-style: italic;
+    }
+
+    .auth-field input:focus { border-bottom-color: rgba(180, 200, 240, 0.55); }
+
+    .field-group-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(180, 200, 240, 0.3);
+      margin: 20px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ── Botão ── */
+    .auth-btn {
+      display: block;
+      width: 100%;
+      margin-top: 24px;
+      padding: 11px 20px;
+      background: rgba(180, 200, 240, 0.1);
+      color: #dce4f5;
+      border: 1px solid rgba(180, 200, 240, 0.25);
+      border-radius: 3px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      text-align: center;
+    }
+
+    .auth-btn:hover {
+      background: rgba(180, 200, 240, 0.18);
+      border-color: rgba(180, 200, 240, 0.4);
+    }
+
+    .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Mensagens ── */
+    .auth-msg {
+      font-size: 0.83rem;
+      font-style: italic;
+      text-align: center;
+      margin-top: 14px;
+      min-height: 18px;
+      color: transparent;
+      transition: color 0.2s;
+    }
+
+    .auth-msg.error   { color: #c87070; }
+    .auth-msg.success { color: #6abf8a; }
+
+    .auth-note {
+      font-size: 0.82rem;
+      font-style: italic;
+      color: rgba(180, 200, 240, 0.35);
+      text-align: center;
+      margin-top: 16px;
+      line-height: 1.5;
+    }
+
+    .auth-note button {
+      background: none;
+      border: none;
+      color: rgba(180, 200, 240, 0.6);
+      font-family: inherit;
+      font-size: inherit;
+      font-style: inherit;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      padding: 0;
+      transition: color 0.2s;
+    }
+
+    .auth-note button:hover { color: #dce4f5; }
+
+    /* ── Responsivo ── */
+    @media (max-width: 720px) {
+      .landing { flex-direction: column; }
+      .landing-brand { padding: 36px 28px 20px; }
+      .brand-tagline { font-size: 1.8rem; }
+      .landing-divider { display: none; }
+      .landing-panel { width: 100%; padding: 28px 28px 48px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -22,42 +267,308 @@
     <span class="logo-text">Sentra</span>
   </header>
 
-  <main>
-    <div class="card">
-      <h1 class="card-title">Login</h1>
+  <main class="landing">
 
-      <div class="field">
-        <input
-          type="text"
-          id="login-user"
-          placeholder="user"
-          autocomplete="username"
-        />
+    <!-- Identidade -->
+    <div class="landing-brand">
+      <p class="brand-tagline">
+        Gateway de segurança<br>para <strong>APIs modernas</strong>
+      </p>
+      <p class="brand-desc">
+        Centralize autenticação, controle de acesso, rate limiting
+        e auditoria em um único ponto de entrada. Proteja seus
+        serviços sem duplicar lógica sensível.
+      </p>
+      <div class="brand-pills">
+        <span class="pill">JWT</span>
+        <span class="pill">Rate Limiting</span>
+        <span class="pill">RBAC</span>
+        <span class="pill">Auditoria</span>
+        <span class="pill">Multi-tenant</span>
+      </div>
+    </div>
+
+    <div class="landing-divider"></div>
+
+    <!-- Painel de auth -->
+    <div class="landing-panel">
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login"    onclick="showTab('login')">Entrar</button>
+        <button class="auth-tab"        id="tab-register" onclick="showTab('register')">Cadastrar</button>
+        <button class="auth-tab"        id="tab-forgot"   onclick="showTab('forgot')">Recuperar</button>
       </div>
 
-      <div class="field">
-        <input
-          type="password"
-          id="login-pass"
-          placeholder="password"
-          autocomplete="current-password"
-        />
+      <!-- LOGIN -->
+      <div class="auth-panel active" id="panel-login">
+        <h2 class="panel-title">Acesso</h2>
+
+        <div class="auth-field">
+          <label for="login-email">E-mail</label>
+          <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" />
+        </div>
+
+        <div class="auth-field">
+          <label for="login-pass">Senha</label>
+          <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        <p class="auth-msg" id="login-msg"></p>
+        <button class="auth-btn" id="login-btn" onclick="handleLogin()">Entrar</button>
       </div>
 
-      <div class="link-row">
-        <a href="forgot-password.html">Esqueceu a senha ?</a>
+      <!-- CADASTRO -->
+      <div class="auth-panel" id="panel-register">
+        <h2 class="panel-title">Nova conta</h2>
+
+        <div class="auth-field">
+          <label for="reg-email">E-mail</label>
+          <input type="email" id="reg-email" placeholder="seu@empresa.com" autocomplete="email" />
+        </div>
+
+        <div class="auth-field">
+          <label for="reg-pass">Senha</label>
+          <input type="password" id="reg-pass" placeholder="mínimo 8 caracteres" autocomplete="new-password" />
+        </div>
+
+        <div class="auth-field">
+          <label for="reg-confirm">Confirmar senha</label>
+          <input type="password" id="reg-confirm" placeholder="repita a senha" autocomplete="new-password" />
+        </div>
+
+        <p class="field-group-label">Dados do tenant</p>
+
+        <div class="auth-field">
+          <label for="reg-company">Nome da empresa</label>
+          <input type="text" id="reg-company" placeholder="Empresa XYZ" />
+        </div>
+
+        <div class="auth-field">
+          <label for="reg-slug">Slug <span style="opacity:.5;text-transform:none;letter-spacing:0">(identificador único, sem espaços)</span></label>
+          <input type="text" id="reg-slug" placeholder="empresa-xyz" />
+        </div>
+
+        <p class="auth-msg" id="reg-msg"></p>
+        <button class="auth-btn" id="reg-btn" onclick="handleRegister()">Criar conta</button>
+
+        <p class="auth-note">
+          Cadastro cria uma conta de administrador com tenant próprio.<br>
+          Já tem conta? <button onclick="showTab('login')">Entrar</button>
+        </p>
       </div>
 
-      <p class="msg" id="login-msg"></p>
+      <!-- RECUPERAR SENHA -->
+      <div class="auth-panel" id="panel-forgot">
+        <h2 class="panel-title">Recuperar acesso</h2>
 
-      <button class="btn" onclick="handleLogin()">Entrar</button>
+        <!-- Etapa 1: email -->
+        <div id="forgot-step1">
+          <div class="auth-field">
+            <label for="forgot-email">E-mail cadastrado</label>
+            <input type="email" id="forgot-email" placeholder="seu@email.com" autocomplete="email" />
+          </div>
+          <p class="auth-msg" id="forgot-msg"></p>
+          <button class="auth-btn" id="forgot-btn" onclick="handleForgot()">Enviar código</button>
+        </div>
+
+        <!-- Etapa 2: código + nova senha -->
+        <div id="forgot-step2" style="display:none">
+          <div class="auth-field">
+            <label for="reset-code">Código recebido por e-mail</label>
+            <input type="text" id="reset-code" placeholder="000000" autocomplete="one-time-code" />
+          </div>
+          <div class="auth-field">
+            <label for="reset-pass">Nova senha</label>
+            <input type="password" id="reset-pass" placeholder="mínimo 8 caracteres" autocomplete="new-password" />
+          </div>
+          <div class="auth-field">
+            <label for="reset-confirm">Confirmar nova senha</label>
+            <input type="password" id="reset-confirm" placeholder="repita a senha" autocomplete="new-password" />
+          </div>
+          <p class="auth-msg" id="reset-msg"></p>
+          <button class="auth-btn" id="reset-btn" onclick="handleReset()">Redefinir senha</button>
+          <p class="auth-note"><button onclick="showForgotStep(1)">← Reenviar código</button></p>
+        </div>
+      </div>
+
     </div>
   </main>
 
   <footer>
-    <span>@2026</span>
+    <span>Sentra &copy; 2026 &mdash; Plataforma de gateway para segurança de APIs</span>
   </footer>
 
-  <script src="js/login.js"></script>
+  <script type="module">
+    import { authApi, tenantsApi } from './js/api.js';
+
+    // ── Redireciona se já autenticado ──────────────────────────────────
+    if (sessionStorage.getItem('sentra_token')) {
+      const tenant = sessionStorage.getItem('sentra_tenant');
+      window.location.href = tenant ? '/dashboard.html' : '/tenant-select.html';
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function msg(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'auth-msg' + (type ? ' ' + type : '');
+    }
+
+    function setLoading(btnId, loading, label) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.textContent = loading ? 'Aguarde…' : label;
+    }
+
+    // ── Tabs ───────────────────────────────────────────────────────────
+    window.showTab = function(tab) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.getElementById('panel-' + tab).classList.add('active');
+    };
+
+    window.showForgotStep = function(step) {
+      document.getElementById('forgot-step1').style.display = step === 1 ? 'block' : 'none';
+      document.getElementById('forgot-step2').style.display = step === 2 ? 'block' : 'none';
+    };
+
+    // ── Login ──────────────────────────────────────────────────────────
+    window.handleLogin = async function() {
+      const email = document.getElementById('login-email').value.trim();
+      const pass  = document.getElementById('login-pass').value;
+      msg('login-msg', '', '');
+
+      if (!email || !pass) { msg('login-msg', 'Preencha e-mail e senha.', 'error'); return; }
+
+      setLoading('login-btn', true, 'Entrar');
+      try {
+        const { access_token } = await authApi.login(email, pass);
+        sessionStorage.setItem('sentra_token', access_token);
+
+        const me = await authApi.me();
+        if (me.tenant_id) {
+          sessionStorage.setItem('sentra_tenant', JSON.stringify({ id: me.tenant_id }));
+          window.location.href = '/dashboard.html';
+        } else {
+          // superuser: sem tenant fixo
+          window.location.href = '/tenant-select.html';
+        }
+      } catch (err) {
+        msg('login-msg', err.detail || 'Credenciais inválidas.', 'error');
+        setLoading('login-btn', false, 'Entrar');
+      }
+    };
+
+    document.getElementById('login-pass').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+
+    // ── Auto-slug no cadastro ──────────────────────────────────────────
+    document.getElementById('reg-company').addEventListener('input', e => {
+      const slugEl = document.getElementById('reg-slug');
+      // só preenche automaticamente se ainda não foi editado manualmente
+      if (!slugEl.dataset.edited) {
+        slugEl.value = e.target.value
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+      }
+    });
+
+    document.getElementById('reg-slug').addEventListener('input', e => {
+      e.target.dataset.edited = '1';
+      // sanitiza em tempo real
+      e.target.value = e.target.value
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-');
+    });
+
+    // ── Cadastro ───────────────────────────────────────────────────────
+    window.handleRegister = async function() {
+      const email   = document.getElementById('reg-email').value.trim();
+      const pass    = document.getElementById('reg-pass').value;
+      const confirm = document.getElementById('reg-confirm').value;
+      const company = document.getElementById('reg-company').value.trim();
+      const slug    = document.getElementById('reg-slug').value.trim();
+      msg('reg-msg', '', '');
+
+      if (!email || !pass || !company || !slug) {
+        msg('reg-msg', 'Preencha todos os campos.', 'error'); return;
+      }
+      if (pass !== confirm) {
+        msg('reg-msg', 'As senhas não coincidem.', 'error'); return;
+      }
+      if (pass.length < 8) {
+        msg('reg-msg', 'Senha deve ter ao menos 8 caracteres.', 'error'); return;
+      }
+
+      setLoading('reg-btn', true, 'Criando conta…');
+      try {
+        // 1. Cria usuário (sem tenant ainda)
+        const data = await authApi.register(email, pass);
+        sessionStorage.setItem('sentra_token', data.access_token);
+
+        // 2. Cria tenant com o token recém-obtido
+        msg('reg-msg', 'Usuário criado. Configurando tenant…', '');
+        const tenant = await tenantsApi.create({ name: company, slug });
+
+        // 3. Salva contexto e redireciona
+        sessionStorage.setItem('sentra_tenant', JSON.stringify({
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+        }));
+
+        msg('reg-msg', 'Conta criada! Redirecionando…', 'success');
+        setTimeout(() => window.location.href = '/dashboard.html', 900);
+      } catch (err) {
+        msg('reg-msg', err.detail || 'Erro ao criar conta.', 'error');
+        setLoading('reg-btn', false, 'Criar conta');
+      }
+    };
+
+    // ── Esqueci a senha ────────────────────────────────────────────────
+    let _forgotEmail = '';
+
+    window.handleForgot = async function() {
+      const email = document.getElementById('forgot-email').value.trim();
+      msg('forgot-msg', '', '');
+      if (!email) { msg('forgot-msg', 'Informe o e-mail cadastrado.', 'error'); return; }
+
+      setLoading('forgot-btn', true, 'Enviando…');
+      try {
+        await authApi.forgotPassword(email);
+        _forgotEmail = email;
+        msg('forgot-msg', 'Código enviado. Verifique seu e-mail.', 'success');
+        setTimeout(() => showForgotStep(2), 1200);
+      } catch (err) {
+        msg('forgot-msg', err.detail || 'Erro ao enviar código.', 'error');
+        setLoading('forgot-btn', false, 'Enviar código');
+      }
+    };
+
+    window.handleReset = async function() {
+      const code    = document.getElementById('reset-code').value.trim();
+      const pass    = document.getElementById('reset-pass').value;
+      const confirm = document.getElementById('reset-confirm').value;
+      msg('reset-msg', '', '');
+
+      if (!code || !pass) { msg('reset-msg', 'Preencha o código e a nova senha.', 'error'); return; }
+      if (pass !== confirm) { msg('reset-msg', 'As senhas não coincidem.', 'error'); return; }
+
+      setLoading('reset-btn', true, 'Redefinindo…');
+      try {
+        await authApi.resetPassword(_forgotEmail, code, pass);
+        msg('reset-msg', 'Senha redefinida. Redirecionando…', 'success');
+        setTimeout(() => { showTab('login'); showForgotStep(1); }, 1500);
+      } catch (err) {
+        msg('reset-msg', err.detail || 'Código inválido ou expirado.', 'error');
+        setLoading('reset-btn', false, 'Redefinir senha');
+      }
+    };
+  </script>
+
 </body>
 </html>

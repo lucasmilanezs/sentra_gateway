@@ -24,3 +24,4 @@ class Request:
     headers: Dict[str, str]
     query_params: Dict[str, str]
     params: Tuple[Param, ...] = field(default_factory=tuple)
+    host: str = ""

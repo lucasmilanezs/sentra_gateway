@@ -55,6 +55,7 @@ async def lifespan(app: FastAPI):
         log_port=FileLogWriter(log_path=Path(settings.log_path)),
         policy_pipeline=policy_pipeline,
         log_event_builder=LogEventBuilder(),
+        tenant_repository=snapshot,
     )
 
     app.state.forward_request = forward_request
@@ -93,4 +94,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],        # em dev, aceita qualquer origem
+    allow_methods=["*"],        # GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_headers=["*"],
+    allow_credentials=False,
+)
 app.include_router(router)
+

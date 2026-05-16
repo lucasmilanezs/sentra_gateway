@@ -40,6 +40,12 @@ class AdminSettings(BaseSettings):
     smtp_password: str | None = Field(default=None, alias="ADMIN_SMTP_PASSWORD")
     smtp_from: str | None = Field(default=None, alias="ADMIN_SMTP_FROM")
     email_use_console: bool = Field(default=True, alias="ADMIN_EMAIL_USE_CONSOLE")
+    superuser_email: str = Field(
+        default="superuser@sentra.dev", alias="SENTRA_SUPERUSER_EMAIL"
+    )
+    superuser_password: str = Field(
+        default="change-me-in-production", alias="SENTRA_SUPERUSER_PASSWORD"
+    )
 
     @property
     def redis_url(self) -> str:

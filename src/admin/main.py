@@ -33,9 +33,10 @@ from src.admin.interface.http.routers import (  # noqa: E402
     auth_router,
     health_router,
     tenant_router,
-    policy_router
+    policy_router,
 )
-from src.admin.interface.http.wiring import AdminWiring  # noqa: E402
+from src.admin.interface.http.routers.global_policy_router import router as global_policy_router  # noqa: E402
+from src.admin.interface.http.wiring import AdminWiring # noqa: E402
 
 
 @asynccontextmanager
@@ -48,19 +49,50 @@ async def lifespan(app: FastAPI):
     logger.info(f"Admin iniciado. Persistência: {mode}")
     if settings.use_postgres:
         logger.info(f"  DB host: {settings.postgres_host}:{settings.postgres_port}")
+    if settings.use_postgres:
+        await _bootstrap_superuser(wiring, settings)
 
     yield
 
     await wiring.dispose()
 
+async def _bootstrap_superuser(wiring, settings: AdminSettings) -> None:
+    """Garante que o superuser de plataforma existe no banco. Idempotente."""
+    from src.admin.domain.entities.user import User
+    import uuid
+    from datetime import datetime, timezone
+
+    async with wiring._session_factory() as session:
+        async with session.begin():
+            w = wiring.build_use_cases_postgres(session)
+            existing = await w.user_repository.get_by_email(settings.superuser_email)
+            if existing:
+                return
+            now = datetime.now(timezone.utc)
+            superuser = User(
+                id=str(uuid.uuid4()),
+                email=settings.superuser_email,
+                password_hash=wiring.hasher.hash(settings.superuser_password),
+                tenant_id=None,
+                created_at=now,
+                updated_at=now,
+                role="superuser",
+            )
+            await w.user_repository.save(superuser)
+            logger.info("Superuser criado: %s", settings.superuser_email)
 
 app = FastAPI(title="Sentra Admin", lifespan=lifespan)
 
 register_domain_exception_handlers(app)
 
-app.mount("/ui", StaticFiles(directory="src/admin/interface/web/static", html=True), name="ui")
+# DEPOIS — routers primeiro, mount por último
 app.include_router(health_router.router, tags=["Health"])
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(tenant_router.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(admin_route_router.router, prefix="/api/v1/routes", tags=["Routes"])
 app.include_router(policy_router.router, prefix="/api/v1/routes", tags=["Policies"])
+app.include_router(global_policy_router, prefix="/api/v1/tenants", tags=["GlobalPolicies"])
+
+# StaticFiles por último — catch-all para o frontend
+# html=True serve index.html para qualquer path não resolvido (necessário para SPA)
+app.mount("/", StaticFiles(directory="src/admin/interface/web/static", html=True), name="frontend")

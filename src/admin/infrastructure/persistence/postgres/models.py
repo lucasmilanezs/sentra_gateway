@@ -49,11 +49,11 @@ class UserORM(Base):
     tenant_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("admin_tenants.id"), nullable=True
     )
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="admin")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-
 
 class PolicyORM(Base):
     __tablename__ = "admin_policies"
@@ -71,3 +71,21 @@ class PolicyORM(Base):
     )
 
     route: Mapped[AdminRouteORM] = relationship(back_populates="policy")
+
+# ADICIONAR ao final do arquivo
+class GlobalPolicyORM(Base):
+    __tablename__ = "admin_global_policies"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("admin_tenants.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    requires_auth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    rate_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    allowed_roles: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    tenant: Mapped[TenantORM] = relationship()

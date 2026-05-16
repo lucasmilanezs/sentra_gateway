@@ -1,11 +1,9 @@
-import { authApi } from './api.js';
-
 export function requireAuth() {
-  const token = sessionStorage.getItem('sentra_token');
-
-  if (!token) {
+  if (!sessionStorage.getItem('sentra_token')) {
     window.location.href = '/index.html';
+    return false;
   }
+  return true;
 }
 
 export function logout() {
@@ -13,12 +11,11 @@ export function logout() {
   window.location.href = '/index.html';
 }
 
-export async function currentUser() {
-  return await authApi.me();
+export function currentTenant() {
+  const raw = sessionStorage.getItem('sentra_tenant');
+  return raw ? JSON.parse(raw) : null;
 }
 
-export function currentTenant() {
-  const tenant = sessionStorage.getItem('sentra_tenant');
-
-  return tenant ? JSON.parse(tenant) : null;
+export function isSuperUser() {
+  return currentTenant() === null;
 }

@@ -21,6 +21,7 @@ class UserPublic(BaseModel):
     id: str
     email: str
     tenant_id: str | None
+    role: str | None = None
 
 
 class RegisterResponse(BaseModel):

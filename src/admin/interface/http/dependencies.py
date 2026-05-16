@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.admin.domain.exceptions import AuthError
@@ -105,3 +106,30 @@ async def get_current_claims(
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
+
+def require_superuser(
+    claims: Annotated[JwtClaims, Depends(get_current_claims)],
+) -> JwtClaims:
+    if claims.role != "superuser":
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="acesso restrito ao superuser",
+        )
+    return claims
+
+
+def require_own_tenant(claims: JwtClaims, tenant_id: str) -> None:
+    """Superuser passa sempre. Admin só acessa o próprio tenant."""
+    if claims.role == "superuser":
+        return
+    if claims.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="acesso negado a recurso de outro tenant",
+        )
+
+
+def get_manage_global_policy(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_global_policy

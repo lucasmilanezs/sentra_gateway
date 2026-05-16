@@ -8,6 +8,7 @@ from src.gateway.domain.value_objects.http_method import HttpMethod
 _DEFAULT_ROUTES: List[Route] = [
     Route(
         id="route-httpbin",
+        tenant_id="dev-tenant",
         path_prefix="/httpbin",
         domain_id="domain-httpbin",
         methods=(HttpMethod.GET, HttpMethod.POST),
@@ -35,7 +36,7 @@ class InMemoryRouteRepository(RouteRepository):
             reverse=True,
         )
 
-    async def get_by_path(self, path: str, method: str) -> Optional[Route]:
+    async def get_by_path(self, path: str, method: str, tenant_id: str = "") -> Optional[Route]:
         for route in self._routes:
             if route.matches(path, method):
                 return route
