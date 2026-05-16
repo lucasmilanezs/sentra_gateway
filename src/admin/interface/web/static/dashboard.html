@@ -5,338 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SENTRA – Dashboard</title>
   <link rel="stylesheet" href="css/dashboard.css" />
-  <style>
-    /* ── Layout raiz ── */
-    .layout {
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* ── Topbar ── */
-    .topbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: var(--topbar-height);
-      background: var(--navy-dark);
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      gap: 12px;
-      z-index: 100;
-    }
-
-    .topbar .logo-icon { width: 26px; height: 26px; flex-shrink: 0; }
-    .topbar .logo-text {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 600;
-      font-size: 1rem;
-      letter-spacing: 0.2em;
-      color: var(--text-light);
-      text-transform: uppercase;
-    }
-
-    .topbar-tenant-badge {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-style: italic;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 3px;
-      padding: 2px 10px;
-      margin-left: 4px;
-    }
-
-    .topbar-right {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .topbar-user {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-style: italic;
-    }
-
-    .btn-switch-tenant {
-      font-size: 0.78rem;
-      color: rgba(180, 200, 240, 0.55);
-      background: none;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 3px;
-      padding: 3px 12px;
-      cursor: pointer;
-      font-family: inherit;
-      font-style: italic;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .btn-switch-tenant:hover {
-      background: rgba(255,255,255,0.06);
-      color: var(--text-light);
-    }
-
-    .topbar-logout {
-      font-size: 0.78rem;
-      color: rgba(180, 200, 240, 0.5);
-      background: none;
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 3px;
-      padding: 3px 12px;
-      cursor: pointer;
-      font-family: inherit;
-      font-style: italic;
-      transition: background 0.2s, color 0.2s;
-    }
-
-    .topbar-logout:hover {
-      background: rgba(255,255,255,0.06);
-      color: var(--text-light);
-    }
-
-    /* ── Sidebar ── */
-    .sidebar {
-      width: var(--sidebar-width);
-      background: var(--sidebar-bg);
-      border-right: 1px solid var(--sidebar-border);
-      display: flex;
-      flex-direction: column;
-      padding-top: var(--topbar-height);
-      overflow-y: auto;
-      flex-shrink: 0;
-    }
-
-    .nav-section-label {
-      font-size: 0.65rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: rgba(180, 200, 240, 0.28);
-      padding: 18px 18px 5px;
-    }
-
-    /* ── Conteúdo principal ── */
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 32px 36px;
-      margin-top: var(--topbar-height);
-      background: var(--content-bg);
-    }
-
-    /* ── Página ── */
-    .page { display: none; animation: fadeIn 0.25s ease both; }
-    .page.active { display: block; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .page-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid var(--card-border);
-    }
-
-    .page-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.75rem;
-      font-weight: 400;
-      color: var(--text-main);
-      letter-spacing: 0.02em;
-    }
-
-    .context-badge {
-      font-size: 0.78rem;
-      color: var(--text-sub);
-      font-style: italic;
-      margin-bottom: 16px;
-    }
-
-    /* ── Botões ── */
-    .btn-primary {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 0.9rem;
-      background: var(--accent);
-      color: #f0eae5;
-      border: none;
-      padding: 7px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      letter-spacing: 0.04em;
-      transition: background 0.2s;
-    }
-    .btn-primary:hover { background: var(--navy); }
-
-    .btn-icon {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 0.78rem;
-      color: var(--text-sub);
-      background: none;
-      border: 1px solid var(--card-border);
-      border-radius: 3px;
-      padding: 3px 10px;
-      cursor: pointer;
-      margin-left: 4px;
-      transition: background 0.15s, color 0.15s;
-    }
-    .btn-icon:hover { background: rgba(26,44,91,0.06); color: var(--text-main); }
-    .btn-icon.danger { color: #a03030; border-color: #d4a0a0; }
-    .btn-icon.danger:hover { background: rgba(160,48,48,0.07); }
-
-    /* ── Card ── */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 22px 26px;
-      margin-bottom: 18px;
-      box-shadow: 0 2px 10px rgba(10,20,60,0.06);
-    }
-
-    /* ── Tabelas ── */
-    .data-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    .data-table th {
-      text-align: left; padding: 8px 12px;
-      border-bottom: 1px solid var(--card-border);
-      font-size: 0.72rem; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--text-sub);
-      font-weight: 500;
-    }
-    .data-table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(26,44,91,0.05);
-      color: var(--text-main);
-      vertical-align: middle;
-    }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: rgba(26,44,91,0.025); }
-
-    /* Badges de método HTTP */
-    .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 3px;
-      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;
-    }
-    .m-GET    { background: #e8f4e8; color: #2a6a2a; }
-    .m-POST   { background: #e8eef8; color: #1a3a8a; }
-    .m-PUT    { background: #f8f0e0; color: #8a5a0a; }
-    .m-PATCH  { background: #f0e8f8; color: #5a2a8a; }
-    .m-DELETE { background: #fce8e8; color: #8a2020; }
-    .m-OTHER  { background: #f0f0f0; color: #555; }
-
-    .policy-on  { font-size: 0.75rem; color: #2a6a50; font-style: italic; }
-    .policy-off { font-size: 0.75rem; color: var(--text-sub); font-style: italic; }
-
-    .tbl-empty {
-      font-style: italic; color: var(--text-sub);
-      font-size: 0.88rem; padding: 24px 0;
-    }
-
-    /* ── Métricas ── */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-    .metric-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 18px 20px;
-    }
-    .metric-label {
-      font-size: 0.7rem; text-transform: uppercase;
-      letter-spacing: 0.1em; color: var(--text-sub); margin-bottom: 8px;
-    }
-    .metric-value { font-size: 1.9rem; font-weight: 500; color: var(--text-main); line-height: 1; }
-    .metric-sub { font-size: 0.78rem; color: var(--text-sub); font-style: italic; margin-top: 4px; }
-
-    /* ── Conta ── */
-    .profile-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-    .profile-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); }
-    .profile-value { font-size: 1rem; color: var(--text-main); }
-
-    .form-field { margin-bottom: 18px; }
-    .form-field label { display: block; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); margin-bottom: 5px; }
-    .form-field input {
-      width: 100%; background: transparent; border: none;
-      border-bottom: 1px solid var(--card-border);
-      padding: 6px 0; font-family: 'Cormorant Garamond', serif;
-      font-size: 0.95rem; color: var(--text-main); outline: none;
-      transition: border-color 0.2s; max-width: 320px;
-    }
-    .form-field input:focus { border-bottom-color: var(--accent); }
-
-    .inline-msg { font-size: 0.82rem; font-style: italic; margin-top: 10px; }
-    .inline-msg.error   { color: #a03030; }
-    .inline-msg.success { color: #2a6a50; }
-
-    /* ── Modal ── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(10,18,40,0.6);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 200; backdrop-filter: blur(2px);
-    }
-    .modal-box {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 28px 32px;
-      width: 100%; max-width: 460px;
-      display: flex; flex-direction: column; gap: 16px;
-      box-shadow: 0 20px 60px rgba(10,20,60,0.2);
-    }
-    .modal-title { font-size: 1.1rem; font-weight: 500; color: var(--text-main); }
-    .modal-field label {
-      display: block; font-size: 0.7rem; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--text-sub); margin-bottom: 5px;
-    }
-    .modal-field input,
-    .modal-field select {
-      width: 100%; background: transparent; border: none;
-      border-bottom: 1px solid var(--card-border);
-      padding: 6px 0; font-family: 'Cormorant Garamond', serif;
-      font-size: 0.95rem; color: var(--text-main); outline: none;
-      transition: border-color 0.2s;
-    }
-    .modal-field input:focus, .modal-field select:focus {
-      border-bottom-color: var(--accent);
-    }
-    .modal-field select { cursor: pointer; }
-    .modal-check { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--text-main); cursor: pointer; }
-    .modal-check input[type=checkbox] { cursor: pointer; }
-    .modal-warning { font-size: 0.78rem; color: #8a5a0a; font-style: italic; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
-    .btn-ghost {
-      font-family: inherit; font-size: 0.9rem; color: var(--text-sub);
-      background: none; border: none; cursor: pointer; padding: 6px 12px;
-      border-radius: 3px; transition: color 0.2s;
-    }
-    .btn-ghost:hover { color: var(--text-main); }
-    .btn-danger-ghost {
-      font-family: inherit; font-size: 0.85rem; color: #a03030;
-      background: none; border: 1px solid #d4a0a0; border-radius: 3px;
-      padding: 5px 14px; cursor: pointer; margin-right: auto;
-      transition: background 0.15s;
-    }
-    .btn-danger-ghost:hover { background: rgba(160,48,48,0.07); }
-    .modal-error { font-size: 0.82rem; color: #a03030; font-style: italic; }
-
-    /* Aviso wildcard */
-    .wildcard-warn {
-      font-size: 0.78rem; color: #8a5a0a; font-style: italic;
-      background: rgba(138,90,10,0.07); border: 1px solid rgba(138,90,10,0.2);
-      border-radius: 4px; padding: 6px 10px; display: none;
-    }
-    .wildcard-warn.visible { display: block; }
-  </style>
+  
 </head>
 <body>
 
@@ -354,7 +23,6 @@
   </svg>
   <span class="logo-text">Sentra</span>
   <span class="topbar-tenant-badge" id="topbar-tenant"></span>
-
   <div class="topbar-right">
     <span class="topbar-user" id="topbar-user"></span>
     <button class="btn-switch-tenant" id="btn-switch" style="display:none">← Tenants</button>
@@ -363,7 +31,6 @@
 </header>
 
 <div class="layout">
-
   <!-- Sidebar -->
   <aside class="sidebar">
     <span class="nav-section-label">Visão geral</span>
@@ -382,6 +49,13 @@
         <path d="M5 4V3a3 3 0 016 0v1"/>
       </svg>
       Tenants
+    </button>
+    <button class="nav-item" data-page="domains">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/>
+      </svg>
+      Domains
     </button>
     <button class="nav-item" data-page="routes">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
@@ -413,14 +87,12 @@
     </button>
   </aside>
 
-  <!-- Conteúdo -->
+  <!-- Content -->
   <main class="content">
 
-    <!-- ── OVERVIEW ── -->
+    <!-- OVERVIEW -->
     <section class="page" id="page-overview">
-      <div class="page-header">
-        <h1 class="page-title">Overview</h1>
-      </div>
+      <div class="page-header"><h1 class="page-title">Overview</h1></div>
       <div class="metrics-grid">
         <div class="metric-card">
           <div class="metric-label">Status</div>
@@ -435,10 +107,14 @@
           <div class="metric-label">Rotas ativas</div>
           <div class="metric-value" id="ov-routes">—</div>
         </div>
+        <div class="metric-card">
+          <div class="metric-label">Domains</div>
+          <div class="metric-value" id="ov-domains">—</div>
+        </div>
       </div>
     </section>
 
-    <!-- ── TENANTS ── -->
+    <!-- TENANTS (superuser only) -->
     <section class="page" id="page-tenants">
       <div class="page-header">
         <h1 class="page-title">Tenants</h1>
@@ -447,7 +123,7 @@
       <div class="card">
         <table class="data-table">
           <thead><tr>
-            <th>Nome</th><th>Slug</th><th>Domínio</th><th>Criado em</th><th>Ações</th>
+            <th>Nome</th><th>Slug</th><th>Domains</th><th>Criado em</th><th>Ações</th>
           </tr></thead>
           <tbody id="tbody-tenants"></tbody>
         </table>
@@ -455,7 +131,30 @@
       </div>
     </section>
 
-    <!-- ── ROTAS ── -->
+    <!-- DOMAINS -->
+    <section class="page" id="page-domains">
+      <div class="page-header">
+        <h1 class="page-title">Domains</h1>
+        <button class="btn-primary" id="btn-new-domain">+ Novo domain</button>
+      </div>
+      <p class="context-badge" id="domains-tenant-badge"></p>
+      <div class="domain-hint" id="domain-gateway-hint">
+        O gateway identifica o tenant pelo <code>Host</code> header da requisição.
+        Cadastre aqui os domains/subdomains que correspondem a este tenant.
+        Exemplo: <code>api.empresa.com</code> → requisições com <code>Host: api.empresa.com</code> serão roteadas para este tenant.
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Domain</th><th>Política global</th><th>Criado em</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-domains"></tbody>
+        </table>
+        <p class="tbl-empty" id="domains-empty" style="display:none">Nenhum domain cadastrado. Sem domain, o gateway não consegue rotear requisições para este tenant.</p>
+      </div>
+    </section>
+
+    <!-- ROTAS -->
     <section class="page" id="page-routes">
       <div class="page-header">
         <h1 class="page-title">Rotas</h1>
@@ -465,7 +164,7 @@
       <div class="card">
         <table class="data-table">
           <thead><tr>
-            <th>Método</th><th>Path</th><th>Backend URL</th><th>Política</th><th>Ações</th>
+            <th>Métodos</th><th>Path</th><th>Backend URL</th><th>Política</th><th>Ações</th>
           </tr></thead>
           <tbody id="tbody-routes"></tbody>
         </table>
@@ -473,11 +172,9 @@
       </div>
     </section>
 
-    <!-- ── AUDITORIA ── -->
+    <!-- AUDITORIA -->
     <section class="page" id="page-audit">
-      <div class="page-header">
-        <h1 class="page-title">Auditoria</h1>
-      </div>
+      <div class="page-header"><h1 class="page-title">Auditoria</h1></div>
       <div class="card">
         <p style="font-style:italic;color:var(--text-sub);font-size:.9rem">
           Integração com endpoint de auditoria pendente de implementação no backend.
@@ -485,23 +182,20 @@
       </div>
     </section>
 
-    <!-- ── MÉTRICAS ── -->
+    <!-- MÉTRICAS -->
     <section class="page" id="page-metrics">
-      <div class="page-header">
-        <h1 class="page-title">Métricas</h1>
-      </div>
+      <div class="page-header"><h1 class="page-title">Métricas</h1></div>
       <div class="metrics-grid">
         <div class="metric-card">
           <div class="metric-label">Rotas configuradas</div>
           <div class="metric-value" id="mt-routes">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Req. hoje</div>
-          <div class="metric-value">—</div>
-          <div class="metric-sub">pendente</div>
+          <div class="metric-label">Domains ativos</div>
+          <div class="metric-value" id="mt-domains">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Bloqueadas</div>
+          <div class="metric-label">Req. hoje</div>
           <div class="metric-value">—</div>
           <div class="metric-sub">pendente</div>
         </div>
@@ -513,11 +207,9 @@
       </div>
     </section>
 
-    <!-- ── CONTA ── -->
+    <!-- CONTA -->
     <section class="page" id="page-conta">
-      <div class="page-header">
-        <h1 class="page-title">Meu perfil</h1>
-      </div>
+      <div class="page-header"><h1 class="page-title">Meu perfil</h1></div>
       <div class="card">
         <div class="profile-row">
           <span class="profile-label">E-mail</span>
@@ -554,7 +246,7 @@
   </main>
 </div>
 
-<!-- ── Modal: Tenant ── -->
+<!-- Modal: Tenant -->
 <div class="modal-overlay" id="modal-tenant" style="display:none">
   <div class="modal-box">
     <h2 class="modal-title" id="modal-tenant-title">Novo tenant</h2>
@@ -567,10 +259,6 @@
       <label>Slug</label>
       <input type="text" id="t-slug" placeholder="empresa-xyz" />
     </div>
-    <div class="modal-field">
-      <label>Domínio <span style="opacity:.5">(opcional)</span></label>
-      <input type="text" id="t-domain" placeholder="api.empresa.com" />
-    </div>
     <p class="modal-error" id="t-error" style="display:none"></p>
     <div class="modal-actions">
       <button class="btn-ghost" id="t-cancel">Cancelar</button>
@@ -579,17 +267,72 @@
   </div>
 </div>
 
-<!-- ── Modal: Rota ── -->
+<!-- Modal: Domain -->
+<div class="modal-overlay" id="modal-domain" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title">Novo domain</h2>
+    <div class="modal-field">
+      <label>Domain / Subdomínio</label>
+      <input type="text" id="d-domain" placeholder="api.empresa.com" />
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-sub);font-style:italic;margin-top:-8px">
+      Requisições com <strong>Host:</strong> igual a este valor serão roteadas para este tenant.
+    </p>
+    <p class="modal-error" id="d-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="d-cancel">Cancelar</button>
+      <button class="btn-primary" id="d-save">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Domain Policy -->
+<div class="modal-overlay" id="modal-domain-policy" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title">Política global — <span id="dp-domain-name" style="font-style:italic;font-weight:400"></span></h2>
+    <input type="hidden" id="dp-domain-id" />
+    <p style="font-size:0.78rem;color:var(--text-sub);font-style:italic;margin-top:-8px">
+      Aplicada a todas as rotas deste tenant que não tenham política individual configurada.
+    </p>
+    <div class="modal-field">
+      <label class="modal-check">
+        <input type="checkbox" id="dp-requires-auth" />
+        Requer autenticação JWT
+      </label>
+    </div>
+    <div class="modal-field">
+      <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
+      <input type="number" id="dp-rate-limit" min="1" placeholder="ex: 100" />
+    </div>
+    <div class="modal-field">
+      <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
+      <input type="text" id="dp-roles" placeholder="admin, user" />
+    </div>
+    <p class="modal-error" id="dp-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="dp-delete">Remover política</button>
+      <button class="btn-ghost" id="dp-cancel">Cancelar</button>
+      <button class="btn-primary" id="dp-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rota -->
 <div class="modal-overlay" id="modal-route" style="display:none">
   <div class="modal-box">
     <h2 class="modal-title" id="modal-route-title">Nova rota</h2>
     <input type="hidden" id="r-edit-id" />
     <div class="modal-field">
-      <label>Método</label>
-      <select id="r-method">
-        <option>GET</option><option>POST</option><option>PUT</option>
-        <option>PATCH</option><option>DELETE</option><option>OPTIONS</option><option>HEAD</option>
-      </select>
+      <label>Métodos aceitos</label>
+      <div class="methods-grid" id="methods-grid">
+        <label class="method-check" data-method="GET"><input type="checkbox" name="r-methods" value="GET"> GET</label>
+        <label class="method-check" data-method="POST"><input type="checkbox" name="r-methods" value="POST"> POST</label>
+        <label class="method-check" data-method="PUT"><input type="checkbox" name="r-methods" value="PUT"> PUT</label>
+        <label class="method-check" data-method="PATCH"><input type="checkbox" name="r-methods" value="PATCH"> PATCH</label>
+        <label class="method-check" data-method="DELETE"><input type="checkbox" name="r-methods" value="DELETE"> DELETE</label>
+        <label class="method-check" data-method="OPTIONS"><input type="checkbox" name="r-methods" value="OPTIONS"> OPTIONS</label>
+        <label class="method-check" data-method="HEAD"><input type="checkbox" name="r-methods" value="HEAD"> HEAD</label>
+      </div>
     </div>
     <div class="modal-field">
       <label>Path pattern</label>
@@ -610,7 +353,7 @@
   </div>
 </div>
 
-<!-- ── Modal: Política ── -->
+<!-- Modal: Política por rota -->
 <div class="modal-overlay" id="modal-policy" style="display:none">
   <div class="modal-box">
     <h2 class="modal-title">Política — <span id="p-route-path" style="font-style:italic;font-weight:400"></span></h2>
@@ -622,7 +365,7 @@
       </label>
     </div>
     <div class="modal-field">
-      <label>Rate limit (req/min) <span style="opacity:.5">— deixe vazio para sem limite</span></label>
+      <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
       <input type="number" id="p-rate-limit" min="1" placeholder="ex: 60" />
     </div>
     <div class="modal-field">
@@ -639,22 +382,21 @@
 </div>
 
 <script type="module">
-import { authApi, tenantsApi, routesApi, policiesApi, healthApi } from './js/api.js';
+import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi } from './js/api.js';
 import { requireAuth, logout, currentTenant, isSuperUser } from './js/auth.js';
 
 if (!requireAuth()) throw new Error('not authenticated');
 
-// ── Estado global ───────────────────────────────────────────────────────
-const tenant = currentTenant();
+// ── Estado ──────────────────────────────────────────────────────────────
+const tenant  = currentTenant();
 const superuser = isSuperUser();
-let _routeCache = []; // cache de rotas para modal de política
 
 // ── Topbar ──────────────────────────────────────────────────────────────
 document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.slug || '';
 document.getElementById('btn-logout').addEventListener('click', logout);
 
 if (superuser) {
-  document.getElementById('btn-switch').style.display = 'inline-block';
+  document.getElementById('btn-switch').style.display  = 'inline-block';
   document.getElementById('nav-tenants').style.display = 'flex';
 }
 document.getElementById('btn-switch').addEventListener('click', () => {
@@ -663,9 +405,9 @@ document.getElementById('btn-switch').addEventListener('click', () => {
 });
 
 authApi.me().then(me => {
-  document.getElementById('topbar-user').textContent = me.email;
+  document.getElementById('topbar-user').textContent  = me.email;
   document.getElementById('profile-email').textContent = me.email;
-  document.getElementById('profile-role').textContent = me.role || '—';
+  document.getElementById('profile-role').textContent  = me.role || '—';
 }).catch(() => {});
 
 document.getElementById('profile-tenant').textContent =
@@ -675,6 +417,7 @@ document.getElementById('profile-tenant').textContent =
 const PAGE_LOADERS = {
   overview: loadOverview,
   tenants:  loadTenants,
+  domains:  loadDomains,
   routes:   loadRoutes,
   metrics:  loadMetrics,
   conta:    loadConta,
@@ -688,40 +431,35 @@ document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
 function navigate(pageId) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-
-  const btn = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-  if (btn) btn.classList.add('active');
-
+  const btn  = document.querySelector(`.nav-item[data-page="${pageId}"]`);
   const page = document.getElementById('page-' + pageId);
+  if (btn)  btn.classList.add('active');
   if (page) page.classList.add('active');
-
   PAGE_LOADERS[pageId]?.();
 }
 
-// Abre na página de rotas por padrão
-navigate('routes');
+navigate('domains');
 
 // ── OVERVIEW ────────────────────────────────────────────────────────────
 async function loadOverview() {
   try {
     const h = await healthApi.check();
-    // Backend retorna: { status, postgres_connected }
     document.getElementById('ov-status').textContent   = h.status === 'ok' ? '✓' : '✗';
     document.getElementById('ov-postgres').textContent = h.postgres_connected ? '✓' : '✗';
     document.getElementById('ov-postgres-sub').textContent = h.postgres_connected ? 'conectado' : 'offline';
-  } catch {
-    document.getElementById('ov-status').textContent = 'erro';
-  }
+  } catch { document.getElementById('ov-status').textContent = 'erro'; }
 
   if (tenant) {
     try {
-      const list = await routesApi.list(tenant.id);
-      document.getElementById('ov-routes').textContent = list.length;
-    } catch { document.getElementById('ov-routes').textContent = '—'; }
+      const routes  = await routesApi.list(tenant.id);
+      const domains = await domainsApi.list(tenant.id);
+      document.getElementById('ov-routes').textContent  = routes.length;
+      document.getElementById('ov-domains').textContent = domains.length;
+    } catch {}
   }
 }
 
-// ── TENANTS ─────────────────────────────────────────────────────────────
+// ── TENANTS (superuser) ──────────────────────────────────────────────────
 async function loadTenants() {
   const tbody = document.getElementById('tbody-tenants');
   const empty = document.getElementById('tenants-empty');
@@ -732,15 +470,25 @@ async function loadTenants() {
     const list = await tenantsApi.list();
     tbody.innerHTML = '';
     if (!list.length) { empty.style.display = 'block'; return; }
-    list.forEach(t => {
+
+    // Carrega domains de cada tenant em paralelo
+    const domainLists = await Promise.all(
+      list.map(t => domainsApi.list(t.id).catch(() => []))
+    );
+
+    list.forEach((t, i) => {
+      const doms = domainLists[i];
+      const domHtml = doms.length
+        ? doms.map(d => `<span class="domain-pill">${d.domain}</span>`).join('')
+        : '<span style="opacity:.4;font-style:italic;font-size:.8rem">nenhum</span>';
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${t.name}</td>
         <td style="font-style:italic;color:var(--text-sub)">${t.slug}</td>
-        <td style="font-size:.82rem;color:var(--text-sub)">${t.domain || '—'}</td>
+        <td>${domHtml}</td>
         <td style="font-size:.78rem;color:var(--text-sub)">${t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '—'}</td>
         <td>
-          <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.slug)}','${esc(t.domain||'')}')">Editar</button>
+          <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.slug)}')">Editar</button>
           <button class="btn-icon danger" onclick="_deleteTenant('${t.id}','${esc(t.name)}')">Excluir</button>
         </td>`;
       tbody.appendChild(tr);
@@ -750,17 +498,15 @@ async function loadTenants() {
   }
 }
 
-function _openTenantModal(id='', name='', slug='', domain='') {
+function _openTenantModal(id='', name='', slug='') {
   document.getElementById('modal-tenant-title').textContent = id ? 'Editar tenant' : 'Novo tenant';
   document.getElementById('tenant-edit-id').value = id;
-  document.getElementById('t-name').value = name;
-  document.getElementById('t-slug').value = slug;
-  document.getElementById('t-domain').value = domain;
+  document.getElementById('t-name').value  = name;
+  document.getElementById('t-slug').value  = slug;
   document.getElementById('t-error').style.display = 'none';
   document.getElementById('modal-tenant').style.display = 'flex';
   document.getElementById('t-name').focus();
 }
-
 window._editTenant = _openTenantModal;
 
 document.getElementById('btn-new-tenant').addEventListener('click', () => _openTenantModal());
@@ -768,91 +514,220 @@ document.getElementById('t-cancel').addEventListener('click', () => { document.g
 document.getElementById('modal-tenant').addEventListener('click', e => { if (e.target.id === 'modal-tenant') document.getElementById('modal-tenant').style.display = 'none'; });
 
 document.getElementById('t-save').addEventListener('click', async () => {
-  const id     = document.getElementById('tenant-edit-id').value;
-  const name   = document.getElementById('t-name').value.trim();
-  const slug   = document.getElementById('t-slug').value.trim();
-  const domain = document.getElementById('t-domain').value.trim() || undefined;
-  const errEl  = document.getElementById('t-error');
+  const id   = document.getElementById('tenant-edit-id').value;
+  const name = document.getElementById('t-name').value.trim();
+  const slug = document.getElementById('t-slug').value.trim();
+  const errEl = document.getElementById('t-error');
   errEl.style.display = 'none';
-
   if (!name || !slug) { errEl.textContent = 'Nome e slug são obrigatórios.'; errEl.style.display = 'block'; return; }
-
   try {
-    if (id) {
-      await tenantsApi.update(id, { name, slug, domain });
-    } else {
-      await tenantsApi.create({ name, slug, domain });
-    }
+    id ? await tenantsApi.update(id, { name, slug }) : await tenantsApi.create({ name, slug });
     document.getElementById('modal-tenant').style.display = 'none';
     loadTenants();
-  } catch (err) {
-    errEl.textContent = err.detail || 'Erro ao salvar tenant.';
-    errEl.style.display = 'block';
-  }
+  } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar.'; errEl.style.display = 'block'; }
 });
 
 window._deleteTenant = async function(id, name) {
-  if (!confirm(`Excluir tenant "${name}"? Esta ação não pode ser desfeita.`)) return;
-  try {
-    await tenantsApi.delete(id);
-    loadTenants();
-  } catch (err) {
-    alert(err.detail || 'Erro ao excluir tenant.');
-  }
+  if (!confirm(`Excluir tenant "${name}"?`)) return;
+  try { await tenantsApi.delete(id); loadTenants(); }
+  catch (err) { alert(err.detail || 'Erro ao excluir.'); }
 };
+
+// ── DOMAINS ──────────────────────────────────────────────────────────────
+async function loadDomains() {
+  const tenantId = tenant?.id;
+  const badge  = document.getElementById('domains-tenant-badge');
+  const hint   = document.getElementById('domain-gateway-hint');
+  const tbody  = document.getElementById('tbody-domains');
+  const empty  = document.getElementById('domains-empty');
+
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.slug || tenant.id}` : '';
+  hint.style.display = 'block';
+
+  if (!tenantId) {
+    tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Selecione um tenant para ver os domains.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const list = await domainsApi.list(tenantId);
+    tbody.innerHTML = '';
+    if (!list.length) { empty.style.display = 'block'; return; }
+
+    // Carrega políticas em paralelo
+    const policies = await Promise.all(
+      list.map(d => domainsApi.getPolicy(tenantId, d.id).catch(() => null))
+    );
+
+    list.forEach((d, i) => {
+      const p = policies[i];
+      const pHtml = p
+        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}</span>
+           <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Editar</button>`
+        : `<span class="policy-off">sem política</span>
+           <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Configurar</button>`;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-family:monospace;font-size:.88rem">${d.domain}</td>
+        <td>${pHtml}</td>
+        <td style="font-size:.78rem;color:var(--text-sub)">${d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+        <td>
+          <button class="btn-icon danger" onclick="_deleteDomain('${d.id}','${esc(d.domain)}')">Remover</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#a03030;font-style:italic">${err.detail||'Erro'}</td></tr>`;
+  }
+}
+
+document.getElementById('btn-new-domain').addEventListener('click', () => {
+  document.getElementById('d-domain').value = '';
+  document.getElementById('d-error').style.display = 'none';
+  document.getElementById('modal-domain').style.display = 'flex';
+  document.getElementById('d-domain').focus();
+});
+document.getElementById('d-cancel').addEventListener('click', () => { document.getElementById('modal-domain').style.display = 'none'; });
+document.getElementById('modal-domain').addEventListener('click', e => { if (e.target.id === 'modal-domain') document.getElementById('modal-domain').style.display = 'none'; });
+
+document.getElementById('d-save').addEventListener('click', async () => {
+  const domain = document.getElementById('d-domain').value.trim();
+  const errEl  = document.getElementById('d-error');
+  errEl.style.display = 'none';
+  if (!domain) { errEl.textContent = 'Informe o domain.'; errEl.style.display = 'block'; return; }
+  try {
+    await domainsApi.create(tenant.id, { domain });
+    document.getElementById('modal-domain').style.display = 'none';
+    loadDomains();
+  } catch (err) { errEl.textContent = err.detail || 'Erro ao criar domain.'; errEl.style.display = 'block'; }
+});
+
+window._deleteDomain = async function(domainId, domain) {
+  if (!confirm(`Remover domain "${domain}"? O gateway deixará de aceitar requisições com este Host.`)) return;
+  try { await domainsApi.delete(tenant.id, domainId); loadDomains(); }
+  catch (err) { alert(err.detail || 'Erro ao remover.'); }
+};
+
+// Modal domain policy
+window._openDomainPolicyModal = async function(domainId, domainName) {
+  document.getElementById('dp-domain-id').value = domainId;
+  document.getElementById('dp-domain-name').textContent = domainName;
+  document.getElementById('dp-requires-auth').checked = false;
+  document.getElementById('dp-rate-limit').value = '';
+  document.getElementById('dp-roles').value = '';
+  document.getElementById('dp-error').style.display = 'none';
+  document.getElementById('modal-domain-policy').style.display = 'flex';
+  try {
+    const p = await domainsApi.getPolicy(tenant.id, domainId);
+    if (p) {
+      document.getElementById('dp-requires-auth').checked = p.requires_auth;
+      document.getElementById('dp-rate-limit').value = p.rate_limit_per_minute || '';
+      document.getElementById('dp-roles').value = (p.allowed_roles || []).join(', ');
+    }
+  } catch {}
+};
+
+document.getElementById('dp-cancel').addEventListener('click', () => { document.getElementById('modal-domain-policy').style.display = 'none'; });
+document.getElementById('modal-domain-policy').addEventListener('click', e => { if (e.target.id === 'modal-domain-policy') document.getElementById('modal-domain-policy').style.display = 'none'; });
+
+document.getElementById('dp-save').addEventListener('click', async () => {
+  const domainId     = document.getElementById('dp-domain-id').value;
+  const requiresAuth = document.getElementById('dp-requires-auth').checked;
+  const rateRaw      = document.getElementById('dp-rate-limit').value.trim();
+  const rolesRaw     = document.getElementById('dp-roles').value.trim();
+  const errEl        = document.getElementById('dp-error');
+  errEl.style.display = 'none';
+  const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
+  const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  try {
+    await domainsApi.upsertPolicy(tenant.id, domainId, { requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles });
+    document.getElementById('modal-domain-policy').style.display = 'none';
+    loadDomains();
+  } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar política.'; errEl.style.display = 'block'; }
+});
+
+document.getElementById('dp-delete').addEventListener('click', async () => {
+  const domainId = document.getElementById('dp-domain-id').value;
+  try {
+    await domainsApi.deletePolicy(tenant.id, domainId);
+    document.getElementById('modal-domain-policy').style.display = 'none';
+    loadDomains();
+  } catch (err) { document.getElementById('dp-error').textContent = err.detail || 'Erro ao remover.'; document.getElementById('dp-error').style.display = 'block'; }
+});
 
 // ── ROTAS ────────────────────────────────────────────────────────────────
 async function loadRoutes() {
   const tbody = document.getElementById('tbody-routes');
   const empty = document.getElementById('routes-empty');
   const badge = document.getElementById('routes-tenant-badge');
-
   badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.slug || tenant.id}` : '';
   tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
     const list = await routesApi.list(tenant?.id);
-    _routeCache = list;
     tbody.innerHTML = '';
     if (!list.length) { empty.style.display = 'block'; return; }
 
-    // Carrega policies em paralelo
     const policies = await Promise.all(
       list.map(r => policiesApi.get(r.id).catch(() => null))
     );
 
     list.forEach((r, i) => {
       const p = policies[i];
-      const methodClass = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
+      // r.methods é array
+      const methods = Array.isArray(r.methods) ? r.methods : (r.method ? [r.method] : []);
+      const methodBadges = methods.map(m => {
+        const cls = ['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'].includes(m) ? `m-${m}` : 'm-OTHER';
+        return `<span class="badge ${cls}">${m}</span>`;
+      }).join('');
+
       const policyHtml = p
         ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}</span>`
         : `<span class="policy-off">sem política</span>`;
 
+      const methodsJson = esc(JSON.stringify(methods));
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><span class="badge ${methodClass}">${r.method}</span></td>
+        <td>${methodBadges}</td>
         <td style="font-family:monospace;font-size:.85rem">${r.path_pattern}</td>
-        <td style="font-size:.8rem;color:var(--text-sub)">${r.backend_url}</td>
+        <td style="font-size:.8rem;color:var(--text-sub);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.backend_url}">${r.backend_url}</td>
         <td>${policyHtml}</td>
         <td>
           <button class="btn-icon" onclick="_openPolicyModal('${r.id}','${esc(r.path_pattern)}')">Política</button>
-          <button class="btn-icon" onclick="_editRoute('${r.id}','${esc(r.method)}','${esc(r.path_pattern)}','${esc(r.backend_url)}')">Editar</button>
+          <button class="btn-icon" onclick="_editRoute('${r.id}','${methodsJson}','${esc(r.path_pattern)}','${esc(r.backend_url)}')">Editar</button>
           <button class="btn-icon danger" onclick="_deleteRoute('${r.id}','${esc(r.path_pattern)}')">Excluir</button>
         </td>`;
       tbody.appendChild(tr);
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro ao carregar rotas.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro'}</td></tr>`;
   }
 }
 
-// Modal rota
-function _openRouteModal(id='', method='GET', path='', backend='') {
+// Checkboxes de método
+function _setMethodCheckboxes(methods) {
+  document.querySelectorAll('input[name="r-methods"]').forEach(cb => {
+    cb.checked = methods.includes(cb.value);
+    cb.closest('.method-check').classList.toggle('checked', cb.checked);
+  });
+}
+
+document.querySelectorAll('input[name="r-methods"]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    cb.closest('.method-check').classList.toggle('checked', cb.checked);
+  });
+});
+
+function _openRouteModal(id='', methods=[], path='', backend='') {
   document.getElementById('modal-route-title').textContent = id ? 'Editar rota' : 'Nova rota';
   document.getElementById('r-edit-id').value = id;
-  document.getElementById('r-method').value = method;
-  document.getElementById('r-path').value = path;
+  _setMethodCheckboxes(Array.isArray(methods) ? methods : []);
+  document.getElementById('r-path').value    = path;
   document.getElementById('r-backend').value = backend;
   document.getElementById('r-error').style.display = 'none';
   document.getElementById('r-wildcard').classList.toggle('visible', path.includes('/*'));
@@ -864,46 +739,45 @@ document.getElementById('r-path').addEventListener('input', e => {
   document.getElementById('r-wildcard').classList.toggle('visible', e.target.value.includes('/*'));
 });
 
-window._editRoute = _openRouteModal;
+window._editRoute = (id, methodsJson, path, backend) => {
+  let methods = [];
+  try { methods = JSON.parse(methodsJson); } catch {}
+  _openRouteModal(id, methods, path, backend);
+};
+
 document.getElementById('btn-new-route').addEventListener('click', () => _openRouteModal());
 document.getElementById('r-cancel').addEventListener('click', () => { document.getElementById('modal-route').style.display = 'none'; });
 document.getElementById('modal-route').addEventListener('click', e => { if (e.target.id === 'modal-route') document.getElementById('modal-route').style.display = 'none'; });
 
 document.getElementById('r-save').addEventListener('click', async () => {
   const id      = document.getElementById('r-edit-id').value;
-  const method  = document.getElementById('r-method').value;
+  const methods = [...document.querySelectorAll('input[name="r-methods"]:checked')].map(el => el.value);
   const path    = document.getElementById('r-path').value.trim();
   const backend = document.getElementById('r-backend').value.trim();
   const errEl   = document.getElementById('r-error');
   errEl.style.display = 'none';
 
+  if (!methods.length) { errEl.textContent = 'Selecione ao menos um método HTTP.'; errEl.style.display = 'block'; return; }
   if (!path || !backend) { errEl.textContent = 'Path e backend URL são obrigatórios.'; errEl.style.display = 'block'; return; }
 
   try {
     if (id) {
-      await routesApi.update(id, { method, path_pattern: path, backend_url: backend });
+      await routesApi.update(id, { methods, path_pattern: path, backend_url: backend });
     } else {
-      await routesApi.create({ tenant_id: tenant?.id, method, path_pattern: path, backend_url: backend });
+      await routesApi.create({ tenant_id: tenant?.id, methods, path_pattern: path, backend_url: backend });
     }
     document.getElementById('modal-route').style.display = 'none';
     loadRoutes();
-  } catch (err) {
-    errEl.textContent = err.detail || 'Erro ao salvar rota.';
-    errEl.style.display = 'block';
-  }
+  } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar rota.'; errEl.style.display = 'block'; }
 });
 
 window._deleteRoute = async function(id, path) {
   if (!confirm(`Excluir rota "${path}"?`)) return;
-  try {
-    await routesApi.delete(id);
-    loadRoutes();
-  } catch (err) {
-    alert(err.detail || 'Erro ao excluir rota.');
-  }
+  try { await routesApi.delete(id); loadRoutes(); }
+  catch (err) { alert(err.detail || 'Erro ao excluir.'); }
 };
 
-// Modal política
+// Modal política por rota
 window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-route-id').value = routeId;
   document.getElementById('p-route-path').textContent = routePath;
@@ -912,7 +786,6 @@ window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-rate-limit').value = '';
   document.getElementById('p-roles').value = '';
   document.getElementById('modal-policy').style.display = 'flex';
-
   try {
     const p = await policiesApi.get(routeId);
     if (p) {
@@ -920,7 +793,7 @@ window._openPolicyModal = async function(routeId, routePath) {
       document.getElementById('p-rate-limit').value = p.rate_limit_per_minute || '';
       document.getElementById('p-roles').value = (p.allowed_roles || []).join(', ');
     }
-  } catch { /* sem política existente, tudo bem */ }
+  } catch {}
 };
 
 document.getElementById('p-cancel').addEventListener('click', () => { document.getElementById('modal-policy').style.display = 'none'; });
@@ -933,18 +806,13 @@ document.getElementById('p-save').addEventListener('click', async () => {
   const rolesRaw     = document.getElementById('p-roles').value.trim();
   const errEl        = document.getElementById('p-error');
   errEl.style.display = 'none';
-
   const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
   const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-
   try {
     await policiesApi.upsert(routeId, { requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles });
     document.getElementById('modal-policy').style.display = 'none';
     loadRoutes();
-  } catch (err) {
-    errEl.textContent = err.detail || 'Erro ao salvar política.';
-    errEl.style.display = 'block';
-  }
+  } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar.'; errEl.style.display = 'block'; }
 });
 
 document.getElementById('p-delete').addEventListener('click', async () => {
@@ -953,19 +821,20 @@ document.getElementById('p-delete').addEventListener('click', async () => {
     await policiesApi.delete(routeId);
     document.getElementById('modal-policy').style.display = 'none';
     loadRoutes();
-  } catch (err) {
-    document.getElementById('p-error').textContent = err.detail || 'Erro ao remover política.';
-    document.getElementById('p-error').style.display = 'block';
-  }
+  } catch (err) { document.getElementById('p-error').textContent = err.detail || 'Erro ao remover.'; document.getElementById('p-error').style.display = 'block'; }
 });
 
 // ── MÉTRICAS ────────────────────────────────────────────────────────────
 async function loadMetrics() {
   if (!tenant) return;
   try {
-    const list = await routesApi.list(tenant.id);
-    document.getElementById('mt-routes').textContent = list.length;
-  } catch { document.getElementById('mt-routes').textContent = '—'; }
+    const [routes, domains] = await Promise.all([
+      routesApi.list(tenant.id),
+      domainsApi.list(tenant.id),
+    ]);
+    document.getElementById('mt-routes').textContent  = routes.length;
+    document.getElementById('mt-domains').textContent = domains.length;
+  } catch {}
 }
 
 // ── CONTA ────────────────────────────────────────────────────────────────
@@ -977,10 +846,8 @@ function loadConta() {
     const msgEl   = document.getElementById('pw-msg');
     msgEl.className = 'inline-msg';
     msgEl.textContent = '';
-
     if (!current || !next) { msgEl.className += ' error'; msgEl.textContent = 'Preencha todos os campos.'; return; }
     if (next !== confirm)   { msgEl.className += ' error'; msgEl.textContent = 'As senhas não coincidem.'; return; }
-
     try {
       await authApi.changePassword(current, next);
       msgEl.className += ' success';
@@ -988,14 +855,11 @@ function loadConta() {
       document.getElementById('pw-current').value = '';
       document.getElementById('pw-new').value = '';
       document.getElementById('pw-confirm').value = '';
-    } catch (err) {
-      msgEl.className += ' error';
-      msgEl.textContent = err.detail || 'Erro ao alterar senha.';
-    }
-  }, { once: true }); // { once } evita duplicar listener em re-navegação
+    } catch (err) { msgEl.className += ' error'; msgEl.textContent = err.detail || 'Erro ao alterar senha.'; }
+  }, { once: true });
 }
 
-// ── Utilitário ─────────────────────────────────────────────────────────
+// ── Util ─────────────────────────────────────────────────────────────────
 function esc(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 </script>
 

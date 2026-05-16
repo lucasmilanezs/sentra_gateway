@@ -5,14 +5,6 @@ from src.gateway.domain.models.route import Route
 
 
 class RouteRepository(ABC):
-    """
-    Outbound port for route resolution.
-
-    The gateway reads routes to match incoming requests against registered
-    path prefixes. Implementations may use in-memory stores, PostgreSQL,
-    or a cached snapshot — the use case is oblivious to the backing store.
-    """
-
     @abstractmethod
     async def get_by_path(self, path: str, method: str, tenant_id: str) -> Optional[Route]:
         """
@@ -23,5 +15,4 @@ class RouteRepository(ABC):
 
     @abstractmethod
     async def list_all(self) -> List[Route]:
-        """Returns all registered routes."""
         ...

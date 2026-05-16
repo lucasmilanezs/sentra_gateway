@@ -30,14 +30,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = GatewaySettings()
 
-    # Snapshot inicial — carrega configurações do Postgres
     snapshot = PostgresSnapshotRepository()
     await snapshot.load(settings.database_url)
 
-    # Cliente Redis compartilhado entre rate limiter e subscriber
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
 
-    # Construção do pipeline de políticas (application layer)
     policy_pipeline = ApplyPolicyPipeline(
         policy_evaluator=PolicyEvaluator(),
         rate_limit_checker=RateLimitChecker(
@@ -60,7 +57,6 @@ async def lifespan(app: FastAPI):
 
     app.state.forward_request = forward_request
 
-    # Subscriber pub/sub em background
     subscriber_task = asyncio.create_task(
         listen_for_config_updates(
             redis_url=settings.redis_url,
@@ -94,14 +90,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # em dev, aceita qualquer origem
-    allow_methods=["*"],        # GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_origins=["*"],
+    allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=False,
 )
 app.include_router(router)
-

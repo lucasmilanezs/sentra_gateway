@@ -11,7 +11,6 @@ def _orm_to_entity(row: TenantORM) -> Tenant:
         id=row.id,
         name=row.name,
         slug=row.slug,
-        domain=row.domain,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -22,7 +21,6 @@ def _entity_to_orm(tenant: Tenant) -> TenantORM:
         id=tenant.id,
         name=tenant.name,
         slug=tenant.slug,
-        domain=tenant.domain,
         created_at=tenant.created_at,
         updated_at=tenant.updated_at,
     )
@@ -55,7 +53,6 @@ class TenantRepository(TenantRepositoryPort):
         if existing:
             existing.name = tenant.name
             existing.slug = tenant.slug
-            existing.domain = tenant.domain
             existing.updated_at = tenant.updated_at
         else:
             self._session.add(_entity_to_orm(tenant))

@@ -36,43 +36,48 @@ async function request(method, path, body = null) {
 }
 
 export const authApi = {
-  login:          (email, password)                  => request('POST', '/auth/login', { email, password }),
-  register:       (email, password, tenant_id=null)  => request('POST', '/auth/register', { email, password, ...(tenant_id && { tenant_id }) }),
-  me:             ()                                 => request('GET',  '/auth/me'),
-  forgotPassword: (email)                            => request('POST', '/auth/forgot-password', { email }),
-  resetPassword:  (email, code, new_password)        => request('POST', '/auth/reset-password', { email, code, new_password }),
-  changePassword: (current_password, new_password)   => request('POST', '/auth/change-password', { current_password, new_password }),
+  login:          (email, password)                 => request('POST', '/auth/login', { email, password }),
+  register:       (email, password, tenant_id=null) => request('POST', '/auth/register', { email, password, ...(tenant_id && { tenant_id }) }),
+  me:             ()                                => request('GET',  '/auth/me'),
+  forgotPassword: (email)                           => request('POST', '/auth/forgot-password', { email }),
+  resetPassword:  (email, code, new_password)       => request('POST', '/auth/reset-password', { email, code, new_password }),
+  changePassword: (current_password, new_password)  => request('POST', '/auth/change-password', { current_password, new_password }),
 };
 
 export const tenantsApi = {
-  list:   ()              => request('GET',    '/tenants'),
-  create: (payload)       => request('POST',   '/tenants', payload),
-  get:    (id)            => request('GET',    `/tenants/${id}`),
-  update: (id, payload)   => request('PATCH',  `/tenants/${id}`, payload),
-  delete: (id)            => request('DELETE', `/tenants/${id}`),
+  list:   ()            => request('GET',    '/tenants'),
+  create: (payload)     => request('POST',   '/tenants', payload),
+  get:    (id)          => request('GET',    `/tenants/${id}`),
+  update: (id, payload) => request('PATCH',  `/tenants/${id}`, payload),
+  delete: (id)          => request('DELETE', `/tenants/${id}`),
+};
+
+// Domains são sub-recurso de tenant — resolvem o Host header no gateway
+export const domainsApi = {
+  list:   (tenantId)                        => request('GET',    `/tenants/${tenantId}/domains`),
+  create: (tenantId, payload)               => request('POST',   `/tenants/${tenantId}/domains`, payload),
+  delete: (tenantId, domainId)              => request('DELETE', `/tenants/${tenantId}/domains/${domainId}`),
+
+  // Política global por domain — fallback para rotas sem policy individual
+  getPolicy:    (tenantId, domainId)           => request('GET',    `/tenants/${tenantId}/domains/${domainId}/policy`),
+  upsertPolicy: (tenantId, domainId, payload)  => request('PUT',    `/tenants/${tenantId}/domains/${domainId}/policy`, payload),
+  deletePolicy: (tenantId, domainId)           => request('DELETE', `/tenants/${tenantId}/domains/${domainId}/policy`),
 };
 
 export const routesApi = {
-  list:   (tenantId)      => request('GET',    tenantId ? `/routes?tenant_id=${tenantId}` : '/routes'),
-  create: (payload)       => request('POST',   '/routes', payload),
-  get:    (id)            => request('GET',    `/routes/${id}`),
-  update: (id, payload)   => request('PATCH',  `/routes/${id}`, payload),
-  delete: (id)            => request('DELETE', `/routes/${id}`),
+  list:   (tenantId)    => request('GET',    tenantId ? `/routes?tenant_id=${tenantId}` : '/routes'),
+  create: (payload)     => request('POST',   '/routes', payload),
+  get:    (id)          => request('GET',    `/routes/${id}`),
+  update: (id, payload) => request('PATCH',  `/routes/${id}`, payload),
+  delete: (id)          => request('DELETE', `/routes/${id}`),
 };
 
 export const policiesApi = {
-  get:    (routeId)           => request('GET',    `/routes/${routeId}/policy`),
-  upsert: (routeId, payload)  => request('PUT',    `/routes/${routeId}/policy`, payload),
-  delete: (routeId)           => request('DELETE', `/routes/${routeId}/policy`),
-};
-
-export const globalPoliciesApi = {
-  get:    (tenantId)           => request('GET',    `/tenants/${tenantId}/policy`),
-  upsert: (tenantId, payload)  => request('PUT',    `/tenants/${tenantId}/policy`, payload),
-  delete: (tenantId)           => request('DELETE', `/tenants/${tenantId}/policy`),
+  get:    (routeId)          => request('GET',    `/routes/${routeId}/policy`),
+  upsert: (routeId, payload) => request('PUT',    `/routes/${routeId}/policy`, payload),
+  delete: (routeId)          => request('DELETE', `/routes/${routeId}/policy`),
 };
 
 export const healthApi = {
-  // Responde { status, postgres_connected } — sem campo redis ainda
   check: () => request('GET', '/health'),
 };

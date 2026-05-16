@@ -35,7 +35,6 @@ from src.admin.interface.http.routers import (  # noqa: E402
     tenant_router,
     policy_router,
 )
-from src.admin.interface.http.routers.global_policy_router import router as global_policy_router  # noqa: E402
 from src.admin.interface.http.wiring import AdminWiring # noqa: E402
 
 
@@ -85,14 +84,10 @@ app = FastAPI(title="Sentra Admin", lifespan=lifespan)
 
 register_domain_exception_handlers(app)
 
-# DEPOIS — routers primeiro, mount por último
 app.include_router(health_router.router, tags=["Health"])
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(tenant_router.router, prefix="/api/v1/tenants", tags=["Tenants"])
 app.include_router(admin_route_router.router, prefix="/api/v1/routes", tags=["Routes"])
 app.include_router(policy_router.router, prefix="/api/v1/routes", tags=["Policies"])
-app.include_router(global_policy_router, prefix="/api/v1/tenants", tags=["GlobalPolicies"])
-
-# StaticFiles por último — catch-all para o frontend
-# html=True serve index.html para qualquer path não resolvido (necessário para SPA)
+# StaticFiles por último
 app.mount("/", StaticFiles(directory="src/admin/interface/web/static", html=True), name="frontend")

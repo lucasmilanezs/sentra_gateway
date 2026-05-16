@@ -38,7 +38,7 @@ class ManageTenant:
             raise NotFoundError("tenant não encontrado")
         return t
 
-    async def create(self, name: str, slug: str, domain: str | None) -> Tenant:
+    async def create(self, name: str, slug: str) -> Tenant:
         self._validate_slug(slug)
         if await self._tenants.get_by_slug(slug):
             raise ConflictError("slug já em uso")
@@ -47,7 +47,6 @@ class ManageTenant:
             id=str(uuid.uuid4()),
             name=name.strip(),
             slug=slug,
-            domain=(domain.strip() if domain else None) or None,
             created_at=now,
             updated_at=now,
         )
@@ -66,16 +65,10 @@ class ManageTenant:
             existing = await self._tenants.get_by_slug(new_slug)
             if existing and existing.id != tenant_id:
                 raise ConflictError("slug já em uso")
-        if "domain" in data:
-            d = data["domain"]
-            new_domain = (d.strip() if d else None) if d is not None else None
-        else:
-            new_domain = t.domain
         updated = Tenant(
             id=t.id,
             name=new_name,
             slug=new_slug,
-            domain=new_domain,
             created_at=t.created_at,
             updated_at=_utcnow(),
         )

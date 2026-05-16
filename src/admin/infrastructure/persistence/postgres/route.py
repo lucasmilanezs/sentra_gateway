@@ -1,5 +1,7 @@
+from __future__ import annotations
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from src.admin.domain.entities.admin_route import AdminRoute
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
@@ -7,12 +9,20 @@ from src.admin.domain.value_objects.http_method import HttpMethod
 from src.admin.infrastructure.persistence.postgres.models import AdminRouteORM
 
 
+def _parse_methods(raw: str) -> list[HttpMethod]:
+    return [HttpMethod(m.strip().upper()) for m in raw.split(",") if m.strip()]
+
+
+def _serialize_methods(methods: list[HttpMethod]) -> str:
+    return ",".join(m.value for m in methods)
+
+
 def _orm_to_entity(row: AdminRouteORM) -> AdminRoute:
     return AdminRoute(
         id=row.id,
         tenant_id=row.tenant_id,
         path_pattern=row.path_pattern,
-        method=HttpMethod(row.method),
+        methods=_parse_methods(row.methods),
         backend_url=row.backend_url,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -24,7 +34,7 @@ def _entity_to_orm(route: AdminRoute) -> AdminRouteORM:
         id=route.id,
         tenant_id=route.tenant_id,
         path_pattern=route.path_pattern,
-        method=route.method.value,
+        methods=_serialize_methods(route.methods),
         backend_url=route.backend_url,
         created_at=route.created_at,
         updated_at=route.updated_at,
@@ -54,7 +64,7 @@ class RouteRepository(AdminRouteRepositoryPort):
         if existing:
             existing.tenant_id = route.tenant_id
             existing.path_pattern = route.path_pattern
-            existing.method = route.method.value
+            existing.methods = _serialize_methods(route.methods)
             existing.backend_url = route.backend_url
             existing.updated_at = route.updated_at
         else:

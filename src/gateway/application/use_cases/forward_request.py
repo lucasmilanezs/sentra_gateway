@@ -26,6 +26,7 @@ class DomainNotFoundError(Exception):
 
 
 class PolicyDeniedError(Exception):
+    """The route policy denied the request."""
 
     def __init__(self, reason: str, status_code: int = 403) -> None:
         self.reason = reason
@@ -38,9 +39,10 @@ class ForwardRequest(GatewayRequestPort):
     Core use case of the gateway data plane.
 
     Orchestrates the full request processing pipeline:
-      1. Route resolution
+      0. Tenant resolution (Host header → tenant)
+      1. Route resolution (path + method + tenant_id)
       2. Domain resolution
-      3. Policy enforcement (delegated to ApplyPolicyPipeline)
+      3. Policy enforcement (route policy, fallback to domain global policy)
       4. Request forwarding
       5. Log recording (best-effort)
     """
@@ -68,9 +70,6 @@ class ForwardRequest(GatewayRequestPort):
     async def handle(self, request: Request, raw_body: bytes) -> GatewayResponse:
         start = time.monotonic()
 
-    async def handle(self, request: Request, raw_body: bytes) -> GatewayResponse:
-        start = time.monotonic()
-
         # 0. Tenant resolution
         tenant = await self._tenants.get_by_domain(request.host)
         if tenant is None:
@@ -78,8 +77,10 @@ class ForwardRequest(GatewayRequestPort):
                 f"No tenant registered for host '{request.host}'."
             )
 
-        # 1. Route resolution
-        route = await self._routes.get_by_path(request.path, request.method.value, tenant.id)
+        # 1. Route resolution (scoped to tenant)
+        route = await self._routes.get_by_path(
+            request.path, request.method.value, tenant.id
+        )
         if route is None:
             raise RouteNotFoundError(
                 f"No route matched path '{request.path}' [{request.method.value}]."
@@ -92,11 +93,17 @@ class ForwardRequest(GatewayRequestPort):
                 f"Domain '{route.domain_id}' referenced by route '{route.id}' is not configured."
             )
 
-        # 3. Policy enforcement — rota individual, com fallback para política global do tenant
+        # 3. Policy enforcement — route policy with global domain policy fallback
         policy = await self._policies.get_by_route_id(route.id)
-        if policy is None and hasattr(self._policies, "get_global_policy"):
-            policy = self._policies.get_global_policy(tenant.id)
+        if policy is None and hasattr(self._policies, "get_domain_policy"):
+            policy = self._policies.get_domain_policy(tenant.id)
+
         result = await self._pipeline.apply(policy, request)
+        if not result.allowed:
+            raise PolicyDeniedError(
+                reason=result.reason or "Request denied by policy.",
+                status_code=result.status_code,
+            )
 
         # 4. Forward
         upstream_path = route.strip_prefix(request.path)

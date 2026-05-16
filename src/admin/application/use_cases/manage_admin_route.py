@@ -1,3 +1,4 @@
+from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -18,6 +19,21 @@ def _validate_backend_url(url: str) -> None:
     p = urlparse(url)
     if p.scheme not in ("http", "https") or not p.netloc:
         raise ValidationError("backend_url deve ser uma URL http(s) válida")
+
+
+def _parse_methods(raw: list[str] | list[HttpMethod]) -> list[HttpMethod]:
+    result = []
+    for m in raw:
+        if isinstance(m, HttpMethod):
+            result.append(m)
+        else:
+            try:
+                result.append(HttpMethod(str(m).upper()))
+            except ValueError:
+                raise ValidationError(f"método HTTP inválido: {m}")
+    if not result:
+        raise ValidationError("pelo menos um método HTTP deve ser informado")
+    return result
 
 
 class ManageAdminRoute:
@@ -44,21 +60,25 @@ class ManageAdminRoute:
         self,
         tenant_id: str,
         path_pattern: str,
-        method: HttpMethod,
+        methods: list[HttpMethod],
         backend_url: str,
     ) -> AdminRoute:
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
+
         path_pattern = path_pattern.strip()
         if not path_pattern.startswith("/"):
             raise ValidationError("path_pattern deve começar com /")
+
+        parsed_methods = _parse_methods(methods)
         _validate_backend_url(backend_url.strip())
+
         now = _utcnow()
         route = AdminRoute(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
             path_pattern=path_pattern,
-            method=method,
+            methods=parsed_methods,
             backend_url=backend_url.strip().rstrip("/"),
             created_at=now,
             updated_at=now,
@@ -74,21 +94,26 @@ class ManageAdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
+
         new_path = data["path_pattern"].strip() if "path_pattern" in data else r.path_pattern
         if not new_path.startswith("/"):
             raise ValidationError("path_pattern deve começar com /")
+
         new_url = (
             data["backend_url"].strip().rstrip("/") if "backend_url" in data else r.backend_url
         )
         _validate_backend_url(new_url)
-        new_method = data["method"] if "method" in data else r.method
-        if isinstance(new_method, str):
-            new_method = HttpMethod(new_method.upper())
+
+        if "methods" in data:
+            new_methods = _parse_methods(data["methods"])
+        else:
+            new_methods = r.methods
+
         updated = AdminRoute(
             id=r.id,
             tenant_id=r.tenant_id,
             path_pattern=new_path,
-            method=new_method,
+            methods=new_methods,
             backend_url=new_url,
             created_at=r.created_at,
             updated_at=_utcnow(),

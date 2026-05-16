@@ -3,7 +3,6 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi import HTTPException, status as http_status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.admin.domain.exceptions import AuthError
@@ -23,13 +22,6 @@ def get_wiring(request: Request) -> AdminWiring:
 async def get_request_wiring(
     request: Request,
 ) -> AsyncGenerator[AdminWiring, None]:
-    """
-    Dependency principal que resolve o wiring correto por request.
-
-    - Modo JSON: retorna o wiring global diretamente (sem sessão).
-    - Modo Postgres: abre uma AsyncSession, constrói wiring com repositórios
-      transacionais, faz commit/rollback ao fim do request e fecha a sessão.
-    """
     wiring: AdminWiring = get_wiring(request)
 
     if not wiring.use_postgres:
@@ -47,10 +39,22 @@ def get_manage_tenant(
     return w.manage_tenant
 
 
+def get_manage_tenant_domain(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_tenant_domain
+
+
 def get_manage_route(
     w: Annotated[AdminWiring, Depends(get_request_wiring)],
 ) -> object:
     return w.manage_route
+
+
+def get_manage_policy(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> object:
+    return w.manage_policy
 
 
 def get_authenticate_user(
@@ -82,10 +86,6 @@ def get_reset_password(
 ) -> object:
     return w.reset_password_with_code
 
-def get_manage_policy(
-    w: Annotated[AdminWiring, Depends(get_request_wiring)],
-) -> object:
-    return w.manage_policy
 
 async def get_current_claims(
     request: Request,
@@ -106,30 +106,3 @@ async def get_current_claims(
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
-
-def require_superuser(
-    claims: Annotated[JwtClaims, Depends(get_current_claims)],
-) -> JwtClaims:
-    if claims.role != "superuser":
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="acesso restrito ao superuser",
-        )
-    return claims
-
-
-def require_own_tenant(claims: JwtClaims, tenant_id: str) -> None:
-    """Superuser passa sempre. Admin só acessa o próprio tenant."""
-    if claims.role == "superuser":
-        return
-    if claims.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="acesso negado a recurso de outro tenant",
-        )
-
-
-def get_manage_global_policy(
-    w: Annotated[AdminWiring, Depends(get_request_wiring)],
-) -> object:
-    return w.manage_global_policy

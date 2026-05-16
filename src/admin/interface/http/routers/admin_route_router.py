@@ -18,7 +18,7 @@ def _to_response(r) -> AdminRouteResponse:
         id=r.id,
         tenant_id=r.tenant_id,
         path_pattern=r.path_pattern,
-        method=r.method,
+        methods=r.methods,
         backend_url=r.backend_url,
         created_at=r.created_at,
         updated_at=r.updated_at,
@@ -41,7 +41,7 @@ async def create_route(
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
     _: Annotated[object, Depends(get_current_claims)],
 ):
-    r = await uc.create(body.tenant_id, body.path_pattern, body.method, body.backend_url)
+    r = await uc.create(body.tenant_id, body.path_pattern, body.methods, body.backend_url)
     return _to_response(r)
 
 

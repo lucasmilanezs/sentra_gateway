@@ -7,7 +7,7 @@ from typing import Optional
 class GatewayTenant:
     """Representação mínima de tenant necessária ao data plane."""
     id: str
-    domain: str | None
+    domain: str
 
 
 class TenantRepository(ABC):
@@ -15,7 +15,7 @@ class TenantRepository(ABC):
     Outbound port para resolução de tenant por domínio HTTP.
 
     O gateway usa o Host header para identificar a qual tenant
-    pertence a requisição antes de fazer qualquer resolução de rota.
+    pertence a requisição antes de qualquer resolução de rota.
     """
 
     @abstractmethod

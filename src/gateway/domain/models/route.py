@@ -7,15 +7,11 @@ from src.gateway.domain.value_objects.http_method import HttpMethod
 @dataclass(frozen=True)
 class Route:
     """
-    Maps an incoming request path to a backend Domain.
+    Maps an incoming request path + tenant to a backend Domain.
 
     Registered and managed by the admin plane.
-    The gateway resolves routes at request time using longest-prefix matching:
-    the route whose path_prefix best (most specifically) matches the incoming
-    path wins. Ties in length are broken by insertion order.
-
-    Single-tenant design: there is no tenant_slug in the URL. Routing is
-    purely path-based against all registered routes.
+    The gateway resolves routes at request time using longest-prefix matching
+    scoped to the tenant resolved from the Host header.
     """
 
     id: str
@@ -46,16 +42,6 @@ class Route:
         return path_ok and method_ok
 
     def strip_prefix(self, path: str) -> str:
-        """
-        Returns the path with this route's prefix stripped.
-
-        The result is the upstream-relative path passed to the backend.
-        Always returns at least "/" so the backend receives a valid path.
-
-        Example:
-            Route(path_prefix="/api").strip_prefix("/api/users/42") → "/users/42"
-            Route(path_prefix="/api").strip_prefix("/api")          → "/"
-        """
         prefix = self.path_prefix.rstrip("/")
         if path.startswith(prefix):
             remainder = path[len(prefix):]

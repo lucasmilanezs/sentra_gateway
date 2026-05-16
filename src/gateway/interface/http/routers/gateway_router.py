@@ -15,7 +15,7 @@ router = APIRouter()
 
 _parser = RequestParser()
 
-_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
 _PATH = "/{path:path}"
 
 
@@ -28,18 +28,6 @@ def _error_response(status_code: int, code: str, message: str) -> Response:
 
 
 async def _gateway_entrypoint(fastapi_request: FastAPIRequest) -> Response:
-    """
-    HttpRouter — single entry point for all proxied requests.
-
-    Responsibilities (interface layer only):
-      1. Read the raw body once (streaming body can only be read once).
-      2. Parse the FastAPI request into a domain Request via RequestParser.
-      3. Load the use-case instance from app state via InstanceLoader.
-      4. Invoke the inbound port and translate the result to an HTTP Response.
-      5. Map domain exceptions to standard HTTP error responses.
-
-    No business logic lives here.
-    """
     raw_body = await fastapi_request.body()
     domain_request = _parser.parse(fastapi_request)
     use_case = InstanceLoader.gateway_request_port(fastapi_request)
