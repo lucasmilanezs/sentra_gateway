@@ -1,73 +1,38 @@
-/* ============================================================
-   SENTRA – login.js
-   Responsável pela lógica da tela de login
-   ============================================================ */
+import { authApi } from './api.js';
 
-/**
- * Exibe uma mensagem de feedback para o usuário.
- * @param {string} elementId - ID do elemento de mensagem
- * @param {string} text      - Texto a exibir
- * @param {'error'|'success'|''} type - Tipo da mensagem
- */
-function setMessage(elementId, text, type = '') {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-  el.textContent = text;
-  el.className = `msg ${type}`;
+const form = document.getElementById('login-form');
+const message = document.getElementById('message');
+
+function showMessage(text, type = 'error') {
+  message.innerText = text;
+  message.className = `message ${type}`;
 }
 
-/**
- * Valida e envia o formulário de login.
- * Substitua o bloco fetch() pela chamada real ao backend quando disponível.
- */
-async function handleLogin() {
-  const username = document.getElementById('login-user').value.trim();
-  const password = document.getElementById('login-pass').value;
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-  // Validação básica de campos
-  if (!username || !password) {
-    setMessage('login-msg', 'Preencha todos os campos.', 'error');
-    return;
-  }
-
-  setMessage('login-msg', 'Autenticando…', '');
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
 
   try {
-    /* ---------------------------------------------------------
-       TODO: substituir pela URL real do backend FastAPI
-       const response = await fetch('/api/auth/login', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ username, password }),
-       });
+    const loginData = await authApi.login(email, password);
 
-       if (!response.ok) {
-         const err = await response.json();
-         setMessage('login-msg', err.detail || 'Credenciais inválidas.', 'error');
-         return;
-       }
+    sessionStorage.setItem('sentra_token', loginData.access_token);
 
-       const data = await response.json();
-       localStorage.setItem('access_token', data.access_token);
-       window.location.href = '/dashboard.html';
-    --------------------------------------------------------- */
+    const me = await authApi.me();
 
-    // Simulação temporária enquanto o backend não está pronto
-    await new Promise(resolve => setTimeout(resolve, 900));
-    setMessage('login-msg', 'Login realizado com sucesso!', 'success');
+    if (me.tenant_id) {
+      sessionStorage.setItem(
+        'sentra_tenant',
+        JSON.stringify({ id: me.tenant_id })
+      );
 
+      window.location.href = '/dashboard.html';
+      return;
+    }
+
+    window.location.href = '/tenant-select.html';
   } catch (error) {
-    setMessage('login-msg', 'Erro ao conectar com o servidor.', 'error');
-    console.error('[login] Erro na requisição:', error);
+    showMessage(error.detail || 'Falha no login');
   }
-}
-
-// Permite enviar o formulário com a tecla Enter
-document.addEventListener('DOMContentLoaded', () => {
-  const inputs = document.querySelectorAll('#login-user, #login-pass');
-  inputs.forEach(input => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handleLogin();
-    });
-  });
 });

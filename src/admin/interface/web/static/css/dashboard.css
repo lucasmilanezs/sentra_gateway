@@ -400,3 +400,48 @@ body {
   font-style: italic;
   margin-top: 6px;
 }
+
+.page-section {
+  display: none;
+}
+
+.page-section.active {
+  display: block;
+}
+
+.table-wrapper {
+  background: #0f172a;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  padding: 16px;
+  text-align: left;
+}
+
+.tenant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.tenant-card {
+  background: #0f172a;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 24px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tenant-card:hover {
+  transform: translateY(-4px);
+}

@@ -228,3 +228,16 @@ footer span {
   color: rgba(180, 195, 230, 0.55);
   font-style: italic;
 }
+
+.message {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.message.error {
+  color: #ff5f5f;
+}
+
+.message.success {
+  color: #4ad295;
+}

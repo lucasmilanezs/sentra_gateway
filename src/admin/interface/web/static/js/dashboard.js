@@ -1,62 +1,104 @@
-/* ============================================================
-   SENTRA – dashboard.js
-   Controla navegação da sidebar e troca de páginas
-   ============================================================ */
+```js
+import {
+  tenantsApi,
+  routesApi,
+  healthApi
+} from './api.js';
 
-/**
- * Abre ou fecha um grupo de submenu da sidebar.
- * @param {string} groupId - ID do grupo (ex: 'group-rotas')
- */
-function toggleGroup(groupId) {
-  const header = document.getElementById(`header-${groupId}`);
-  const sub    = document.getElementById(`sub-${groupId}`);
+import {
+  requireAuth,
+  logout,
+  currentTenant
+} from './auth.js';
 
-  if (!header || !sub) return;
+requireAuth();
 
-  const isOpen = sub.classList.contains('open');
+const sections = document.querySelectorAll('.page-section');
+const navItems = document.querySelectorAll('.nav-item');
 
-  // Fecha todos os grupos abertos
-  document.querySelectorAll('.nav-sub.open').forEach(el => el.classList.remove('open'));
-  document.querySelectorAll('.nav-group-header.open').forEach(el => el.classList.remove('open'));
+const tenantName = document.getElementById('tenant-name');
+const logoutBtn = document.getElementById('logout-btn');
 
-  // Abre o grupo clicado (se estava fechado)
-  if (!isOpen) {
-    sub.classList.add('open');
-    header.classList.add('open');
-  }
+const tenant = currentTenant();
+
+if (tenant && tenant.name) {
+  tenantName.innerText = tenant.name;
 }
 
-/**
- * Navega para uma página específica e marca o item de menu como ativo.
- * @param {string} pageId   - ID da <div class="page"> a exibir
- * @param {string} navId    - ID do item de nav a marcar como ativo
- * @param {string} groupId  - (opcional) ID do grupo pai para manter aberto
- */
-function navigate(pageId, navId, groupId = null) {
-  // ── Troca de página ──
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  const target = document.getElementById(pageId);
-  if (target) target.classList.add('active');
+logoutBtn.addEventListener('click', logout);
 
-  // ── Marca item ativo ──
-  document.querySelectorAll('.nav-item, .nav-sub-item').forEach(el => {
-    el.classList.remove('active');
+navItems.forEach((item) => {
+  item.addEventListener('click', () => {
+    const page = item.dataset.page;
+
+    sections.forEach((section) => {
+      section.classList.remove('active');
+    });
+
+    document.getElementById(page).classList.add('active');
+
+    loadPage(page);
   });
-  const navEl = document.getElementById(navId);
-  if (navEl) navEl.classList.add('active');
+});
 
-  // ── Garante que o grupo pai está aberto ──
-  if (groupId) {
-    const sub    = document.getElementById(`sub-${groupId}`);
-    const header = document.getElementById(`header-${groupId}`);
-    if (sub)    sub.classList.add('open');
-    if (header) header.classList.add('open');
+async function loadPage(page) {
+  switch (page) {
+    case 'overview':
+      await loadOverview();
+      break;
+
+    case 'routes':
+      await loadRoutes();
+      break;
+
+    case 'tenants':
+      await loadTenants();
+      break;
   }
 }
 
-/**
- * Ativa a primeira página ao carregar o dashboard.
- */
-document.addEventListener('DOMContentLoaded', () => {
-  navigate('page-sobre', 'nav-sobre');
-});
+async function loadOverview() {
+  const health = await healthApi.check();
+
+  document.getElementById('health-status').innerText = health.status;
+  document.getElementById('postgres-status').innerText = health.postgres;
+  document.getElementById('redis-status').innerText = health.redis;
+}
+
+async function loadTenants() {
+  const list = document.getElementById('tenant-list');
+
+  const tenants = await tenantsApi.list();
+
+  list.innerHTML = tenants
+    .map(
+      (tenant) => `
+      <tr>
+        <td>${tenant.name}</td>
+        <td>${tenant.slug}</td>
+        <td>${tenant.domain || '-'}</td>
+      </tr>
+    `
+    )
+    .join('');
+}
+
+async function loadRoutes() {
+  const list = document.getElementById('routes-list');
+
+  const routes = await routesApi.list(tenant.id);
+
+  list.innerHTML = routes
+    .map(
+      (route) => `
+      <tr>
+        <td>${route.method}</td>
+        <td>${route.path_pattern}</td>
+        <td>${route.backend_url}</td>
+      </tr>
+    `
+    )
+    .join('');
+}
+
+loadOverview();
