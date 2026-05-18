@@ -18,7 +18,7 @@ async function loadTenants() {
 
       card.innerHTML = `
         <h3>${tenant.name}</h3>
-        <p>${tenant.slug}</p>
+        <p>${tenant.alias}</p>
       `;
 
       card.addEventListener('click', () => {
@@ -27,7 +27,7 @@ async function loadTenants() {
           JSON.stringify({
             id: tenant.id,
             name: tenant.name,
-            slug: tenant.slug
+            alias: tenant.alias
           })
         );
 

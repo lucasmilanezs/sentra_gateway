@@ -11,7 +11,7 @@ def _row_to_tenant(row: dict) -> Tenant:
     return Tenant(
         id=row["id"],
         name=row["name"],
-        slug=row["slug"],
+        alias=row["alias"],
         domain=row.get("domain"),
         created_at=_parse_dt(row["created_at"]),
         updated_at=_parse_dt(row["updated_at"]),
@@ -22,7 +22,7 @@ def _tenant_to_row(t: Tenant) -> dict:
     return {
         "id": t.id,
         "name": t.name,
-        "slug": t.slug,
+        "alias": t.alias,
         "domain": t.domain,
         "created_at": _serialize_dt(t.created_at),
         "updated_at": _serialize_dt(t.updated_at),
@@ -44,10 +44,10 @@ class TenantRepository(TenantRepositoryPort):
                 return _row_to_tenant(r)
         return None
 
-    async def get_by_slug(self, slug: str) -> Tenant | None:
+    async def get_by_alias(self, alias: str) -> Tenant | None:
         doc = await self._store.read_async()
         for r in doc["tenants"]:
-            if r["slug"] == slug:
+            if r["alias"] == alias:
                 return _row_to_tenant(r)
         return None
 

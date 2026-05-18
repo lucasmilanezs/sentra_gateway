@@ -10,7 +10,7 @@ def _orm_to_entity(row: TenantORM) -> Tenant:
     return Tenant(
         id=row.id,
         name=row.name,
-        slug=row.slug,
+        alias=row.alias,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -20,7 +20,7 @@ def _entity_to_orm(tenant: Tenant) -> TenantORM:
     return TenantORM(
         id=tenant.id,
         name=tenant.name,
-        slug=tenant.slug,
+        alias=tenant.alias,
         created_at=tenant.created_at,
         updated_at=tenant.updated_at,
     )
@@ -41,9 +41,9 @@ class TenantRepository(TenantRepositoryPort):
         row = result.scalar_one_or_none()
         return _orm_to_entity(row) if row else None
 
-    async def get_by_slug(self, slug: str) -> Tenant | None:
+    async def get_by_alias(self, alias: str) -> Tenant | None:
         result = await self._session.execute(
-            select(TenantORM).where(TenantORM.slug == slug)
+            select(TenantORM).where(TenantORM.alias == alias)
         )
         row = result.scalar_one_or_none()
         return _orm_to_entity(row) if row else None
@@ -52,7 +52,7 @@ class TenantRepository(TenantRepositoryPort):
         existing = await self._session.get(TenantORM, tenant.id)
         if existing:
             existing.name = tenant.name
-            existing.slug = tenant.slug
+            existing.alias = tenant.alias
             existing.updated_at = tenant.updated_at
         else:
             self._session.add(_entity_to_orm(tenant))

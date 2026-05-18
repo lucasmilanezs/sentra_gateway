@@ -9,6 +9,7 @@ from src.admin.application.use_cases.manage_admin_route import ManageAdminRoute
 from src.admin.application.use_cases.manage_policy import ManagePolicy
 from src.admin.application.use_cases.manage_tenant import ManageTenant
 from src.admin.application.use_cases.manage_tenant_domain import ManageTenantDomain
+from src.admin.application.use_cases.query_audit import QueryAudit
 from src.admin.infrastructure.config.settings import AdminSettings
 from src.admin.infrastructure.email.console_email_sender import ConsoleEmailSender
 from src.admin.infrastructure.email.smtp_email_sender import SmtpEmailSender
@@ -29,6 +30,7 @@ from src.admin.infrastructure.persistence.postgres.tenant_domain import TenantDo
 from src.admin.infrastructure.persistence.postgres.domain_policy import DomainPolicyRepository as PgDomainPolicyRepository
 from src.admin.infrastructure.persistence.postgres.user import UserRepository as PgUserRepository
 from src.admin.infrastructure.persistence.postgres.policy import PolicyRepository as PgPolicyRepository
+from src.admin.infrastructure.persistence.postgres.audit import AuditRepository as PgAuditRepository
 
 from src.admin.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
 from src.admin.infrastructure.security.jwt_token_service import JwtTokenService
@@ -84,6 +86,7 @@ class AdminWiring:
             self.change_password = None
             self.request_password_reset = None
             self.reset_password_with_code = None
+            self.query_audit = None
         else:
             self._engine = None
             self._session_factory = None
@@ -95,6 +98,7 @@ class AdminWiring:
             self.route_repository = JsonRouteRepository(store)
             self.policy_repository = JsonPolicyRepository(store)
             self.reset_repository = JsonPasswordResetRepository(store)
+            self.query_audit = None
             self._build_use_cases_json()
 
         self.postgres_connected = settings.use_postgres
@@ -171,6 +175,8 @@ class AdminWiring:
         w.reset_password_with_code = ResetPasswordWithCode(
             w.user_repository, w.reset_repository, w.hasher
         )
+        w.audit_repository = PgAuditRepository(session)
+        w.query_audit = QueryAudit(w.audit_repository)
         return w
 
     async def dispose(self) -> None:

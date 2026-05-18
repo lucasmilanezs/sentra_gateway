@@ -5,6 +5,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.admin.application.use_cases.query_audit import QueryAudit
 from src.admin.domain.exceptions import AuthError
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
 from src.admin.interface.http.wiring import AdminWiring
@@ -85,6 +86,17 @@ def get_reset_password(
     w: Annotated[AdminWiring, Depends(get_request_wiring)],
 ) -> object:
     return w.reset_password_with_code
+
+
+def get_query_audit(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> QueryAudit:
+    if w.query_audit is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="auditoria requer modo Postgres",
+        )
+    return w.query_audit
 
 
 async def get_current_claims(

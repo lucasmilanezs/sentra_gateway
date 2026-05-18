@@ -9,17 +9,7 @@ from src.gateway.domain.services.rate_limit_checker import RateLimitChecker
 
 class ApplyPolicyPipeline:
     """
-    Application use case that orchestrates policy enforcement.
-
-    Sequences domain service calls in the correct order — first
-    authentication, then rate limiting, then RBAC (planned).
-    Each check short-circuits evaluation on failure.
-
-    Contains no business logic — delegates every decision to domain
-    services. Orchestration only.
-
-    RateLimitChecker is optional: when absent (e.g. in test environments
-    without Redis), rate limiting is silently skipped.
+    Orchestrates policy enforcement: authentication → rate limiting → RBAC (in evaluator).
     """
 
     def __init__(
@@ -30,21 +20,26 @@ class ApplyPolicyPipeline:
         self._evaluator = policy_evaluator
         self._rate_limit = rate_limit_checker
 
-    async def apply(self, policy: Optional[Policy], request: Request) -> PolicyResult:
+    async def apply(
+        self,
+        policy: Optional[Policy],
+        request: Request,
+        *,
+        tenant_id: str,
+        route_id: str,
+    ) -> PolicyResult:
         if policy is None:
             return PolicyResult(allowed=True)
 
-        # 1. Authentication
         result = self._evaluator.evaluate(policy, request)
         if not result.allowed:
             return result
 
-        # 2. Rate limiting
         if self._rate_limit is not None:
-            result = await self._rate_limit.check(policy, request)
+            result = await self._rate_limit.check(
+                policy, request, tenant_id=tenant_id, route_id=route_id
+            )
             if not result.allowed:
                 return result
-
-        # 3. RBAC — planned, checker will be injected here
 
         return PolicyResult(allowed=True)

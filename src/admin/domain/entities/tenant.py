@@ -6,6 +6,6 @@ from datetime import datetime
 class Tenant:
     id: str
     name: str
-    slug: str
+    alias: str
     created_at: datetime
     updated_at: datetime

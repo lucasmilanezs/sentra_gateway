@@ -12,6 +12,7 @@ from src.admin.interface.http.dependencies import (
 from src.admin.interface.schema.tenant_schema import (
     DomainPolicyResponse,
     DomainPolicyUpsert,
+    DomainSuggestionsResponse,
     TenantCreate,
     TenantDomainCreate,
     TenantDomainResponse,
@@ -26,7 +27,7 @@ def _to_response(t) -> TenantResponse:
     return TenantResponse(
         id=t.id,
         name=t.name,
-        slug=t.slug,
+        alias=t.alias,
         created_at=t.created_at,
         updated_at=t.updated_at,
     )
@@ -49,7 +50,7 @@ async def create_tenant(
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
     _: Annotated[object, Depends(get_current_claims)],
 ):
-    t = await uc.create(body.name, body.slug)
+    t = await uc.create(body.name, body.alias)
     return _to_response(t)
 
 
@@ -76,6 +77,24 @@ async def patch_tenant(
         return _to_response(t)
     t = await uc.update(tenant_id, data)
     return _to_response(t)
+
+
+@router.get("/{tenant_id}/domain-suggestions", response_model=DomainSuggestionsResponse)
+async def domain_suggestions(
+    tenant_id: str,
+    uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
+    _: Annotated[object, Depends(get_current_claims)],
+):
+    t = await uc.get(tenant_id)
+    suggestions = [
+        f"api.{t.alias}.local",
+        f"gateway.{t.alias}.corp",
+        f"{t.alias}.internal",
+    ]
+    return DomainSuggestionsResponse(
+        suggestions=suggestions,
+        group_label=f"{t.name} ({t.alias})",
+    )
 
 
 @router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -161,12 +180,12 @@ async def upsert_domain_policy(
         requires_auth=body.requires_auth,
         rate_limit_per_minute=body.rate_limit_per_minute,
         allowed_roles=body.allowed_roles,
+        jwt_validate_exp=body.jwt_validate_exp,
+        jwt_issuer=body.jwt_issuer,
+        jwt_audience=body.jwt_audience,
+        jwt_clock_skew_seconds=body.jwt_clock_skew_seconds,
     )
-    return DomainPolicyResponse(
-        id=p.id, domain_id=p.domain_id, requires_auth=p.requires_auth,
-        rate_limit_per_minute=p.rate_limit_per_minute, allowed_roles=p.allowed_roles,
-        created_at=p.created_at, updated_at=p.updated_at,
-    )
+    return DomainPolicyResponse.model_validate(p)
 
 
 @router.delete(

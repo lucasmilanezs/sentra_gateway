@@ -13,7 +13,7 @@ class TenantRepositoryPort(ABC):
         ...
 
     @abstractmethod
-    async def get_by_slug(self, slug: str) -> Tenant | None:
+    async def get_by_alias(self, alias: str) -> Tenant | None:
         ...
 
     @abstractmethod

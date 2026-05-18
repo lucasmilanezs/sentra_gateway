@@ -24,7 +24,7 @@ def upgrade() -> None:
         "admin_tenants",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("name", sa.String(255), nullable=False),
-        sa.Column("slug", sa.String(128), nullable=False),
+        sa.Column("alias", sa.String(128), nullable=False),
         sa.Column("domain", sa.String(255), nullable=True),
         sa.Column(
             "created_at",
@@ -39,7 +39,7 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_index("ix_admin_tenants_slug", "admin_tenants", ["slug"], unique=True)
+    op.create_index("ix_admin_tenants_alias", "admin_tenants", ["alias"], unique=True)
 
     op.create_table(
         "admin_users",
@@ -96,5 +96,5 @@ def downgrade() -> None:
     op.drop_table("admin_routes")
     op.drop_index("ix_admin_users_email", table_name="admin_users")
     op.drop_table("admin_users")
-    op.drop_index("ix_admin_tenants_slug", table_name="admin_tenants")
+    op.drop_index("ix_admin_tenants_alias", table_name="admin_tenants")
     op.drop_table("admin_tenants")

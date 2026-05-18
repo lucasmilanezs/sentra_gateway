@@ -23,4 +23,6 @@ class LogEvent:
     status_code: int
     latency_ms: float
     route_id: Optional[str] = None
+    tenant_id: Optional[str] = None
+    client_ip: Optional[str] = None
     error: Optional[str] = None

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from src.admin.domain.entities.admin_route import AdminRoute
 from src.admin.domain.exceptions import NotFoundError, ValidationError
+from src.admin.domain.services.route_validation import validate_path_pattern
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.value_objects.http_method import HttpMethod
@@ -66,9 +67,7 @@ class ManageAdminRoute:
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
 
-        path_pattern = path_pattern.strip()
-        if not path_pattern.startswith("/"):
-            raise ValidationError("path_pattern deve começar com /")
+        path_pattern = validate_path_pattern(path_pattern)
 
         parsed_methods = _parse_methods(methods)
         _validate_backend_url(backend_url.strip())
@@ -95,9 +94,9 @@ class ManageAdminRoute:
         if not r:
             raise NotFoundError("rota não encontrada")
 
-        new_path = data["path_pattern"].strip() if "path_pattern" in data else r.path_pattern
-        if not new_path.startswith("/"):
-            raise ValidationError("path_pattern deve começar com /")
+        new_path = (
+            validate_path_pattern(data["path_pattern"]) if "path_pattern" in data else r.path_pattern
+        )
 
         new_url = (
             data["backend_url"].strip().rstrip("/") if "backend_url" in data else r.backend_url

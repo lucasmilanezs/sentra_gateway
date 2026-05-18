@@ -158,7 +158,7 @@
       letter-spacing: 0.02em;
     }
 
-    .tc-slug {
+    .tc-alias {
       font-size: 0.8rem;
       color: var(--text-muted);
       font-style: italic;
@@ -365,8 +365,8 @@
     </div>
 
     <div class="modal-field">
-      <label for="nt-slug">Slug</label>
-      <input type="text" id="nt-slug" placeholder="empresa-xyz" />
+      <label for="nt-alias">alias</label>
+      <input type="text" id="nt-alias" placeholder="empresa-xyz" />
     </div>
 
     <div class="modal-field">
@@ -415,12 +415,12 @@
         card.className = 'tenant-card';
         card.innerHTML = `
           <div class="tc-name">${t.name}</div>
-          <div class="tc-slug">${t.slug}</div>
+          <div class="tc-alias">${t.alias}</div>
           ${t.domain ? `<div class="tc-domain">${t.domain}</div>` : ''}
           <span class="tc-arrow">→</span>
         `;
         card.addEventListener('click', () => {
-          sessionStorage.setItem('sentra_tenant', JSON.stringify({ id: t.id, name: t.name, slug: t.slug }));
+          sessionStorage.setItem('sentra_tenant', JSON.stringify({ id: t.id, name: t.name, alias: t.alias }));
           window.location.href = '/dashboard.html';
         });
         grid.appendChild(card);
@@ -447,22 +447,22 @@
 
   document.getElementById('nt-save').addEventListener('click', async () => {
     const name   = document.getElementById('nt-name').value.trim();
-    const slug   = document.getElementById('nt-slug').value.trim();
+    const alias   = document.getElementById('nt-alias').value.trim();
     const domain = document.getElementById('nt-domain').value.trim() || undefined;
     const errEl  = document.getElementById('nt-error');
     errEl.style.display = 'none';
 
-    if (!name || !slug) {
-      errEl.textContent = 'Nome e slug são obrigatórios.';
+    if (!name || !alias) {
+      errEl.textContent = 'Nome e alias são obrigatórios.';
       errEl.style.display = 'block';
       return;
     }
 
     try {
-      await tenantsApi.create({ name, slug, domain });
+      await tenantsApi.create({ name, alias, domain });
       modal.style.display = 'none';
       document.getElementById('nt-name').value = '';
-      document.getElementById('nt-slug').value = '';
+      document.getElementById('nt-alias').value = '';
       document.getElementById('nt-domain').value = '';
       await loadTenants();
     } catch (err) {

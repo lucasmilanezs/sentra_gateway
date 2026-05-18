@@ -27,6 +27,11 @@ class GatewaySettings(BaseSettings):
 
     # Observabilidade
     log_path: str = Field(default="logs/gateway.log", alias="GATEWAY_LOG_PATH")
+    audit_to_postgres: bool = Field(default=True, alias="GATEWAY_AUDIT_TO_POSTGRES")
+
+    # JWT — mesma secret do admin para validação criptográfica opcional
+    jwt_secret: str = Field(default="", alias="ADMIN_JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", alias="ADMIN_JWT_ALGORITHM")
 
     @model_validator(mode="after")
     def _build_database_url(self) -> "GatewaySettings":

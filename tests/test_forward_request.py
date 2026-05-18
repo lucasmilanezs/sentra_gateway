@@ -27,8 +27,10 @@ from src.gateway.domain.models.policy import Policy
 from src.gateway.domain.models.policy_result import PolicyResult
 from src.gateway.domain.models.request import Request
 from src.gateway.domain.models.route import Route
+from src.gateway.domain.ports.tenant_repository import GatewayTenant
 from src.gateway.domain.ports.upstream_proxy_port import UpstreamResponse
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
+from src.gateway.application.use_cases.apply_policy_pipeline import ApplyPolicyPipeline
 from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
 from src.gateway.domain.value_objects.backend_url import BackendUrl
 from src.gateway.domain.value_objects.http_method import HttpMethod
@@ -47,9 +49,14 @@ def _make_request(path: str = "/httpbin/get", method: str = "GET") -> Request:
     )
 
 
-def _make_route(path_prefix: str = "/httpbin", domain_id: str = "domain-httpbin") -> Route:
+def _make_route(
+    path_prefix: str = "/httpbin",
+    domain_id: str = "domain-httpbin",
+    tenant_id: str = "tenant-1",
+) -> Route:
     return Route(
         id="route-1",
+        tenant_id=tenant_id,
         path_prefix=path_prefix,
         domain_id=domain_id,
         methods=(HttpMethod.GET, HttpMethod.POST),
@@ -72,14 +79,23 @@ def _make_upstream_response(status: int = 200, body: bytes = b'{"ok": true}') ->
     )
 
 
+def _make_tenant_repo(tenant_id: str = "tenant-1"):
+    repo = AsyncMock()
+    repo.get_by_domain.return_value = GatewayTenant(id=tenant_id, domain="localhost")
+    return repo
+
+
 def _make_use_case(
     route=None,
     domain=None,
     policy=None,
+    proxy=None,
     proxy_response=None,
     proxy_raises=None,
+    log_port=None,
     log_raises=None,
     policy_result: PolicyResult = None,
+    tenant_repo=None,
 ):
     """
     Monta um ForwardRequest com todos os colaboradores mockados.
@@ -94,21 +110,25 @@ def _make_use_case(
     policy_repo = AsyncMock()
     policy_repo.get_by_route_id.return_value = policy
 
-    proxy = AsyncMock()
-    if proxy_raises:
-        proxy.forward.side_effect = proxy_raises
-    else:
-        proxy.forward.return_value = proxy_response or _make_upstream_response()
+    if proxy is None:
+        proxy = AsyncMock()
+        if proxy_raises:
+            proxy.forward.side_effect = proxy_raises
+        else:
+            proxy.forward.return_value = proxy_response or _make_upstream_response()
 
-    log_port = AsyncMock()
-    if log_raises:
-        log_port.write.side_effect = log_raises
+    if log_port is None:
+        log_port = AsyncMock()
+        if log_raises:
+            log_port.write.side_effect = log_raises
 
-    evaluator = MagicMock(spec=PolicyEvaluator)
+    pipeline = MagicMock(spec=ApplyPolicyPipeline)
     if policy_result is not None:
-        evaluator.evaluate.return_value = policy_result
+        pipeline.apply = AsyncMock(return_value=policy_result)
     else:
-        evaluator.evaluate.return_value = PolicyResult(allowed=True)
+        pipeline.apply = AsyncMock(return_value=PolicyResult(allowed=True))
+
+    tenant = tenant_repo or _make_tenant_repo()
 
     return ForwardRequest(
         route_repository=route_repo,
@@ -116,8 +136,9 @@ def _make_use_case(
         policy_repository=policy_repo,
         proxy=proxy,
         log_port=log_port,
-        policy_evaluator=evaluator,
+        policy_pipeline=pipeline,
         log_event_builder=LogEventBuilder(),
+        tenant_repository=tenant,
     )
 
 
@@ -157,15 +178,7 @@ async def test_happy_path_strips_prefix_before_forwarding():
     proxy = AsyncMock()
     proxy.forward.return_value = _make_upstream_response()
 
-    use_case = ForwardRequest(
-        route_repository=AsyncMock(get_by_path=AsyncMock(return_value=route)),
-        domain_repository=AsyncMock(get_by_id=AsyncMock(return_value=domain)),
-        policy_repository=AsyncMock(get_by_route_id=AsyncMock(return_value=None)),
-        proxy=proxy,
-        log_port=AsyncMock(),
-        policy_evaluator=PolicyEvaluator(),
-        log_event_builder=LogEventBuilder(),
-    )
+    use_case = _make_use_case(route=route, domain=domain, proxy=proxy)
 
     await use_case.handle(_make_request(path="/httpbin/get"), raw_body=b"")
 
@@ -180,16 +193,7 @@ async def test_happy_path_log_is_called():
     domain = _make_domain()
 
     log_port = AsyncMock()
-
-    use_case = ForwardRequest(
-        route_repository=AsyncMock(get_by_path=AsyncMock(return_value=route)),
-        domain_repository=AsyncMock(get_by_id=AsyncMock(return_value=domain)),
-        policy_repository=AsyncMock(get_by_route_id=AsyncMock(return_value=None)),
-        proxy=AsyncMock(forward=AsyncMock(return_value=_make_upstream_response())),
-        log_port=log_port,
-        policy_evaluator=PolicyEvaluator(),
-        log_event_builder=LogEventBuilder(),
-    )
+    use_case = _make_use_case(route=route, domain=domain, log_port=log_port)
 
     await use_case.handle(_make_request(), raw_body=b"")
 
@@ -261,15 +265,8 @@ async def test_policy_requires_auth_missing_bearer_denies():
     domain = _make_domain()
     policy = Policy(id="p1", route_id="route-1", requires_auth=True)
 
-    use_case = ForwardRequest(
-        route_repository=AsyncMock(get_by_path=AsyncMock(return_value=route)),
-        domain_repository=AsyncMock(get_by_id=AsyncMock(return_value=domain)),
-        policy_repository=AsyncMock(get_by_route_id=AsyncMock(return_value=policy)),
-        proxy=AsyncMock(),
-        log_port=AsyncMock(),
-        policy_evaluator=PolicyEvaluator(),
-        log_event_builder=LogEventBuilder(),
-    )
+    denied = PolicyResult(allowed=False, status_code=401, reason="Missing Bearer")
+    use_case = _make_use_case(route=route, domain=domain, policy=policy, policy_result=denied)
 
     with pytest.raises(PolicyDeniedError) as exc_info:
         await use_case.handle(_make_request(), raw_body=b"")
@@ -291,15 +288,7 @@ async def test_policy_requires_auth_with_bearer_allows():
         query_params={},
     )
 
-    use_case = ForwardRequest(
-        route_repository=AsyncMock(get_by_path=AsyncMock(return_value=route)),
-        domain_repository=AsyncMock(get_by_id=AsyncMock(return_value=domain)),
-        policy_repository=AsyncMock(get_by_route_id=AsyncMock(return_value=policy)),
-        proxy=AsyncMock(forward=AsyncMock(return_value=_make_upstream_response())),
-        log_port=AsyncMock(),
-        policy_evaluator=PolicyEvaluator(),
-        log_event_builder=LogEventBuilder(),
-    )
+    use_case = _make_use_case(route=route, domain=domain, policy=policy)
 
     response = await use_case.handle(request, raw_body=b"")
     assert response.status_code == 200
@@ -366,15 +355,7 @@ async def test_raw_body_forwarded_unchanged():
     proxy = AsyncMock()
     proxy.forward.return_value = _make_upstream_response()
 
-    use_case = ForwardRequest(
-        route_repository=AsyncMock(get_by_path=AsyncMock(return_value=route)),
-        domain_repository=AsyncMock(get_by_id=AsyncMock(return_value=domain)),
-        policy_repository=AsyncMock(get_by_route_id=AsyncMock(return_value=None)),
-        proxy=proxy,
-        log_port=AsyncMock(),
-        policy_evaluator=PolicyEvaluator(),
-        log_event_builder=LogEventBuilder(),
-    )
+    use_case = _make_use_case(route=route, domain=domain, proxy=proxy)
 
     await use_case.handle(_make_request(), raw_body=original_body)
 

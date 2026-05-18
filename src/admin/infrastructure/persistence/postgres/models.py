@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.shared.db import Base
@@ -11,7 +11,7 @@ class TenantORM(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    slug: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    alias: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -42,6 +42,25 @@ class TenantDomainORM(Base):
     )
 
 
+class AuditRequestORM(Base):
+    __tablename__ = "admin_audit_requests"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("admin_tenants.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    route_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    method: Mapped[str] = mapped_column(String(16), nullable=False)
+    path: Mapped[str] = mapped_column(String(2048), nullable=False)
+    upstream_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    client_ip: Mapped[str] = mapped_column(String(64), nullable=False, default="unknown")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class DomainPolicyORM(Base):
     __tablename__ = "admin_domain_policies"
 
@@ -55,6 +74,10 @@ class DomainPolicyORM(Base):
     requires_auth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     rate_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
     allowed_roles: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    jwt_validate_exp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    jwt_issuer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    jwt_audience: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    jwt_clock_skew_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -111,6 +134,10 @@ class PolicyORM(Base):
     requires_auth: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     rate_limit_per_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
     allowed_roles: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    jwt_validate_exp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    jwt_issuer: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    jwt_audience: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    jwt_clock_skew_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

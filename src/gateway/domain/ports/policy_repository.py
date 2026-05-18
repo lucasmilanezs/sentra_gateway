@@ -17,3 +17,7 @@ class PolicyRepository(ABC):
     async def get_by_route_id(self, route_id: str) -> Optional[Policy]:
         """Returns the Policy for the given route_id, or None if not found."""
         ...
+
+    def get_domain_policy(self, host: str) -> Optional[Policy]:
+        """Returns domain-level fallback policy for the request Host, if any."""
+        return None

@@ -34,6 +34,10 @@ async def upsert_policy(
         requires_auth=body.requires_auth,
         rate_limit_per_minute=body.rate_limit_per_minute,
         allowed_roles=body.allowed_roles,
+        jwt_validate_exp=body.jwt_validate_exp,
+        jwt_issuer=body.jwt_issuer,
+        jwt_audience=body.jwt_audience,
+        jwt_clock_skew_seconds=body.jwt_clock_skew_seconds,
     )
 
 

@@ -21,8 +21,14 @@ class LogEventBuilder:
         status_code: int,
         latency_ms: float,
         route_id: Optional[str] = None,
+        tenant_id: Optional[str] = None,
         error: Optional[str] = None,
     ) -> LogEvent:
+        client_ip = (
+            request.headers.get("x-forwarded-for")
+            or request.headers.get("x-real-ip")
+            or "unknown"
+        )
         return LogEvent(
             timestamp=datetime.now(tz=timezone.utc),
             method=request.method.value,
@@ -31,5 +37,7 @@ class LogEventBuilder:
             status_code=status_code,
             latency_ms=latency_ms,
             route_id=route_id,
+            tenant_id=tenant_id,
+            client_ip=client_ip.split(",")[0].strip(),
             error=error,
         )

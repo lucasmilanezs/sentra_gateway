@@ -8,17 +8,21 @@ class RateLimitChecker:
     """
     Domain service that enforces rate limiting per route and client.
 
-    Single responsibility: checks whether the request is within the
-    configured rate limit. Delegates counter storage to RateLimitPort.
-
-    Key is scoped per route + client IP — limits are per-consumer,
-    not global across all consumers of a route.
+    Key is scoped per tenant + route + client IP so domain-policy fallbacks
+    do not share counters across different routes.
     """
 
     def __init__(self, port: RateLimitPort) -> None:
         self._port = port
 
-    async def check(self, policy: Policy, request: Request) -> PolicyResult:
+    async def check(
+        self,
+        policy: Policy,
+        request: Request,
+        *,
+        tenant_id: str,
+        route_id: str,
+    ) -> PolicyResult:
         if policy.rate_limit_per_minute is None:
             return PolicyResult(allowed=True)
 
@@ -29,7 +33,7 @@ class RateLimitChecker:
         )
         client_ip = client_ip.split(",")[0].strip()
 
-        key = f"rate:{policy.route_id}:{client_ip}"
+        key = f"rate:{tenant_id}:{route_id}:{client_ip}"
 
         allowed = await self._port.is_allowed(
             key=key,

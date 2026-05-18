@@ -7,7 +7,7 @@ from src.admin.domain.exceptions import ConflictError, NotFoundError, Validation
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 
-_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_alias_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def _utcnow() -> datetime:
@@ -23,11 +23,11 @@ class ManageTenant:
         self._tenants = tenants
         self._routes = routes
 
-    def _validate_slug(self, slug: str) -> None:
-        if not slug or len(slug) > 128:
-            raise ValidationError("slug inválido")
-        if not _SLUG_RE.match(slug):
-            raise ValidationError("slug deve conter apenas letras minúsculas, números e hífens")
+    def _validate_alias(self, alias: str) -> None:
+        if not alias or len(alias) > 128:
+            raise ValidationError("alias inválido")
+        if not _alias_RE.match(alias):
+            raise ValidationError("alias deve conter apenas letras minúsculas, números e hífens")
 
     async def list(self) -> list[Tenant]:
         return await self._tenants.list_all()
@@ -38,15 +38,15 @@ class ManageTenant:
             raise NotFoundError("tenant não encontrado")
         return t
 
-    async def create(self, name: str, slug: str) -> Tenant:
-        self._validate_slug(slug)
-        if await self._tenants.get_by_slug(slug):
-            raise ConflictError("slug já em uso")
+    async def create(self, name: str, alias: str) -> Tenant:
+        self._validate_alias(alias)
+        if await self._tenants.get_by_alias(alias):
+            raise ConflictError("alias já em uso")
         now = _utcnow()
         tenant = Tenant(
             id=str(uuid.uuid4()),
             name=name.strip(),
-            slug=slug,
+            alias=alias,
             created_at=now,
             updated_at=now,
         )
@@ -58,17 +58,17 @@ class ManageTenant:
         if not t:
             raise NotFoundError("tenant não encontrado")
         new_name = data["name"].strip() if "name" in data else t.name
-        new_slug = data["slug"] if "slug" in data else t.slug
-        if "slug" in data:
-            self._validate_slug(new_slug)
-        if new_slug != t.slug:
-            existing = await self._tenants.get_by_slug(new_slug)
+        new_alias = data["alias"] if "alias" in data else t.alias
+        if "alias" in data:
+            self._validate_alias(new_alias)
+        if new_alias != t.alias:
+            existing = await self._tenants.get_by_alias(new_alias)
             if existing and existing.id != tenant_id:
-                raise ConflictError("slug já em uso")
+                raise ConflictError("alias já em uso")
         updated = Tenant(
             id=t.id,
             name=new_name,
-            slug=new_slug,
+            alias=new_alias,
             created_at=t.created_at,
             updated_at=_utcnow(),
         )

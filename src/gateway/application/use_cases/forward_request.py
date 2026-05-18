@@ -93,12 +93,14 @@ class ForwardRequest(GatewayRequestPort):
                 f"Domain '{route.domain_id}' referenced by route '{route.id}' is not configured."
             )
 
-        # 3. Policy enforcement — route policy with global domain policy fallback
+        # 3. Policy enforcement — route policy with domain (Host) policy fallback
         policy = await self._policies.get_by_route_id(route.id)
         if policy is None and hasattr(self._policies, "get_domain_policy"):
-            policy = self._policies.get_domain_policy(tenant.id)
+            policy = self._policies.get_domain_policy(request.host)
 
-        result = await self._pipeline.apply(policy, request)
+        result = await self._pipeline.apply(
+            policy, request, tenant_id=tenant.id, route_id=route.id
+        )
         if not result.allowed:
             raise PolicyDeniedError(
                 reason=result.reason or "Request denied by policy.",
@@ -126,6 +128,7 @@ class ForwardRequest(GatewayRequestPort):
             status_code=upstream_response.status_code,
             latency_ms=latency_ms,
             route_id=route.id,
+            tenant_id=tenant.id,
         )
         try:
             await self._log.write(log_event)

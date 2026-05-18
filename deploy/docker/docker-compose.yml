@@ -47,6 +47,7 @@ services:
         condition: service_healthy
     environment:
       ADMIN_USE_POSTGRES: "true"
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -54,6 +55,8 @@ services:
       POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      SENTRA_SUPERUSER_EMAIL: ${SENTRA_SUPERUSER_EMAIL:-superuser@sentra.dev}
+      SENTRA_SUPERUSER_PASSWORD: ${SENTRA_SUPERUSER_PASSWORD}
     ports:
       - "8001:8001"
 
@@ -77,6 +80,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       GATEWAY_LOG_PATH: logs/gateway.log
+      GATEWAY_AUDIT_TO_POSTGRES: "true"
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      ADMIN_JWT_ALGORITHM: ${ADMIN_JWT_ALGORITHM:-HS256}
     ports:
       - "8000:8000"
 

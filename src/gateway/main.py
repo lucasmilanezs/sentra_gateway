@@ -13,7 +13,9 @@ from src.gateway.domain.services.log_event_builder import LogEventBuilder
 from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
 from src.gateway.domain.services.rate_limit_checker import RateLimitChecker
 from src.gateway.infrastructure.config.settings import GatewaySettings
+from src.gateway.infrastructure.observability.composite_log_writer import CompositeLogWriter
 from src.gateway.infrastructure.observability.file_log_writer import FileLogWriter
+from src.gateway.infrastructure.observability.postgres_audit_writer import PostgresAuditWriter
 from src.gateway.infrastructure.persistence.postgres_snapshot import (
     PostgresSnapshotRepository,
 )
@@ -35,12 +37,22 @@ async def lifespan(app: FastAPI):
 
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
 
+    jwt_secret = settings.jwt_secret or None
     policy_pipeline = ApplyPolicyPipeline(
-        policy_evaluator=PolicyEvaluator(),
+        policy_evaluator=PolicyEvaluator(
+            jwt_secret=jwt_secret,
+            jwt_algorithms=(settings.jwt_algorithm,),
+        ),
         rate_limit_checker=RateLimitChecker(
             port=RateLimiter(client=redis_client)
         ),
     )
+
+    log_writers = [FileLogWriter(log_path=Path(settings.log_path))]
+    audit_writer = None
+    if settings.audit_to_postgres:
+        audit_writer = PostgresAuditWriter(settings.database_url)
+        log_writers.append(audit_writer)
 
     http_client = httpx.AsyncClient()
 
@@ -49,7 +61,7 @@ async def lifespan(app: FastAPI):
         domain_repository=snapshot,
         policy_repository=snapshot,
         proxy=HttpxUpstreamProxy(client=http_client),
-        log_port=FileLogWriter(log_path=Path(settings.log_path)),
+        log_port=CompositeLogWriter(*log_writers),
         policy_pipeline=policy_pipeline,
         log_event_builder=LogEventBuilder(),
         tenant_repository=snapshot,
@@ -82,6 +94,8 @@ async def lifespan(app: FastAPI):
 
     await http_client.aclose()
     await redis_client.aclose()
+    if audit_writer is not None:
+        await audit_writer.dispose()
 
 
 app = FastAPI(

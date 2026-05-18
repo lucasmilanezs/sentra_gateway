@@ -344,8 +344,8 @@
         </div>
 
         <div class="auth-field">
-          <label for="reg-slug">Slug <span style="opacity:.5;text-transform:none;letter-spacing:0">(identificador único, sem espaços)</span></label>
-          <input type="text" id="reg-slug" placeholder="empresa-xyz" />
+          <label for="reg-alias">alias <span style="opacity:.5;text-transform:none;letter-spacing:0">(identificador único, sem espaços)</span></label>
+          <input type="text" id="reg-alias" placeholder="empresa-xyz" />
         </div>
 
         <p class="auth-msg" id="reg-msg"></p>
@@ -464,12 +464,12 @@
       if (e.key === 'Enter') handleLogin();
     });
 
-    // ── Auto-slug no cadastro ──────────────────────────────────────────
+    // ── Auto-alias no cadastro ──────────────────────────────────────────
     document.getElementById('reg-company').addEventListener('input', e => {
-      const slugEl = document.getElementById('reg-slug');
+      const aliasEl = document.getElementById('reg-alias');
       // só preenche automaticamente se ainda não foi editado manualmente
-      if (!slugEl.dataset.edited) {
-        slugEl.value = e.target.value
+      if (!aliasEl.dataset.edited) {
+        aliasEl.value = e.target.value
           .toLowerCase()
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .replace(/[^a-z0-9]+/g, '-')
@@ -477,7 +477,7 @@
       }
     });
 
-    document.getElementById('reg-slug').addEventListener('input', e => {
+    document.getElementById('reg-alias').addEventListener('input', e => {
       e.target.dataset.edited = '1';
       // sanitiza em tempo real
       e.target.value = e.target.value
@@ -491,10 +491,10 @@
       const pass    = document.getElementById('reg-pass').value;
       const confirm = document.getElementById('reg-confirm').value;
       const company = document.getElementById('reg-company').value.trim();
-      const slug    = document.getElementById('reg-slug').value.trim();
+      const alias    = document.getElementById('reg-alias').value.trim();
       msg('reg-msg', '', '');
 
-      if (!email || !pass || !company || !slug) {
+      if (!email || !pass || !company || !alias) {
         msg('reg-msg', 'Preencha todos os campos.', 'error'); return;
       }
       if (pass !== confirm) {
@@ -512,13 +512,13 @@
 
         // 2. Cria tenant com o token recém-obtido
         msg('reg-msg', 'Usuário criado. Configurando tenant…', '');
-        const tenant = await tenantsApi.create({ name: company, slug });
+        const tenant = await tenantsApi.create({ name: company, alias });
 
         // 3. Salva contexto e redireciona
         sessionStorage.setItem('sentra_tenant', JSON.stringify({
           id: tenant.id,
           name: tenant.name,
-          slug: tenant.slug,
+          alias: tenant.alias,
         }));
 
         msg('reg-msg', 'Conta criada! Redirecionando…', 'success');

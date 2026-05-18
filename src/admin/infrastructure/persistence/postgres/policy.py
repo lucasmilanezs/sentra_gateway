@@ -13,6 +13,10 @@ def _orm_to_entity(row: PolicyORM) -> Policy:
         requires_auth=row.requires_auth,
         rate_limit_per_minute=row.rate_limit_per_minute,
         allowed_roles=[r for r in row.allowed_roles.split(",") if r] if row.allowed_roles else [],
+        jwt_validate_exp=row.jwt_validate_exp,
+        jwt_issuer=row.jwt_issuer,
+        jwt_audience=row.jwt_audience,
+        jwt_clock_skew_seconds=row.jwt_clock_skew_seconds,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -25,6 +29,10 @@ def _entity_to_orm(policy: Policy) -> PolicyORM:
         requires_auth=policy.requires_auth,
         rate_limit_per_minute=policy.rate_limit_per_minute,
         allowed_roles=",".join(policy.allowed_roles),
+        jwt_validate_exp=policy.jwt_validate_exp,
+        jwt_issuer=policy.jwt_issuer,
+        jwt_audience=policy.jwt_audience,
+        jwt_clock_skew_seconds=policy.jwt_clock_skew_seconds,
         created_at=policy.created_at,
         updated_at=policy.updated_at,
     )
@@ -54,6 +62,10 @@ class PolicyRepository(PolicyRepositoryPort):
             existing.requires_auth = policy.requires_auth
             existing.rate_limit_per_minute = policy.rate_limit_per_minute
             existing.allowed_roles = ",".join(policy.allowed_roles)
+            existing.jwt_validate_exp = policy.jwt_validate_exp
+            existing.jwt_issuer = policy.jwt_issuer
+            existing.jwt_audience = policy.jwt_audience
+            existing.jwt_clock_skew_seconds = policy.jwt_clock_skew_seconds
             existing.updated_at = policy.updated_at
         else:
             self._session.add(_entity_to_orm(policy))

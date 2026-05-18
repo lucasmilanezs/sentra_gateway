@@ -123,7 +123,7 @@
       <div class="card">
         <table class="data-table">
           <thead><tr>
-            <th>Nome</th><th>Slug</th><th>Domains</th><th>Criado em</th><th>Ações</th>
+            <th>Nome</th><th>alias</th><th>Domains</th><th>Criado em</th><th>Ações</th>
           </tr></thead>
           <tbody id="tbody-tenants"></tbody>
         </table>
@@ -175,10 +175,15 @@
     <!-- AUDITORIA -->
     <section class="page" id="page-audit">
       <div class="page-header"><h1 class="page-title">Auditoria</h1></div>
+      <p class="context-badge" id="audit-tenant-badge"></p>
       <div class="card">
-        <p style="font-style:italic;color:var(--text-sub);font-size:.9rem">
-          Integração com endpoint de auditoria pendente de implementação no backend.
-        </p>
+        <table class="data-table">
+          <thead><tr>
+            <th>Quando</th><th>Método</th><th>Path</th><th>Status</th><th>Latência</th><th>IP</th>
+          </tr></thead>
+          <tbody id="tbody-audit"></tbody>
+        </table>
+        <p class="tbl-empty" id="audit-empty" style="display:none">Nenhuma requisição registrada ainda.</p>
       </div>
     </section>
 
@@ -187,22 +192,21 @@
       <div class="page-header"><h1 class="page-title">Métricas</h1></div>
       <div class="metrics-grid">
         <div class="metric-card">
-          <div class="metric-label">Rotas configuradas</div>
-          <div class="metric-value" id="mt-routes">—</div>
+          <div class="metric-label">Requisições (24h)</div>
+          <div class="metric-value" id="mt-total">—</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Domains ativos</div>
           <div class="metric-value" id="mt-domains">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Req. hoje</div>
-          <div class="metric-value">—</div>
-          <div class="metric-sub">pendente</div>
+          <div class="metric-label">Latência média</div>
+          <div class="metric-value" id="mt-avg-lat">—</div>
+          <div class="metric-sub" id="mt-p95-lat"></div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Latência média</div>
-          <div class="metric-value">—</div>
-          <div class="metric-sub">pendente</div>
+          <div class="metric-label">Top rotas</div>
+          <div class="metric-value" id="mt-top-routes" style="font-size:.85rem">—</div>
         </div>
       </div>
     </section>
@@ -256,8 +260,8 @@
       <input type="text" id="t-name" placeholder="Empresa XYZ" />
     </div>
     <div class="modal-field">
-      <label>Slug</label>
-      <input type="text" id="t-slug" placeholder="empresa-xyz" />
+      <label>alias</label>
+      <input type="text" id="t-alias" placeholder="empresa-xyz" />
     </div>
     <p class="modal-error" id="t-error" style="display:none"></p>
     <div class="modal-actions">
@@ -307,6 +311,21 @@
     <div class="modal-field">
       <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
       <input type="text" id="dp-roles" placeholder="admin, user" />
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-check">
+        <input type="checkbox" id="dp-jwt-validate-exp" checked />
+        Validar expiração do JWT (exp)
+      </label>
+    </div>
+    <div class="modal-field">
+      <label>Issuer (iss) <span style="opacity:.5">— opcional</span></label>
+      <input type="text" id="dp-jwt-issuer" placeholder="https://auth.empresa.com" />
+    </div>
+    <div class="modal-field">
+      <label>Audience (aud) <span style="opacity:.5">— opcional</span></label>
+      <input type="text" id="dp-jwt-audience" placeholder="api-interna" />
     </div>
     <p class="modal-error" id="dp-error" style="display:none"></p>
     <div class="modal-actions">
@@ -382,7 +401,7 @@
 </div>
 
 <script type="module">
-import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi } from './js/api.js';
+import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi, auditApi } from './js/api.js';
 import { requireAuth, logout, currentTenant, isSuperUser } from './js/auth.js';
 
 if (!requireAuth()) throw new Error('not authenticated');
@@ -392,7 +411,7 @@ const tenant  = currentTenant();
 const superuser = isSuperUser();
 
 // ── Topbar ──────────────────────────────────────────────────────────────
-document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.slug || '';
+document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.alias || '';
 document.getElementById('btn-logout').addEventListener('click', logout);
 
 if (superuser) {
@@ -421,7 +440,7 @@ const PAGE_LOADERS = {
   routes:   loadRoutes,
   metrics:  loadMetrics,
   conta:    loadConta,
-  audit:    () => {},
+  audit:    loadAudit,
 };
 
 document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
@@ -484,11 +503,11 @@ async function loadTenants() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${t.name}</td>
-        <td style="font-style:italic;color:var(--text-sub)">${t.slug}</td>
+        <td style="font-style:italic;color:var(--text-sub)">${t.alias}</td>
         <td>${domHtml}</td>
         <td style="font-size:.78rem;color:var(--text-sub)">${t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '—'}</td>
         <td>
-          <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.slug)}')">Editar</button>
+          <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.alias)}')">Editar</button>
           <button class="btn-icon danger" onclick="_deleteTenant('${t.id}','${esc(t.name)}')">Excluir</button>
         </td>`;
       tbody.appendChild(tr);
@@ -498,11 +517,11 @@ async function loadTenants() {
   }
 }
 
-function _openTenantModal(id='', name='', slug='') {
+function _openTenantModal(id='', name='', alias='') {
   document.getElementById('modal-tenant-title').textContent = id ? 'Editar tenant' : 'Novo tenant';
   document.getElementById('tenant-edit-id').value = id;
   document.getElementById('t-name').value  = name;
-  document.getElementById('t-slug').value  = slug;
+  document.getElementById('t-alias').value  = alias;
   document.getElementById('t-error').style.display = 'none';
   document.getElementById('modal-tenant').style.display = 'flex';
   document.getElementById('t-name').focus();
@@ -516,12 +535,12 @@ document.getElementById('modal-tenant').addEventListener('click', e => { if (e.t
 document.getElementById('t-save').addEventListener('click', async () => {
   const id   = document.getElementById('tenant-edit-id').value;
   const name = document.getElementById('t-name').value.trim();
-  const slug = document.getElementById('t-slug').value.trim();
+  const alias = document.getElementById('t-alias').value.trim();
   const errEl = document.getElementById('t-error');
   errEl.style.display = 'none';
-  if (!name || !slug) { errEl.textContent = 'Nome e slug são obrigatórios.'; errEl.style.display = 'block'; return; }
+  if (!name || !alias) { errEl.textContent = 'Nome e alias são obrigatórios.'; errEl.style.display = 'block'; return; }
   try {
-    id ? await tenantsApi.update(id, { name, slug }) : await tenantsApi.create({ name, slug });
+    id ? await tenantsApi.update(id, { name, alias }) : await tenantsApi.create({ name, alias });
     document.getElementById('modal-tenant').style.display = 'none';
     loadTenants();
   } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar.'; errEl.style.display = 'block'; }
@@ -541,7 +560,7 @@ async function loadDomains() {
   const tbody  = document.getElementById('tbody-domains');
   const empty  = document.getElementById('domains-empty');
 
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.slug || tenant.id}` : '';
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : '';
   hint.style.display = 'block';
 
   if (!tenantId) {
@@ -644,7 +663,12 @@ document.getElementById('dp-save').addEventListener('click', async () => {
   const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
   const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   try {
-    await domainsApi.upsertPolicy(tenant.id, domainId, { requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles });
+    await domainsApi.upsertPolicy(tenant.id, domainId, {
+      requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
+      jwt_validate_exp: document.getElementById('dp-jwt-validate-exp').checked,
+      jwt_issuer: document.getElementById('dp-jwt-issuer').value.trim() || null,
+      jwt_audience: document.getElementById('dp-jwt-audience').value.trim() || null,
+    });
     document.getElementById('modal-domain-policy').style.display = 'none';
     loadDomains();
   } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar política.'; errEl.style.display = 'block'; }
@@ -664,7 +688,7 @@ async function loadRoutes() {
   const tbody = document.getElementById('tbody-routes');
   const empty = document.getElementById('routes-empty');
   const badge = document.getElementById('routes-tenant-badge');
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.slug || tenant.id}` : '';
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : '';
   tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
@@ -749,6 +773,13 @@ document.getElementById('btn-new-route').addEventListener('click', () => _openRo
 document.getElementById('r-cancel').addEventListener('click', () => { document.getElementById('modal-route').style.display = 'none'; });
 document.getElementById('modal-route').addEventListener('click', e => { if (e.target.id === 'modal-route') document.getElementById('modal-route').style.display = 'none'; });
 
+function validateRoutePath(path) {
+  if (!path.startsWith('/')) return 'Path deve começar com /';
+  if (path.includes('//')) return 'Path não pode conter //';
+  if (/[A-Z]/.test(path)) return 'Use apenas letras minúsculas no path (REST)';
+  if (!/^\/[a-z0-9][a-z0-9/_\-{}]*$/.test(path)) return 'Path com caracteres inválidos';
+  return null;
+}
 document.getElementById('r-save').addEventListener('click', async () => {
   const id      = document.getElementById('r-edit-id').value;
   const methods = [...document.querySelectorAll('input[name="r-methods"]:checked')].map(el => el.value);
@@ -758,6 +789,8 @@ document.getElementById('r-save').addEventListener('click', async () => {
   errEl.style.display = 'none';
 
   if (!methods.length) { errEl.textContent = 'Selecione ao menos um método HTTP.'; errEl.style.display = 'block'; return; }
+  const pathErr = validateRoutePath(path);
+  if (pathErr) { errEl.textContent = pathErr; errEl.style.display = 'block'; return; }
   if (!path || !backend) { errEl.textContent = 'Path e backend URL são obrigatórios.'; errEl.style.display = 'block'; return; }
 
   try {
@@ -809,7 +842,12 @@ document.getElementById('p-save').addEventListener('click', async () => {
   const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
   const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   try {
-    await policiesApi.upsert(routeId, { requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles });
+    await policiesApi.upsert(routeId, {
+      requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
+      jwt_validate_exp: document.getElementById('p-jwt-validate-exp').checked,
+      jwt_issuer: document.getElementById('p-jwt-issuer').value.trim() || null,
+      jwt_audience: document.getElementById('p-jwt-audience').value.trim() || null,
+    });
     document.getElementById('modal-policy').style.display = 'none';
     loadRoutes();
   } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar.'; errEl.style.display = 'block'; }
@@ -824,17 +862,42 @@ document.getElementById('p-delete').addEventListener('click', async () => {
   } catch (err) { document.getElementById('p-error').textContent = err.detail || 'Erro ao remover.'; document.getElementById('p-error').style.display = 'block'; }
 });
 
+
+async function loadAudit() {
+  const tbody = document.getElementById('tbody-audit');
+  const empty = document.getElementById('audit-empty');
+  const badge = document.getElementById('audit-tenant-badge');
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  tbody.innerHTML = '<tr><td colspan="6" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+  try {
+    const rows = await auditApi.list(tenant?.id || null, 100);
+    tbody.innerHTML = '';
+    if (!rows.length) { empty.style.display = 'block'; return; }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const when = new Date(r.created_at).toLocaleString('pt-BR');
+      tr.innerHTML = `<td style="font-size:.8rem">${when}</td><td><span class="badge">${r.method}</span></td><td style="font-family:monospace;font-size:.8rem">${r.path}</td><td>${r.status_code}</td><td>${Math.round(r.latency_ms)} ms</td><td>${r.client_ip}</td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:#a03030">${err.detail||'Erro'}</td></tr>`;
+  }
+}
+
 // ── MÉTRICAS ────────────────────────────────────────────────────────────
 async function loadMetrics() {
-  if (!tenant) return;
   try {
-    const [routes, domains] = await Promise.all([
-      routesApi.list(tenant.id),
-      domainsApi.list(tenant.id),
-    ]);
-    document.getElementById('mt-routes').textContent  = routes.length;
-    document.getElementById('mt-domains').textContent = domains.length;
-  } catch {}
+    const m = await auditApi.metrics(tenant?.id || null, 24);
+    document.getElementById('mt-total').textContent = m.total_requests;
+    document.getElementById('mt-status').textContent = `${m.status_2xx} / ${m.status_4xx} / ${m.status_5xx}`;
+    document.getElementById('mt-avg-lat').textContent = `${m.avg_latency_ms} ms`;
+    document.getElementById('mt-p95-lat').textContent = m.p95_latency_ms ? `p95: ${m.p95_latency_ms} ms` : '';
+    const top = (m.top_routes || []).map(t => `${(t.route_id||'?').slice(0,8)}… (${t.count})`).join(', ');
+    document.getElementById('mt-top-routes').textContent = top || '—';
+  } catch {
+    document.getElementById('mt-total').textContent = '—';
+  }
 }
 
 // ── CONTA ────────────────────────────────────────────────────────────────

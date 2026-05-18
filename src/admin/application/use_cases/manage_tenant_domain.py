@@ -102,6 +102,10 @@ class ManageTenantDomain:
         requires_auth: bool,
         rate_limit_per_minute: int | None,
         allowed_roles: list[str],
+        jwt_validate_exp: bool = True,
+        jwt_issuer: str | None = None,
+        jwt_audience: str | None = None,
+        jwt_clock_skew_seconds: int = 30,
     ) -> DomainPolicy:
         if not await self._domains.get_by_id(domain_id):
             raise NotFoundError("domain não encontrado")
@@ -118,6 +122,10 @@ class ManageTenantDomain:
             requires_auth=requires_auth,
             rate_limit_per_minute=rate_limit_per_minute,
             allowed_roles=allowed_roles,
+            jwt_validate_exp=jwt_validate_exp,
+            jwt_issuer=jwt_issuer,
+            jwt_audience=jwt_audience,
+            jwt_clock_skew_seconds=jwt_clock_skew_seconds,
             created_at=existing.created_at if existing else now,
             updated_at=now,
         )

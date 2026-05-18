@@ -245,7 +245,7 @@
 									"pm.test('201 Created', () => pm.response.to.have.status(201));",
 									"const b = pm.response.json();",
 									"pm.collectionVariables.set('tenant_id', b.id);",
-									"pm.test('slug correto', () => pm.expect(b.slug).to.eql('acme'));"
+									"pm.test('alias correto', () => pm.expect(b.alias).to.eql('acme'));"
 								],
 								"type": "text/javascript"
 							}
@@ -265,20 +265,20 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme\",\n  \"domain\": \"acme.com\"\n}"
+							"raw": "{\n  \"name\": \"Acme Corp\",\n  \"alias\": \"acme\",\n  \"domain\": \"acme.com\"\n}"
 						},
 						"url": "{{admin_url}}/api/v1/tenants"
 					},
 					"response": []
 				},
 				{
-					"name": "Slug duplicado → 409",
+					"name": "alias duplicado → 409",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test('409 slug duplicado', () => pm.response.to.have.status(409));"
+									"pm.test('409 alias duplicado', () => pm.response.to.have.status(409));"
 								],
 								"type": "text/javascript"
 							}
@@ -298,20 +298,20 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Outro\",\n  \"slug\": \"acme\",\n  \"domain\": null\n}"
+							"raw": "{\n  \"name\": \"Outro\",\n  \"alias\": \"acme\",\n  \"domain\": null\n}"
 						},
 						"url": "{{admin_url}}/api/v1/tenants"
 					},
 					"response": []
 				},
 				{
-					"name": "Slug com maiúsculas → 422",
+					"name": "alias com maiúsculas → 422",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test('422 slug inválido', () => pm.response.to.have.status(422));"
+									"pm.test('422 alias inválido', () => pm.response.to.have.status(422));"
 								],
 								"type": "text/javascript"
 							}
@@ -331,7 +331,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"Bad\",\n  \"slug\": \"BadSlug\",\n  \"domain\": null\n}"
+							"raw": "{\n  \"name\": \"Bad\",\n  \"alias\": \"Badalias\",\n  \"domain\": null\n}"
 						},
 						"url": "{{admin_url}}/api/v1/tenants"
 					},

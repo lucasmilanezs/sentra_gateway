@@ -50,6 +50,7 @@ export const tenantsApi = {
   get:    (id)          => request('GET',    `/tenants/${id}`),
   update: (id, payload) => request('PATCH',  `/tenants/${id}`, payload),
   delete: (id)          => request('DELETE', `/tenants/${id}`),
+  domainSuggestions: (id) => request('GET', `/tenants/${id}/domain-suggestions`),
 };
 
 // Domains são sub-recurso de tenant — resolvem o Host header no gateway
@@ -80,4 +81,17 @@ export const policiesApi = {
 
 export const healthApi = {
   check: () => request('GET', '/health'),
+};
+
+export const auditApi = {
+  list: (tenantId = null, limit = 100) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (tenantId) q.set('tenant_id', tenantId);
+    return request('GET', `/audit?${q}`);
+  },
+  metrics: (tenantId = null, hours = 24) => {
+    const q = new URLSearchParams({ hours: String(hours) });
+    if (tenantId) q.set('tenant_id', tenantId);
+    return request('GET', `/metrics/summary?${q}`);
+  },
 };
