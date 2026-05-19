@@ -19,6 +19,7 @@ class JwtTokenService(TokenServicePort):
         email: str,
         tenant_id: str | None,
         role: str | None = None,
+        permissions: list[str] | None = None,
     ) -> str:
         now = datetime.now(timezone.utc)
         exp = now + timedelta(minutes=self._expire_minutes)
@@ -32,6 +33,10 @@ class JwtTokenService(TokenServicePort):
             payload["tenant_id"] = tenant_id
         if role is not None:
             payload["role"] = role
+        # Só inclui permissions no token se houver alguma.
+        # Para superuser/admin não enviamos a lista — has_permission() cuida disso.
+        if permissions:
+            payload["permissions"] = permissions
         return jwt.encode(payload, self._secret, algorithm=self._algorithm)
 
     def decode_and_validate(self, token: str) -> JwtClaims:
@@ -43,6 +48,10 @@ class JwtTokenService(TokenServicePort):
         email = payload.get("email")
         if not sub or not email:
             raise AuthError("token inválido")
-        tenant_id = payload.get("tenant_id")
-        role = payload.get("role")
-        return JwtClaims(sub=str(sub), email=str(email), tenant_id=tenant_id, role=role)
+        return JwtClaims(
+            sub=str(sub),
+            email=str(email),
+            tenant_id=payload.get("tenant_id"),
+            role=payload.get("role"),
+            permissions=tuple(payload.get("permissions", [])),
+        )

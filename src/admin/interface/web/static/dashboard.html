@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SENTRA – Dashboard</title>
   <link rel="stylesheet" href="css/dashboard.css" />
-  
 </head>
 <body>
 
@@ -50,28 +49,39 @@
       </svg>
       Tenants
     </button>
-    <button class="nav-item" data-page="domains">
+    <button class="nav-item" id="nav-domains" data-page="domains" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
         <circle cx="8" cy="8" r="6"/>
         <path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/>
       </svg>
       Domains
     </button>
-    <button class="nav-item" data-page="routes">
+    <button class="nav-item" id="nav-routes" data-page="routes" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
         <path d="M2 8h12M9 4l5 4-5 4"/>
       </svg>
       Rotas
     </button>
+    <button class="nav-item" id="nav-members" data-page="members" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="5.5" cy="5" r="2.5"/>
+        <path d="M1 13c0-2.5 2-4.5 4.5-4.5"/>
+        <circle cx="12" cy="7" r="2"/>
+        <path d="M9.5 13c0-1.933 1.119-3.5 2.5-3.5s2.5 1.567 2.5 3.5"/>
+        <line x1="12" y1="3" x2="12" y2="5.2" stroke-linecap="round"/>
+        <line x1="11" y1="4.1" x2="13" y2="4.1" stroke-linecap="round"/>
+      </svg>
+      Membros
+    </button>
 
     <span class="nav-section-label">Observabilidade</span>
-    <button class="nav-item" data-page="audit">
+    <button class="nav-item" id="nav-audit" data-page="audit" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
         <path d="M2 4h12M2 8h8M2 12h5"/>
       </svg>
       Auditoria
     </button>
-    <button class="nav-item" data-page="metrics">
+    <button class="nav-item" id="nav-metrics" data-page="metrics" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
         <path d="M1 13l4-5 3 3 3-6 4 2"/>
       </svg>
@@ -172,6 +182,24 @@
       </div>
     </section>
 
+    <!-- MEMBROS -->
+    <section class="page" id="page-members">
+      <div class="page-header">
+        <h1 class="page-title">Membros</h1>
+        <button class="btn-primary" id="btn-new-member">+ Novo membro</button>
+      </div>
+      <p class="context-badge" id="members-tenant-badge"></p>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>E-mail</th><th>Permissões</th><th>Criado em</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-members"></tbody>
+        </table>
+        <p class="tbl-empty" id="members-empty" style="display:none">Nenhum membro cadastrado ainda.</p>
+      </div>
+    </section>
+
     <!-- AUDITORIA -->
     <section class="page" id="page-audit">
       <div class="page-header"><h1 class="page-title">Auditoria</h1></div>
@@ -196,8 +224,8 @@
           <div class="metric-value" id="mt-total">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Domains ativos</div>
-          <div class="metric-value" id="mt-domains">—</div>
+          <div class="metric-label">2xx / 4xx / 5xx</div>
+          <div class="metric-value" id="mt-status" style="font-size:1.1rem">—</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Latência média</div>
@@ -226,6 +254,10 @@
         <div class="profile-row">
           <span class="profile-label">Tenant</span>
           <span class="profile-value" id="profile-tenant">—</span>
+        </div>
+        <div class="profile-row" id="profile-perms-row" style="display:none">
+          <span class="profile-label">Permissões</span>
+          <span class="profile-value" id="profile-perms">—</span>
         </div>
       </div>
       <div class="card">
@@ -312,7 +344,6 @@
       <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
       <input type="text" id="dp-roles" placeholder="admin, user" />
     </div>
-
     <div class="modal-field">
       <label class="modal-check">
         <input type="checkbox" id="dp-jwt-validate-exp" checked />
@@ -391,6 +422,20 @@
       <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
       <input type="text" id="p-roles" placeholder="admin, user" />
     </div>
+    <div class="modal-field">
+      <label class="modal-check">
+        <input type="checkbox" id="p-jwt-validate-exp" checked />
+        Validar expiração do JWT (exp)
+      </label>
+    </div>
+    <div class="modal-field">
+      <label>Issuer (iss) <span style="opacity:.5">— opcional</span></label>
+      <input type="text" id="p-jwt-issuer" placeholder="https://auth.empresa.com" />
+    </div>
+    <div class="modal-field">
+      <label>Audience (aud) <span style="opacity:.5">— opcional</span></label>
+      <input type="text" id="p-jwt-audience" placeholder="api-interna" />
+    </div>
     <p class="modal-error" id="p-error" style="display:none"></p>
     <div class="modal-actions">
       <button class="btn-danger-ghost" id="p-delete">Remover política</button>
@@ -400,44 +445,69 @@
   </div>
 </div>
 
+<!-- Modal: Membro -->
+<div class="modal-overlay" id="modal-member" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-member-title">Novo membro</h2>
+    <input type="hidden" id="member-edit-id" />
+    <div class="modal-field">
+      <label>E-mail</label>
+      <input type="email" id="m-email" placeholder="usuario@empresa.com" />
+    </div>
+    <div class="modal-field" id="m-password-field">
+      <label>Senha</label>
+      <input type="password" id="m-password" placeholder="Mínimo 8 caracteres" />
+    </div>
+    <div class="modal-field">
+      <label style="margin-bottom:10px;display:block">Permissões</label>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+          <input type="checkbox" id="m-perm-domains" value="domains" />
+          <span><strong>Domains</strong> — cadastrar e editar domains do gateway</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+          <input type="checkbox" id="m-perm-routes" value="routes" />
+          <span><strong>Rotas</strong> — cadastrar e editar rotas e políticas</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+          <input type="checkbox" id="m-perm-audit" value="audit" />
+          <span><strong>Auditoria</strong> — visualizar eventos de requisições</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+          <input type="checkbox" id="m-perm-metrics" value="metrics" />
+          <span><strong>Métricas</strong> — visualizar dashboard de desempenho</span>
+        </label>
+      </div>
+    </div>
+    <p class="modal-error" id="m-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="m-delete" style="display:none">Remover membro</button>
+      <button class="btn-ghost" id="m-cancel">Cancelar</button>
+      <button class="btn-primary" id="m-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
-import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi, auditApi } from './js/api.js';
-import { requireAuth, logout, currentTenant, isSuperUser } from './js/auth.js';
+import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi, auditApi, subUsersApi } from './js/api.js';
+import { requireAuth, logout, currentTenant, currentUser, saveCurrentUser, isSuperUser, isAdmin, hasPermission } from './js/auth.js';
 
 if (!requireAuth()) throw new Error('not authenticated');
-
-// ── Estado ──────────────────────────────────────────────────────────────
-const tenant  = currentTenant();
-const superuser = isSuperUser();
-
-// ── Topbar ──────────────────────────────────────────────────────────────
-document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.alias || '';
+let tenant = null;
+// ── Topbar base (não depende de identidade) ───────────────────────────────
 document.getElementById('btn-logout').addEventListener('click', logout);
-
-if (superuser) {
-  document.getElementById('btn-switch').style.display  = 'inline-block';
-  document.getElementById('nav-tenants').style.display = 'flex';
-}
 document.getElementById('btn-switch').addEventListener('click', () => {
   sessionStorage.removeItem('sentra_tenant');
   window.location.href = '/tenant-select.html';
 });
 
-authApi.me().then(me => {
-  document.getElementById('topbar-user').textContent  = me.email;
-  document.getElementById('profile-email').textContent = me.email;
-  document.getElementById('profile-role').textContent  = me.role || '—';
-}).catch(() => {});
-
-document.getElementById('profile-tenant').textContent =
-  tenant ? (tenant.name || tenant.id) : 'Superuser — sem tenant fixo';
-
-// ── Navegação ────────────────────────────────────────────────────────────
+// ── Navegação ─────────────────────────────────────────────────────────────
 const PAGE_LOADERS = {
   overview: loadOverview,
   tenants:  loadTenants,
   domains:  loadDomains,
   routes:   loadRoutes,
+  members:  loadMembers,
   metrics:  loadMetrics,
   conta:    loadConta,
   audit:    loadAudit,
@@ -457,28 +527,96 @@ function navigate(pageId) {
   PAGE_LOADERS[pageId]?.();
 }
 
-navigate('domains');
+// ── Inicialização — tudo depende de me() ─────────────────────────────────
+// Uma única chamada ao servidor confirma a identidade antes de qualquer
+// decisão de UI. Nenhuma inferência por sessionStorage antes disso.
+(async function init() {
+  try {
+    const me = await authApi.me();
+    saveCurrentUser(me);
 
-// ── OVERVIEW ────────────────────────────────────────────────────────────
+    if (me.role === 'superuser') {
+      tenant = currentTenant();
+
+      if (!tenant) {
+        window.location.href = '/tenant-select.html';
+        return;
+      }
+    } else {
+      if (!me.tenant_id) {
+        logout();
+        return;
+      }
+
+  tenant = { id: me.tenant_id };
+  sessionStorage.setItem('sentra_tenant', JSON.stringify(tenant));
+}
+
+    // Topbar
+    document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.alias || '';
+    document.getElementById('topbar-user').textContent   = me.email;
+
+    // Perfil
+    document.getElementById('profile-email').textContent = me.email;
+    document.getElementById('profile-role').textContent  = me.role || '—';
+    document.getElementById('profile-tenant').textContent =
+      tenant ? (tenant.name || tenant.alias || tenant.id) : 'Superuser — sem tenant fixo';
+
+    if (me.role === 'member' && me.permissions?.length) {
+      document.getElementById('profile-perms-row').style.display = '';
+      document.getElementById('profile-perms').textContent = me.permissions.join(', ');
+    }
+
+    // btn-switch e nav-tenants: apenas superuser real (role confirmado pelo servidor)
+    if (me.role === 'superuser') {
+      document.getElementById('btn-switch').style.display  = 'inline-block';
+      document.getElementById('nav-tenants').style.display = 'flex';
+    }
+
+    // Visibilidade das abas funcionais
+    const permMap = {
+      'nav-domains':  'domains',
+      'nav-routes':   'routes',
+      'nav-audit':    'audit',
+      'nav-metrics':  'metrics',
+    };
+    for (const [id, perm] of Object.entries(permMap)) {
+      if (hasPermission(perm)) {
+        document.getElementById(id).style.display = 'flex';
+      }
+    }
+    if (isAdmin()) {
+      document.getElementById('nav-members').style.display = 'flex';
+    }
+
+    navigate('overview');
+  } catch {
+    // token inválido ou expirado — api.js já redireciona para index no 401
+  }
+})();
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────
 async function loadOverview() {
   try {
     const h = await healthApi.check();
-    document.getElementById('ov-status').textContent   = h.status === 'ok' ? '✓' : '✗';
-    document.getElementById('ov-postgres').textContent = h.postgres_connected ? '✓' : '✗';
+    document.getElementById('ov-status').textContent    = h.status === 'ok' ? '✓' : '✗';
+    document.getElementById('ov-postgres').textContent  = h.postgres_connected ? '✓' : '✗';
     document.getElementById('ov-postgres-sub').textContent = h.postgres_connected ? 'conectado' : 'offline';
   } catch { document.getElementById('ov-status').textContent = 'erro'; }
 
   if (tenant) {
     try {
-      const routes  = await routesApi.list(tenant.id);
-      const domains = await domainsApi.list(tenant.id);
+      const [routes, domains] = await Promise.all([
+        routesApi.list(tenant.id),
+        domainsApi.list(tenant.id),
+      ]);
       document.getElementById('ov-routes').textContent  = routes.length;
       document.getElementById('ov-domains').textContent = domains.length;
     } catch {}
   }
 }
 
-// ── TENANTS (superuser) ──────────────────────────────────────────────────
+// ── TENANTS (superuser) ───────────────────────────────────────────────────
 async function loadTenants() {
   const tbody = document.getElementById('tbody-tenants');
   const empty = document.getElementById('tenants-empty');
@@ -490,7 +628,6 @@ async function loadTenants() {
     tbody.innerHTML = '';
     if (!list.length) { empty.style.display = 'block'; return; }
 
-    // Carrega domains de cada tenant em paralelo
     const domainLists = await Promise.all(
       list.map(t => domainsApi.list(t.id).catch(() => []))
     );
@@ -521,7 +658,7 @@ function _openTenantModal(id='', name='', alias='') {
   document.getElementById('modal-tenant-title').textContent = id ? 'Editar tenant' : 'Novo tenant';
   document.getElementById('tenant-edit-id').value = id;
   document.getElementById('t-name').value  = name;
-  document.getElementById('t-alias').value  = alias;
+  document.getElementById('t-alias').value = alias;
   document.getElementById('t-error').style.display = 'none';
   document.getElementById('modal-tenant').style.display = 'flex';
   document.getElementById('t-name').focus();
@@ -533,8 +670,8 @@ document.getElementById('t-cancel').addEventListener('click', () => { document.g
 document.getElementById('modal-tenant').addEventListener('click', e => { if (e.target.id === 'modal-tenant') document.getElementById('modal-tenant').style.display = 'none'; });
 
 document.getElementById('t-save').addEventListener('click', async () => {
-  const id   = document.getElementById('tenant-edit-id').value;
-  const name = document.getElementById('t-name').value.trim();
+  const id    = document.getElementById('tenant-edit-id').value;
+  const name  = document.getElementById('t-name').value.trim();
   const alias = document.getElementById('t-alias').value.trim();
   const errEl = document.getElementById('t-error');
   errEl.style.display = 'none';
@@ -552,16 +689,14 @@ window._deleteTenant = async function(id, name) {
   catch (err) { alert(err.detail || 'Erro ao excluir.'); }
 };
 
-// ── DOMAINS ──────────────────────────────────────────────────────────────
+// ── DOMAINS ───────────────────────────────────────────────────────────────
 async function loadDomains() {
   const tenantId = tenant?.id;
   const badge  = document.getElementById('domains-tenant-badge');
-  const hint   = document.getElementById('domain-gateway-hint');
   const tbody  = document.getElementById('tbody-domains');
   const empty  = document.getElementById('domains-empty');
 
   badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : '';
-  hint.style.display = 'block';
 
   if (!tenantId) {
     tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Selecione um tenant para ver os domains.</td></tr>';
@@ -576,7 +711,6 @@ async function loadDomains() {
     tbody.innerHTML = '';
     if (!list.length) { empty.style.display = 'block'; return; }
 
-    // Carrega políticas em paralelo
     const policies = await Promise.all(
       list.map(d => domainsApi.getPolicy(tenantId, d.id).catch(() => null))
     );
@@ -631,13 +765,15 @@ window._deleteDomain = async function(domainId, domain) {
   catch (err) { alert(err.detail || 'Erro ao remover.'); }
 };
 
-// Modal domain policy
 window._openDomainPolicyModal = async function(domainId, domainName) {
   document.getElementById('dp-domain-id').value = domainId;
   document.getElementById('dp-domain-name').textContent = domainName;
   document.getElementById('dp-requires-auth').checked = false;
   document.getElementById('dp-rate-limit').value = '';
   document.getElementById('dp-roles').value = '';
+  document.getElementById('dp-jwt-validate-exp').checked = true;
+  document.getElementById('dp-jwt-issuer').value = '';
+  document.getElementById('dp-jwt-audience').value = '';
   document.getElementById('dp-error').style.display = 'none';
   document.getElementById('modal-domain-policy').style.display = 'flex';
   try {
@@ -646,6 +782,9 @@ window._openDomainPolicyModal = async function(domainId, domainName) {
       document.getElementById('dp-requires-auth').checked = p.requires_auth;
       document.getElementById('dp-rate-limit').value = p.rate_limit_per_minute || '';
       document.getElementById('dp-roles').value = (p.allowed_roles || []).join(', ');
+      document.getElementById('dp-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
+      document.getElementById('dp-jwt-issuer').value = p.jwt_issuer || '';
+      document.getElementById('dp-jwt-audience').value = p.jwt_audience || '';
     }
   } catch {}
 };
@@ -666,7 +805,7 @@ document.getElementById('dp-save').addEventListener('click', async () => {
     await domainsApi.upsertPolicy(tenant.id, domainId, {
       requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
       jwt_validate_exp: document.getElementById('dp-jwt-validate-exp').checked,
-      jwt_issuer: document.getElementById('dp-jwt-issuer').value.trim() || null,
+      jwt_issuer:   document.getElementById('dp-jwt-issuer').value.trim()   || null,
       jwt_audience: document.getElementById('dp-jwt-audience').value.trim() || null,
     });
     document.getElementById('modal-domain-policy').style.display = 'none';
@@ -683,7 +822,7 @@ document.getElementById('dp-delete').addEventListener('click', async () => {
   } catch (err) { document.getElementById('dp-error').textContent = err.detail || 'Erro ao remover.'; document.getElementById('dp-error').style.display = 'block'; }
 });
 
-// ── ROTAS ────────────────────────────────────────────────────────────────
+// ── ROTAS ─────────────────────────────────────────────────────────────────
 async function loadRoutes() {
   const tbody = document.getElementById('tbody-routes');
   const empty = document.getElementById('routes-empty');
@@ -703,7 +842,6 @@ async function loadRoutes() {
 
     list.forEach((r, i) => {
       const p = policies[i];
-      // r.methods é array
       const methods = Array.isArray(r.methods) ? r.methods : (r.method ? [r.method] : []);
       const methodBadges = methods.map(m => {
         const cls = ['GET','POST','PUT','PATCH','DELETE','OPTIONS','HEAD'].includes(m) ? `m-${m}` : 'm-OTHER';
@@ -733,7 +871,6 @@ async function loadRoutes() {
   }
 }
 
-// Checkboxes de método
 function _setMethodCheckboxes(methods) {
   document.querySelectorAll('input[name="r-methods"]').forEach(cb => {
     cb.checked = methods.includes(cb.value);
@@ -773,13 +910,6 @@ document.getElementById('btn-new-route').addEventListener('click', () => _openRo
 document.getElementById('r-cancel').addEventListener('click', () => { document.getElementById('modal-route').style.display = 'none'; });
 document.getElementById('modal-route').addEventListener('click', e => { if (e.target.id === 'modal-route') document.getElementById('modal-route').style.display = 'none'; });
 
-function validateRoutePath(path) {
-  if (!path.startsWith('/')) return 'Path deve começar com /';
-  if (path.includes('//')) return 'Path não pode conter //';
-  if (/[A-Z]/.test(path)) return 'Use apenas letras minúsculas no path (REST)';
-  if (!/^\/[a-z0-9][a-z0-9/_\-{}]*$/.test(path)) return 'Path com caracteres inválidos';
-  return null;
-}
 document.getElementById('r-save').addEventListener('click', async () => {
   const id      = document.getElementById('r-edit-id').value;
   const methods = [...document.querySelectorAll('input[name="r-methods"]:checked')].map(el => el.value);
@@ -789,9 +919,8 @@ document.getElementById('r-save').addEventListener('click', async () => {
   errEl.style.display = 'none';
 
   if (!methods.length) { errEl.textContent = 'Selecione ao menos um método HTTP.'; errEl.style.display = 'block'; return; }
-  const pathErr = validateRoutePath(path);
-  if (pathErr) { errEl.textContent = pathErr; errEl.style.display = 'block'; return; }
   if (!path || !backend) { errEl.textContent = 'Path e backend URL são obrigatórios.'; errEl.style.display = 'block'; return; }
+  if (!path.startsWith('/')) { errEl.textContent = 'Path deve começar com /.'; errEl.style.display = 'block'; return; }
 
   try {
     if (id) {
@@ -810,7 +939,6 @@ window._deleteRoute = async function(id, path) {
   catch (err) { alert(err.detail || 'Erro ao excluir.'); }
 };
 
-// Modal política por rota
 window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-route-id').value = routeId;
   document.getElementById('p-route-path').textContent = routePath;
@@ -818,6 +946,9 @@ window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-requires-auth').checked = false;
   document.getElementById('p-rate-limit').value = '';
   document.getElementById('p-roles').value = '';
+  document.getElementById('p-jwt-validate-exp').checked = true;
+  document.getElementById('p-jwt-issuer').value = '';
+  document.getElementById('p-jwt-audience').value = '';
   document.getElementById('modal-policy').style.display = 'flex';
   try {
     const p = await policiesApi.get(routeId);
@@ -825,6 +956,9 @@ window._openPolicyModal = async function(routeId, routePath) {
       document.getElementById('p-requires-auth').checked = p.requires_auth;
       document.getElementById('p-rate-limit').value = p.rate_limit_per_minute || '';
       document.getElementById('p-roles').value = (p.allowed_roles || []).join(', ');
+      document.getElementById('p-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
+      document.getElementById('p-jwt-issuer').value = p.jwt_issuer || '';
+      document.getElementById('p-jwt-audience').value = p.jwt_audience || '';
     }
   } catch {}
 };
@@ -845,7 +979,7 @@ document.getElementById('p-save').addEventListener('click', async () => {
     await policiesApi.upsert(routeId, {
       requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
       jwt_validate_exp: document.getElementById('p-jwt-validate-exp').checked,
-      jwt_issuer: document.getElementById('p-jwt-issuer').value.trim() || null,
+      jwt_issuer:   document.getElementById('p-jwt-issuer').value.trim()   || null,
       jwt_audience: document.getElementById('p-jwt-audience').value.trim() || null,
     });
     document.getElementById('modal-policy').style.display = 'none';
@@ -862,7 +996,138 @@ document.getElementById('p-delete').addEventListener('click', async () => {
   } catch (err) { document.getElementById('p-error').textContent = err.detail || 'Erro ao remover.'; document.getElementById('p-error').style.display = 'block'; }
 });
 
+// ── MEMBROS ───────────────────────────────────────────────────────────────
+async function loadMembers() {
+  if (!tenant) {
+    document.getElementById('tbody-members').innerHTML =
+      '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Selecione um tenant para ver os membros.</td></tr>';
+    return;
+  }
 
+  const tbody = document.getElementById('tbody-members');
+  const empty = document.getElementById('members-empty');
+  const badge = document.getElementById('members-tenant-badge');
+
+  badge.textContent = `Tenant: ${tenant.name || tenant.alias || tenant.id}`;
+  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const members = await subUsersApi.listByTenant(tenant.id);
+    tbody.innerHTML = '';
+    if (!members.length) { empty.style.display = 'block'; return; }
+
+    members.forEach(m => {
+      const tr = document.createElement('tr');
+      const perms = (m.permissions || [])
+        .map(p => `<span class="policy-on" style="font-size:.75rem;padding:2px 7px">${p}</span>`)
+        .join(' ');
+      const when = new Date(m.created_at).toLocaleDateString('pt-BR');
+      tr.innerHTML = `
+        <td>${m.email}</td>
+        <td>${perms || '<span style="color:var(--text-sub);font-size:.8rem;font-style:italic">nenhuma</span>'}</td>
+        <td style="color:var(--text-sub);font-size:.85rem">${when}</td>
+        <td>
+          <button class="btn-icon"
+            data-member-id="${m.id}"
+            data-member-email="${esc(m.email)}"
+            data-member-perms='${JSON.stringify(m.permissions || [])}'>
+            Editar
+          </button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('[data-member-id]').forEach(btn => {
+      btn.addEventListener('click', () => _openEditMember(
+        btn.dataset.memberId,
+        btn.dataset.memberEmail,
+        JSON.parse(btn.dataset.memberPerms),
+      ));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#a03030">${err.detail || 'Erro ao carregar membros'}</td></tr>`;
+  }
+}
+
+function _openNewMember() {
+  document.getElementById('modal-member-title').textContent = 'Novo membro';
+  document.getElementById('member-edit-id').value = '';
+  document.getElementById('m-email').value = '';
+  document.getElementById('m-email').disabled = false;
+  document.getElementById('m-password').value = '';
+  document.getElementById('m-password-field').style.display = 'block';
+  document.getElementById('m-delete').style.display = 'none';
+  document.getElementById('m-error').style.display = 'none';
+  ['domains','routes','audit','metrics'].forEach(p => {
+    document.getElementById(`m-perm-${p}`).checked = false;
+  });
+  document.getElementById('modal-member').style.display = 'flex';
+  document.getElementById('m-email').focus();
+}
+
+function _openEditMember(id, email, permissions) {
+  document.getElementById('modal-member-title').textContent = 'Editar membro';
+  document.getElementById('member-edit-id').value = id;
+  document.getElementById('m-email').value = email;
+  document.getElementById('m-email').disabled = true;
+  document.getElementById('m-password-field').style.display = 'none';
+  document.getElementById('m-delete').style.display = 'inline-flex';
+  document.getElementById('m-error').style.display = 'none';
+  ['domains','routes','audit','metrics'].forEach(p => {
+    document.getElementById(`m-perm-${p}`).checked = permissions.includes(p);
+  });
+  document.getElementById('modal-member').style.display = 'flex';
+}
+
+function _closeMemberModal() {
+  document.getElementById('modal-member').style.display = 'none';
+  document.getElementById('m-email').disabled = false;
+}
+
+document.getElementById('btn-new-member').addEventListener('click', _openNewMember);
+document.getElementById('m-cancel').addEventListener('click', _closeMemberModal);
+document.getElementById('modal-member').addEventListener('click', e => { if (e.target.id === 'modal-member') _closeMemberModal(); });
+
+document.getElementById('m-save').addEventListener('click', async () => {
+  const id    = document.getElementById('member-edit-id').value;
+  const email = document.getElementById('m-email').value.trim();
+  const pass  = document.getElementById('m-password').value;
+  const perms = ['domains','routes','audit','metrics'].filter(p => document.getElementById(`m-perm-${p}`).checked);
+  const errEl = document.getElementById('m-error');
+  errEl.style.display = 'none';
+
+  try {
+    if (id) {
+      await subUsersApi.updatePermissions(id, perms);
+    } else {
+      if (!email) { errEl.textContent = 'E-mail obrigatório.'; errEl.style.display = 'block'; return; }
+      if (!pass)  { errEl.textContent = 'Senha obrigatória.'; errEl.style.display = 'block'; return; }
+      if (!perms.length) { errEl.textContent = 'Selecione ao menos uma permissão.'; errEl.style.display = 'block'; return; }
+      await subUsersApi.create({ email, password: pass, permissions: perms, tenant_id: tenant?.id || null });
+    }
+    _closeMemberModal();
+    loadMembers();
+  } catch (err) {
+    errEl.textContent = err.detail || 'Erro ao salvar.';
+    errEl.style.display = 'block';
+  }
+});
+
+document.getElementById('m-delete').addEventListener('click', async () => {
+  const id = document.getElementById('member-edit-id').value;
+  if (!id || !confirm('Remover este membro?')) return;
+  try {
+    await subUsersApi.delete(id);
+    _closeMemberModal();
+    loadMembers();
+  } catch (err) {
+    document.getElementById('m-error').textContent = err.detail || 'Erro ao remover.';
+    document.getElementById('m-error').style.display = 'block';
+  }
+});
+
+// ── AUDITORIA ─────────────────────────────────────────────────────────────
 async function loadAudit() {
   const tbody = document.getElementById('tbody-audit');
   const empty = document.getElementById('audit-empty');
@@ -877,7 +1142,14 @@ async function loadAudit() {
     rows.forEach(r => {
       const tr = document.createElement('tr');
       const when = new Date(r.created_at).toLocaleString('pt-BR');
-      tr.innerHTML = `<td style="font-size:.8rem">${when}</td><td><span class="badge">${r.method}</span></td><td style="font-family:monospace;font-size:.8rem">${r.path}</td><td>${r.status_code}</td><td>${Math.round(r.latency_ms)} ms</td><td>${r.client_ip}</td>`;
+      const cls  = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
+      tr.innerHTML = `
+        <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
+        <td><span class="badge ${cls}">${r.method}</span></td>
+        <td style="font-family:monospace;font-size:.8rem">${r.path}</td>
+        <td style="font-family:monospace">${r.status_code}</td>
+        <td style="color:var(--text-sub)">${Math.round(r.latency_ms)} ms</td>
+        <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${r.client_ip}</td>`;
       tbody.appendChild(tr);
     });
   } catch (err) {
@@ -885,14 +1157,14 @@ async function loadAudit() {
   }
 }
 
-// ── MÉTRICAS ────────────────────────────────────────────────────────────
+// ── MÉTRICAS ──────────────────────────────────────────────────────────────
 async function loadMetrics() {
   try {
     const m = await auditApi.metrics(tenant?.id || null, 24);
-    document.getElementById('mt-total').textContent = m.total_requests;
-    document.getElementById('mt-status').textContent = `${m.status_2xx} / ${m.status_4xx} / ${m.status_5xx}`;
-    document.getElementById('mt-avg-lat').textContent = `${m.avg_latency_ms} ms`;
-    document.getElementById('mt-p95-lat').textContent = m.p95_latency_ms ? `p95: ${m.p95_latency_ms} ms` : '';
+    document.getElementById('mt-total').textContent     = m.total_requests;
+    document.getElementById('mt-status').textContent    = `${m.status_2xx} / ${m.status_4xx} / ${m.status_5xx}`;
+    document.getElementById('mt-avg-lat').textContent   = `${m.avg_latency_ms} ms`;
+    document.getElementById('mt-p95-lat').textContent   = m.p95_latency_ms ? `p95: ${m.p95_latency_ms} ms` : '';
     const top = (m.top_routes || []).map(t => `${(t.route_id||'?').slice(0,8)}… (${t.count})`).join(', ');
     document.getElementById('mt-top-routes').textContent = top || '—';
   } catch {
@@ -900,7 +1172,7 @@ async function loadMetrics() {
   }
 }
 
-// ── CONTA ────────────────────────────────────────────────────────────────
+// ── CONTA ─────────────────────────────────────────────────────────────────
 function loadConta() {
   document.getElementById('btn-change-pw').addEventListener('click', async () => {
     const current = document.getElementById('pw-current').value;
@@ -910,7 +1182,7 @@ function loadConta() {
     msgEl.className = 'inline-msg';
     msgEl.textContent = '';
     if (!current || !next) { msgEl.className += ' error'; msgEl.textContent = 'Preencha todos os campos.'; return; }
-    if (next !== confirm)   { msgEl.className += ' error'; msgEl.textContent = 'As senhas não coincidem.'; return; }
+    if (next !== confirm)  { msgEl.className += ' error'; msgEl.textContent = 'As senhas não coincidem.'; return; }
     try {
       await authApi.changePassword(current, next);
       msgEl.className += ' success';
@@ -922,7 +1194,7 @@ function loadConta() {
   }, { once: true });
 }
 
-// ── Util ─────────────────────────────────────────────────────────────────
+// ── Util ──────────────────────────────────────────────────────────────────
 function esc(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 </script>
 

@@ -272,20 +272,13 @@
     <!-- Identidade -->
     <div class="landing-brand">
       <p class="brand-tagline">
-        Gateway de segurança<br>para <strong>APIs modernas</strong>
+        Gateway de segurança<br>para <strong>serviços e APIs</strong>
       </p>
       <p class="brand-desc">
         Centralize autenticação, controle de acesso, rate limiting
         e auditoria em um único ponto de entrada. Proteja seus
         serviços sem duplicar lógica sensível.
       </p>
-      <div class="brand-pills">
-        <span class="pill">JWT</span>
-        <span class="pill">Rate Limiting</span>
-        <span class="pill">RBAC</span>
-        <span class="pill">Auditoria</span>
-        <span class="pill">Multi-tenant</span>
-      </div>
     </div>
 
     <div class="landing-divider"></div>
@@ -399,7 +392,7 @@
   </footer>
 
   <script type="module">
-    import { authApi, tenantsApi } from './js/api.js';
+    import { authApi } from './js/api.js';
 
     // ── Redireciona se já autenticado ──────────────────────────────────
     if (sessionStorage.getItem('sentra_token')) {
@@ -447,13 +440,24 @@
         sessionStorage.setItem('sentra_token', access_token);
 
         const me = await authApi.me();
-        if (me.tenant_id) {
-          sessionStorage.setItem('sentra_tenant', JSON.stringify({ id: me.tenant_id }));
-          window.location.href = '/dashboard.html';
-        } else {
-          // superuser: sem tenant fixo
+        sessionStorage.setItem('sentra_user', JSON.stringify({
+          id:          me.id,
+          email:       me.email,
+          role:        me.role,
+          tenant_id:   me.tenant_id,
+          permissions: me.permissions || [],
+        }));
+        if (me.role === 'superuser') {
           window.location.href = '/tenant-select.html';
+          return;
         }
+
+        if (!me.tenant_id) {
+          throw { detail: 'Usuário admin/member sem tenant vinculado.' };
+        }
+
+sessionStorage.setItem('sentra_tenant', JSON.stringify({ id: me.tenant_id }));
+window.location.href = '/dashboard.html';
       } catch (err) {
         msg('login-msg', err.detail || 'Credenciais inválidas.', 'error');
         setLoading('login-btn', false, 'Entrar');
@@ -486,12 +490,14 @@
     });
 
     // ── Cadastro ───────────────────────────────────────────────────────
+    // Onboarding atômico: o backend cria tenant + admin numa única
+    // transação. Não há mais chamada separada a /tenants depois.
     window.handleRegister = async function() {
       const email   = document.getElementById('reg-email').value.trim();
       const pass    = document.getElementById('reg-pass').value;
       const confirm = document.getElementById('reg-confirm').value;
       const company = document.getElementById('reg-company').value.trim();
-      const alias    = document.getElementById('reg-alias').value.trim();
+      const alias   = document.getElementById('reg-alias').value.trim();
       msg('reg-msg', '', '');
 
       if (!email || !pass || !company || !alias) {
@@ -506,23 +512,30 @@
 
       setLoading('reg-btn', true, 'Criando conta…');
       try {
-        // 1. Cria usuário (sem tenant ainda)
-        const data = await authApi.register(email, pass);
+        const data = await authApi.register({
+          email,
+          password: pass,
+          company_name: company,
+          company_alias: alias,
+        });
+
+        // Backend já retornou user + tenant + token na mesma resposta.
         sessionStorage.setItem('sentra_token', data.access_token);
-
-        // 2. Cria tenant com o token recém-obtido
-        msg('reg-msg', 'Usuário criado. Configurando tenant…', '');
-        const tenant = await tenantsApi.create({ name: company, alias });
-
-        // 3. Salva contexto e redireciona
+        sessionStorage.setItem('sentra_user', JSON.stringify({
+          id:          data.user.id,
+          email:       data.user.email,
+          role:        data.user.role,
+          tenant_id:   data.user.tenant_id,
+          permissions: data.user.permissions || [],
+        }));
         sessionStorage.setItem('sentra_tenant', JSON.stringify({
-          id: tenant.id,
-          name: tenant.name,
-          alias: tenant.alias,
+          id:    data.tenant.id,
+          name:  data.tenant.name,
+          alias: data.tenant.alias,
         }));
 
         msg('reg-msg', 'Conta criada! Redirecionando…', 'success');
-        setTimeout(() => window.location.href = '/dashboard.html', 900);
+        setTimeout(() => window.location.href = '/dashboard.html', 700);
       } catch (err) {
         msg('reg-msg', err.detail || 'Erro ao criar conta.', 'error');
         setLoading('reg-btn', false, 'Criar conta');

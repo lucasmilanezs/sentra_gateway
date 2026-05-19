@@ -37,7 +37,7 @@ async function request(method, path, body = null) {
 
 export const authApi = {
   login:          (email, password)                 => request('POST', '/auth/login', { email, password }),
-  register:       (email, password, tenant_id=null) => request('POST', '/auth/register', { email, password, ...(tenant_id && { tenant_id }) }),
+  register:       (payload)                         => request('POST', '/auth/register', payload),
   me:             ()                                => request('GET',  '/auth/me'),
   forgotPassword: (email)                           => request('POST', '/auth/forgot-password', { email }),
   resetPassword:  (email, code, new_password)       => request('POST', '/auth/reset-password', { email, code, new_password }),
@@ -94,4 +94,11 @@ export const auditApi = {
     if (tenantId) q.set('tenant_id', tenantId);
     return request('GET', `/metrics/summary?${q}`);
   },
+};
+
+export const subUsersApi = {
+  create:            (payload)             => request('POST',   '/sub-users', payload),
+  listByTenant:      (tenantId)            => request('GET',    `/sub-users/${tenantId}`),
+  updatePermissions: (userId, permissions) => request('PATCH',  `/sub-users/${userId}/permissions`, { permissions }),
+  delete:            (userId)              => request('DELETE', `/sub-users/${userId}`),
 };

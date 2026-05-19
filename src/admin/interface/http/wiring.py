@@ -2,14 +2,19 @@ import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.admin.application.use_cases.authenticate_user import (
-    AuthenticateUser, ChangePassword, RegisterUser,
+    AuthenticateUser, ChangePassword,
     RequestPasswordReset, ResetPasswordWithCode,
 )
+from src.admin.application.use_cases.register_admin_with_tenant import (
+    RegisterAdminWithTenant,
+)
+
 from src.admin.application.use_cases.manage_admin_route import ManageAdminRoute
 from src.admin.application.use_cases.manage_policy import ManagePolicy
 from src.admin.application.use_cases.manage_tenant import ManageTenant
 from src.admin.application.use_cases.manage_tenant_domain import ManageTenantDomain
 from src.admin.application.use_cases.query_audit import QueryAudit
+from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.infrastructure.config.settings import AdminSettings
 from src.admin.infrastructure.email.console_email_sender import ConsoleEmailSender
 from src.admin.infrastructure.email.smtp_email_sender import SmtpEmailSender
@@ -81,8 +86,9 @@ class AdminWiring:
             self.manage_tenant_domain = None
             self.manage_route = None
             self.manage_policy = None
+            self.manage_sub_user = None
             self.authenticate_user = None
-            self.register_user = None
+            self.register_admin_with_tenant = None
             self.change_password = None
             self.request_password_reset = None
             self.reset_password_with_code = None
@@ -98,6 +104,7 @@ class AdminWiring:
             self.route_repository = JsonRouteRepository(store)
             self.policy_repository = JsonPolicyRepository(store)
             self.reset_repository = JsonPasswordResetRepository(store)
+            self.manage_sub_user = None 
             self.query_audit = None
             self._build_use_cases_json()
 
@@ -115,8 +122,10 @@ class AdminWiring:
         self.authenticate_user = AuthenticateUser(
             self.user_repository, self.hasher, self.token_service
         )
-        self.register_user = RegisterUser(
-            self.user_repository, self.hasher, self.tenant_repository
+        self.register_admin_with_tenant = RegisterAdminWithTenant(
+            users=self.user_repository,
+            tenants=self.tenant_repository,
+            hasher=self.hasher,
         )
         self.change_password = ChangePassword(self.user_repository, self.hasher)
         self.request_password_reset = RequestPasswordReset(
@@ -165,8 +174,10 @@ class AdminWiring:
         w.authenticate_user = AuthenticateUser(
             w.user_repository, w.hasher, w.token_service
         )
-        w.register_user = RegisterUser(
-            w.user_repository, w.hasher, w.tenant_repository
+        w.register_admin_with_tenant = RegisterAdminWithTenant(
+            users=w.user_repository,
+            tenants=w.tenant_repository,
+            hasher=w.hasher,
         )
         w.change_password = ChangePassword(w.user_repository, w.hasher)
         w.request_password_reset = RequestPasswordReset(
@@ -177,6 +188,12 @@ class AdminWiring:
         )
         w.audit_repository = PgAuditRepository(session)
         w.query_audit = QueryAudit(w.audit_repository)
+        w.manage_sub_user = ManageSubUser(
+            users=w.user_repository,
+            tenants=w.tenant_repository,
+            hasher=w.hasher,
+        )
+
         return w
 
     async def dispose(self) -> None:

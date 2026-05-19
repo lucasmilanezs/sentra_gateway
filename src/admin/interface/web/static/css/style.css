@@ -355,3 +355,19 @@ footer span {
   .landing-divider { display: none; }
   .landing-panel { width: 100%; padding: 28px 28px 48px; }
 }
+
+.brand-image {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center; /* centraliza horizontalmente */
+}
+
+.brand-image img {
+  width: 100%;
+  max-width: 520px; /* ajuste conforme necessário */
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 16px;
+  opacity: 0.95;
+  filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.35));
+}

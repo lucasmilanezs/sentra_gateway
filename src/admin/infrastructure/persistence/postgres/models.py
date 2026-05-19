@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.shared.db import Base
@@ -110,18 +110,33 @@ class AdminRouteORM(Base):
 
 class UserORM(Base):
     __tablename__ = "admin_users"
-
+    __table_args__ = (
+        # Invariante:
+        #   superuser  ⇒  tenant_id IS NULL
+        #   qualquer outra role  ⇒  tenant_id IS NOT NULL
+        CheckConstraint(
+            "(role = 'superuser' AND tenant_id IS NULL) "
+            "OR (role <> 'superuser' AND tenant_id IS NOT NULL)",
+            name="ck_users_role_tenant_consistency",
+        ),
+    )
+ 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # tenant_id NULL é permitido APENAS quando role='superuser'.
+    # A CHECK constraint acima garante isso a nível de banco.
     tenant_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("admin_tenants.id"), nullable=True
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="admin")
+    permissions: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
 
 
 class PolicyORM(Base):

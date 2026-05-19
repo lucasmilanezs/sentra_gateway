@@ -4,7 +4,8 @@ from pydantic import BaseModel, EmailStr, Field
 class RegisterBody(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    tenant_id: str | None = None
+    company_name: str = Field(min_length=1, max_length=255)
+    company_alias: str = Field(min_length=1, max_length=128)
 
 
 class LoginBody(BaseModel):
@@ -22,10 +23,18 @@ class UserPublic(BaseModel):
     email: str
     tenant_id: str | None
     role: str | None = None
+    permissions: list[str] = []
+
+
+class TenantPublic(BaseModel):
+    id: str
+    name: str
+    alias: str
 
 
 class RegisterResponse(BaseModel):
     user: UserPublic
+    tenant: TenantPublic
     access_token: str
     token_type: str = "bearer"
 

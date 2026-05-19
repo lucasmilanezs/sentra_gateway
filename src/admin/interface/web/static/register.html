@@ -24,38 +24,70 @@
 
   <main>
     <div class="card">
-      <h1 class="card-title">Register</h1>
+      <h1 class="card-title">Cadastro</h1>
+      <p style="font-size:.85rem;color:#7a8398;margin:-8px 0 16px 0">
+        Crie sua conta e a empresa associada. Você será o admin do tenant.
+      </p>
 
-      <div class="field">
-        <input
-          type="text"
-          id="reg-user"
-          placeholder="user"
-          autocomplete="username"
-        />
-      </div>
+      <form id="register-form">
+        <div class="field">
+          <input
+            type="email"
+            id="email"
+            placeholder="E-mail do administrador"
+            autocomplete="email"
+            required
+          />
+        </div>
 
-      <div class="field">
-        <input
-          type="password"
-          id="reg-pass"
-          placeholder="password"
-          autocomplete="new-password"
-        />
-      </div>
+        <div class="field">
+          <input
+            type="password"
+            id="password"
+            placeholder="Senha (mínimo 8 caracteres)"
+            autocomplete="new-password"
+            required
+            minlength="8"
+          />
+        </div>
 
-      <div class="field">
-        <input
-          type="password"
-          id="reg-confirm"
-          placeholder="confirm password"
-          autocomplete="new-password"
-        />
-      </div>
+        <div class="field">
+          <input
+            type="password"
+            id="confirm-password"
+            placeholder="Confirmar senha"
+            autocomplete="new-password"
+            required
+            minlength="8"
+          />
+        </div>
 
-      <p class="msg" id="reg-msg"></p>
+        <div class="field">
+          <input
+            type="text"
+            id="company-name"
+            placeholder="Nome da empresa"
+            required
+            maxlength="255"
+          />
+        </div>
 
-      <button class="btn" onclick="handleRegister()">Registrar</button>
+        <div class="field">
+          <input
+            type="text"
+            id="company-alias"
+            placeholder="Alias da empresa (ex: minha-empresa)"
+            required
+            maxlength="128"
+            pattern="^[a-z0-9]+(-[a-z0-9]+)*$"
+            title="Apenas letras minúsculas, números e hífens"
+          />
+        </div>
+
+        <p class="message" id="message"></p>
+
+        <button class="btn" type="submit">Criar conta</button>
+      </form>
 
       <div class="link-row" style="margin-top: 16px; text-align: center;">
         <a href="index.html">Já tem conta? Entrar</a>
@@ -67,6 +99,6 @@
     <span>@2026</span>
   </footer>
 
-  <script src="js/register.js"></script>
+  <script type="module" src="js/register.js"></script>
 </body>
 </html>

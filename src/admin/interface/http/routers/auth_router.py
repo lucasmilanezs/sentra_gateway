@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, status
 from src.admin.application.use_cases.authenticate_user import (
     AuthenticateUser,
     ChangePassword,
-    RegisterUser,
     RequestPasswordReset,
     ResetPasswordWithCode,
 )
@@ -15,7 +14,6 @@ from src.admin.interface.http.dependencies import (
     get_authenticate_user,
     get_change_password,
     get_current_claims,
-    get_register_user,
     get_request_password_reset,
     get_reset_password,
     get_request_wiring,
@@ -28,6 +26,7 @@ from src.admin.interface.schema.auth_schema import (
     RegisterBody,
     RegisterResponse,
     ResetPasswordBody,
+    TenantPublic,
     TokenResponse,
     UserPublic,
 )
@@ -40,12 +39,27 @@ async def register(
     body: RegisterBody,
     w: Annotated[AdminWiring, Depends(get_request_wiring)],
 ):
-    user = await w.register_user.execute(body.email, body.password, body.tenant_id)
+    """
+    Onboarding atômico: cria tenant + admin numa única transação.
+    O use case é acessado diretamente do wiring para garantir que
+    tenant e admin compartilhem exatamente a mesma sessão de banco.
+    """
+    user, tenant = await w.register_admin_with_tenant.execute(
+        email=body.email,
+        password=body.password,
+        company_name=body.company_name,
+        company_alias=body.company_alias,
+    )
     access = w.token_service.create_access_token(
-        user.id, user.email, user.tenant_id, user.role
+        user.id, user.email, user.tenant_id, user.role,
+        permissions=user.permissions or None,
     )
     return RegisterResponse(
-        user=UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id, role=user.role),
+        user=UserPublic(
+            id=user.id, email=user.email, tenant_id=user.tenant_id,
+            role=user.role, permissions=user.permissions,
+        ),
+        tenant=TenantPublic(id=tenant.id, name=tenant.name, alias=tenant.alias),
         access_token=access,
     )
 
@@ -67,7 +81,10 @@ async def me(
     user = await w.user_repository.get_by_id(claims.sub)
     if not user:
         raise AuthError("usuário não encontrado")
-    return UserPublic(id=user.id, email=user.email, tenant_id=user.tenant_id, role=user.role)
+    return UserPublic(
+        id=user.id, email=user.email, tenant_id=user.tenant_id,
+        role=user.role, permissions=user.permissions,
+    )
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

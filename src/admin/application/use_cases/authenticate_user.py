@@ -1,13 +1,11 @@
 import hashlib
 import secrets
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from src.admin.domain.entities.user import User
-from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
+from src.admin.domain.exceptions import AuthError, ValidationError
 from src.admin.domain.ports.email_sender import EmailSenderPort
 from src.admin.domain.ports.password_reset_repository import PasswordResetRecord, PasswordResetRepositoryPort
-from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.ports.user_repository import UserRepositoryPort
 from src.admin.domain.services.password_hasher import PasswordHasherPort
 from src.admin.domain.services.token_service import TokenServicePort
@@ -34,44 +32,28 @@ class AuthenticateUser:
         if not user or not self._hasher.verify(password, user.password_hash):
             raise AuthError("email ou senha inválidos")
         access = self._tokens.create_access_token(
-            user.id, user.email, user.tenant_id, user.role
+            user.id,
+            user.email,
+            user.tenant_id,
+            user.role,
+            permissions=user.permissions or None,
         )
         return access, user
 
 
-class RegisterUser:
-    def __init__(
-        self,
-        users: UserRepositoryPort,
-        hasher: PasswordHasherPort,
-        tenants: TenantRepositoryPort,
-    ) -> None:
-        self._users = users
-        self._hasher = hasher
-        self._tenants = tenants
-
-    async def execute(self, email: str, password: str, tenant_id: str | None = None) -> User:
-        if len(password) < 8:
-            raise ValidationError("senha deve ter pelo menos 8 caracteres")
-        email_n = email.strip().lower()
-        if not email_n or "@" not in email_n:
-            raise ValidationError("email inválido")
-        if tenant_id and not await self._tenants.get_by_id(tenant_id):
-            raise NotFoundError("tenant não encontrado")
-        if await self._users.get_by_email(email_n):
-            raise ConflictError("email já cadastrado")
-        now = _utcnow()
-        user = User(
-            id=str(uuid.uuid4()),
-            email=email_n,
-            password_hash=self._hasher.hash(password),
-            tenant_id=tenant_id,
-            created_at=now,
-            updated_at=now,
-            role="admin",
-        )
-        await self._users.save(user)
-        return user
+# NOTA: RegisterUser foi REMOVIDO deste módulo.
+#
+# Criar admin isoladamente, sem tenant, violaria a invariante de domínio:
+#   (role != 'superuser') ⇒ tenant_id IS NOT NULL
+#
+# O fluxo de onboarding correto é RegisterAdminWithTenant, que cria
+# tenant + admin atomicamente na mesma transação.
+#
+# Sub-usuários (members) são criados via ManageSubUser.create, sempre
+# vinculados ao tenant do admin que os cria.
+#
+# Superuser é criado uma única vez no bootstrap (main.py) a partir
+# de variáveis de ambiente, com tenant_id=NULL deliberadamente.
 
 
 class ChangePassword:
@@ -91,6 +73,7 @@ class ChangePassword:
             raise AuthError("usuário não encontrado")
         if not self._hasher.verify(current_password, user.password_hash):
             raise AuthError("senha atual incorreta")
+        # Preserva role, tenant_id E permissions — não quebra perfil do member.
         updated = User(
             id=user.id,
             email=user.email,
@@ -99,6 +82,7 @@ class ChangePassword:
             created_at=user.created_at,
             updated_at=_utcnow(),
             role=user.role,
+            permissions=user.permissions,
         )
         await self._users.save(updated)
 
@@ -157,6 +141,7 @@ class ResetPasswordWithCode:
         if not user:
             await self._resets.clear(email_n)
             raise AuthError("código inválido ou expirado")
+        # Preserva role, tenant_id E permissions
         updated = User(
             id=user.id,
             email=user.email,
@@ -165,6 +150,7 @@ class ResetPasswordWithCode:
             created_at=user.created_at,
             updated_at=_utcnow(),
             role=user.role,
+            permissions=user.permissions,
         )
         await self._users.save(updated)
         await self._resets.clear(email_n)

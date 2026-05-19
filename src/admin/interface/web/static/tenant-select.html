@@ -388,6 +388,11 @@
   import { requireAuth, logout } from './js/auth.js';
 
   if (!requireAuth()) throw new Error('not authenticated');
+  const me = await authApi.me();
+
+  if (me.role !== 'superuser') {
+    window.location.href = '/dashboard.html';
+  }
 
   document.getElementById('ts-logout').addEventListener('click', logout);
 
