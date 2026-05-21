@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
+from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
 from src.admin.domain.entities.policy import Policy
-from src.admin.domain.exceptions import NotFoundError, ValidationError
+from src.admin.domain.exceptions import AuthError, NotFoundError, ValidationError
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.policy_repository import PolicyRepositoryPort
 from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
@@ -32,13 +33,28 @@ class ManagePolicy:
         self._routes = routes
         self._publisher = publisher
 
-    async def get_by_route(self, route_id: str) -> Policy | None:
-        if not await self._routes.get_by_id(route_id):
+    async def get_by_route(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        route_id: str,
+    ) -> Policy | None:
+        route = await self._routes.get_by_id(route_id)
+        if not route:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=route.tenant_id,
+        )
         return await self._policies.get_by_route_id(route_id)
 
     async def upsert(
         self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
         route_id: str,
         requires_auth: bool,
         rate_limit_per_minute: int | None,
@@ -48,8 +64,14 @@ class ManagePolicy:
         jwt_audience: str | None = None,
         jwt_clock_skew_seconds: int = 30,
     ) -> Policy:
-        if not await self._routes.get_by_id(route_id):
+        route = await self._routes.get_by_id(route_id)
+        if not route:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=route.tenant_id,
+        )
 
         if rate_limit_per_minute is not None and rate_limit_per_minute <= 0:
             raise ValidationError("rate_limit_per_minute deve ser maior que zero")
@@ -78,9 +100,21 @@ class ManagePolicy:
 
         return policy
 
-    async def delete(self, route_id: str) -> None:
-        if not await self._routes.get_by_id(route_id):
+    async def delete(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        route_id: str,
+    ) -> None:
+        route = await self._routes.get_by_id(route_id)
+        if not route:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=route.tenant_id,
+        )
         deleted = await self._policies.delete_by_route_id(route_id)
         if not deleted:
             raise NotFoundError("política não encontrada para esta rota")

@@ -19,6 +19,12 @@ class RequestParser:
         params = self._extract_path_params(dict(fastapi_request.path_params))
         host = fastapi_request.headers.get("host", "")
 
+        # Se não há x-forwarded-for na requisição (caso mais comum: cliente conecta
+        # diretamente ao gateway sem proxy reverso na frente), injeta o IP da conexão
+        # TCP como x-forwarded-for para que o LogEventBuilder consiga lê-lo.
+        if "x-forwarded-for" not in headers and fastapi_request.client:
+            headers = {**headers, "x-forwarded-for": fastapi_request.client.host}
+
         return Request(
             method=method,
             path=path,

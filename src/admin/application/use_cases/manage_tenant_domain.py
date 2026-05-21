@@ -2,10 +2,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-
+from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
 from src.admin.domain.entities.domain_policy import DomainPolicy
 from src.admin.domain.entities.tenant_domain import TenantDomain
-from src.admin.domain.exceptions import ConflictError, NotFoundError, ValidationError
+from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
 from src.admin.domain.ports.domain_policy_repository import DomainPolicyRepositoryPort
 from src.admin.domain.ports.tenant_domain_repository import TenantDomainRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
@@ -41,7 +41,18 @@ class ManageTenantDomain:
 
     # ── Domains ────────────────────────────────────────────────────────
 
-    async def list(self, tenant_id: str) -> list[TenantDomain]:
+    async def list(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        tenant_id: str,
+    ) -> list[TenantDomain]:
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=tenant_id,
+        )
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
         return await self._domains.list_by_tenant(tenant_id)
@@ -52,7 +63,19 @@ class ManageTenantDomain:
             raise NotFoundError("domain não encontrado")
         return d
 
-    async def create(self, tenant_id: str, domain: str) -> TenantDomain:
+    async def create(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        tenant_id: str,
+        domain: str,
+    ) -> TenantDomain:
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=tenant_id,
+        )
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
 
@@ -80,10 +103,21 @@ class ManageTenantDomain:
 
         return td
 
-    async def delete(self, domain_id: str) -> None:
+    async def delete(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        domain_id: str,
+    ) -> None:
         d = await self._domains.get_by_id(domain_id)
         if not d:
             raise NotFoundError("domain não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=d.tenant_id,
+        )
         await self._domains.delete(domain_id)
 
         if self._publisher:
@@ -91,13 +125,28 @@ class ManageTenantDomain:
 
     # ── Domain Policy (política global por domain) ─────────────────────
 
-    async def get_policy(self, domain_id: str) -> DomainPolicy | None:
-        if not await self._domains.get_by_id(domain_id):
+    async def get_policy(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        domain_id: str,
+    ) -> DomainPolicy | None:
+        d = await self._domains.get_by_id(domain_id)
+        if not d:
             raise NotFoundError("domain não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=d.tenant_id,
+        )
         return await self._domain_policies.get_by_domain_id(domain_id)
 
     async def upsert_policy(
         self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
         domain_id: str,
         requires_auth: bool,
         rate_limit_per_minute: int | None,
@@ -107,8 +156,14 @@ class ManageTenantDomain:
         jwt_audience: str | None = None,
         jwt_clock_skew_seconds: int = 30,
     ) -> DomainPolicy:
-        if not await self._domains.get_by_id(domain_id):
+        d = await self._domains.get_by_id(domain_id)
+        if not d:
             raise NotFoundError("domain não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=d.tenant_id,
+        )
 
         if rate_limit_per_minute is not None and rate_limit_per_minute <= 0:
             raise ValidationError("rate_limit_per_minute deve ser maior que zero")
@@ -136,9 +191,21 @@ class ManageTenantDomain:
 
         return policy
 
-    async def delete_policy(self, domain_id: str) -> None:
-        if not await self._domains.get_by_id(domain_id):
+    async def delete_policy(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        domain_id: str,
+    ) -> None:
+        d = await self._domains.get_by_id(domain_id)
+        if not d:
             raise NotFoundError("domain não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=d.tenant_id,
+        )
         deleted = await self._domain_policies.delete_by_domain_id(domain_id)
         if not deleted:
             raise NotFoundError("política não encontrada para este domain")

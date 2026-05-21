@@ -29,6 +29,80 @@ document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
   btn.addEventListener('click', () => navigate(btn.dataset.page));
 });
 
+// ── Audit polling ─────────────────────────────────────────────────────────
+// Roda apenas enquanto a aba de auditoria está visível.
+// Polling diferencial: só insere linhas novas no topo — sem reescrever a
+// tabela inteira a cada tick.
+const AUDIT_POLL_MS = 8000;
+let _auditPollTimer  = null;
+let _auditNewestTs   = null;   // ISO string do registro mais recente exibido
+
+async function _auditPollTick() {
+  const tbody = document.getElementById('tbody-audit');
+  if (!tbody) return;
+  try {
+    const rows = await auditApi.list(tenant?.id || null, 100);
+    if (!rows.length) return;
+
+    // Quantos registros são mais novos que o último exibido
+    const newRows = _auditNewestTs
+      ? rows.filter(r => r.created_at > _auditNewestTs)
+      : rows;
+
+    if (!newRows.length) return;
+
+    _auditNewestTs = rows[0].created_at;
+
+    // Na primeira carga (placeholder ainda presente) substitui tudo
+    if (tbody.querySelector('td[colspan]')) {
+      tbody.innerHTML = '';
+      rows.forEach(r => tbody.appendChild(_auditRow(r)));
+      document.getElementById('audit-empty').style.display = rows.length ? 'none' : 'block';
+      return;
+    }
+
+    // Insere novas linhas no topo com highlight transitório
+    newRows.slice().reverse().forEach(r => {
+      const tr = _auditRow(r);
+      tr.style.transition = 'background 1.2s ease';
+      tr.style.background = 'rgba(82,196,138,.15)';
+      tbody.prepend(tr);
+      requestAnimationFrame(() => { tr.style.background = ''; });
+    });
+
+    // Mantém no máximo 100 linhas
+    while (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
+
+  } catch { /* falha silenciosa — estado anterior permanece */ }
+}
+
+function _auditRow(r) {
+  const tr   = document.createElement('tr');
+  const when = new Date(r.created_at).toLocaleString('pt-BR');
+  const cls  = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
+  tr.innerHTML = `
+    <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
+    <td><span class="badge ${cls}">${r.method}</span></td>
+    <td style="font-family:monospace;font-size:.8rem">${r.path}</td>
+    <td style="font-family:monospace">${r.status_code}</td>
+    <td style="color:var(--text-sub)">${Math.round(r.latency_ms)} ms</td>
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${r.client_ip}</td>`;
+  return tr;
+}
+
+function _startAuditPoll() {
+  if (_auditPollTimer) return;
+  _auditNewestTs  = null;
+  _auditPollTimer = setInterval(_auditPollTick, AUDIT_POLL_MS);
+  _auditPollTick();
+}
+
+function _stopAuditPoll() {
+  if (!_auditPollTimer) return;
+  clearInterval(_auditPollTimer);
+  _auditPollTimer = null;
+}
+
 function navigate(pageId) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -36,7 +110,11 @@ function navigate(pageId) {
   const page = document.getElementById('page-' + pageId);
   if (btn)  btn.classList.add('active');
   if (page) page.classList.add('active');
-  PAGE_LOADERS[pageId]?.();
+
+  if (pageId === 'audit') { _startAuditPoll(); }
+  else                    { _stopAuditPoll();  }
+
+  if (pageId !== 'audit') PAGE_LOADERS[pageId]?.();
 }
 
 // ── Inicialização — tudo depende de me() ─────────────────────────────────
@@ -651,33 +729,12 @@ document.getElementById('m-delete').addEventListener('click', async () => {
 });
 
 // ── AUDITORIA ─────────────────────────────────────────────────────────────
-async function loadAudit() {
-  const tbody = document.getElementById('tbody-audit');
-  const empty = document.getElementById('audit-empty');
+function loadAudit() {
+  // A carga e atualização da auditoria é gerida pelo poll diferencial (_startAuditPoll).
+  // navigate() chama _startAuditPoll() diretamente quando a aba é selecionada;
+  // esta função existe apenas para compatibilidade com PAGE_LOADERS e não faz nada.
   const badge = document.getElementById('audit-tenant-badge');
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
-  tbody.innerHTML = '<tr><td colspan="6" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
-  empty.style.display = 'none';
-  try {
-    const rows = await auditApi.list(tenant?.id || null, 100);
-    tbody.innerHTML = '';
-    if (!rows.length) { empty.style.display = 'block'; return; }
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      const when = new Date(r.created_at).toLocaleString('pt-BR');
-      const cls  = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
-      tr.innerHTML = `
-        <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
-        <td><span class="badge ${cls}">${r.method}</span></td>
-        <td style="font-family:monospace;font-size:.8rem">${r.path}</td>
-        <td style="font-family:monospace">${r.status_code}</td>
-        <td style="color:var(--text-sub)">${Math.round(r.latency_ms)} ms</td>
-        <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${r.client_ip}</td>`;
-      tbody.appendChild(tr);
-    });
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:#a03030">${err.detail||'Erro'}</td></tr>`;
-  }
+  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
 }
 
 // ── MÉTRICAS ──────────────────────────────────────────────────────────────

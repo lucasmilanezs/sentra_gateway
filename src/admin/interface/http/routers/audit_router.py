@@ -11,7 +11,11 @@ router = APIRouter()
 
 
 def _tenant_scope(claims: JwtClaims, tenant_id: str | None) -> str | None:
-    if claims.role in ("superuser",) or (claims.role == "admin" and not claims.tenant_id):
+    """
+    superuser pode consultar qualquer tenant via query param (ou None = global).
+    Todos os outros roles ficam presos ao próprio tenant, independente do query param.
+    """
+    if claims.role == "superuser":
         return tenant_id
     return claims.tenant_id
 

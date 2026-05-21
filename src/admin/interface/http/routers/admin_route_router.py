@@ -32,9 +32,11 @@ async def list_routes(
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
     tenant_id: str | None = Query(default=None),
 ):
-    # members e admins com tenant só enxergam rotas do próprio tenant
-    effective_tenant = claims.tenant_id or tenant_id
-    items = await uc.list(tenant_id=effective_tenant)
+    items = await uc.list(
+        caller_role=claims.role,
+        caller_tenant_id=claims.tenant_id,
+        tenant_id=tenant_id,
+    )
     return [_to_response(r) for r in items]
 
 
@@ -44,17 +46,28 @@ async def create_route(
     claims: Annotated[JwtClaims, Depends(require_permission("routes"))],
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
 ):
-    r = await uc.create(body.tenant_id, body.path_pattern, body.methods, body.backend_url)
+    r = await uc.create(
+        caller_role=claims.role,
+        caller_tenant_id=claims.tenant_id,
+        tenant_id=body.tenant_id,
+        path_pattern=body.path_pattern,
+        methods=body.methods,
+        backend_url=body.backend_url,
+    )
     return _to_response(r)
 
 
 @router.get("/{route_id}", response_model=AdminRouteResponse)
 async def get_route(
     route_id: str,
-    _: Annotated[JwtClaims, Depends(require_permission("routes"))],
+    claims: Annotated[JwtClaims, Depends(require_permission("routes"))],
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
 ):
-    r = await uc.get(route_id)
+    r = await uc.get(
+        caller_role=claims.role,
+        caller_tenant_id=claims.tenant_id,
+        route_id=route_id,
+    )
     return _to_response(r)
 
 
@@ -62,21 +75,34 @@ async def get_route(
 async def patch_route(
     route_id: str,
     body: AdminRouteUpdate,
-    _: Annotated[JwtClaims, Depends(require_permission("routes"))],
+    claims: Annotated[JwtClaims, Depends(require_permission("routes"))],
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
 ):
     data = body.model_dump(exclude_unset=True)
     if not data:
-        r = await uc.get(route_id)
+        r = await uc.get(
+            caller_role=claims.role,
+            caller_tenant_id=claims.tenant_id,
+            route_id=route_id,
+        )
         return _to_response(r)
-    r = await uc.update(route_id, data)
+    r = await uc.update(
+        caller_role=claims.role,
+        caller_tenant_id=claims.tenant_id,
+        route_id=route_id,
+        data=data,
+    )
     return _to_response(r)
 
 
 @router.delete("/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_route(
     route_id: str,
-    _: Annotated[JwtClaims, Depends(require_permission("routes"))],
+    claims: Annotated[JwtClaims, Depends(require_permission("routes"))],
     uc: Annotated[ManageAdminRoute, Depends(get_manage_route)],
 ):
-    await uc.delete(route_id)
+    await uc.delete(
+        caller_role=claims.role,
+        caller_tenant_id=claims.tenant_id,
+        route_id=route_id,
+    )

@@ -2,8 +2,9 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
 from src.admin.domain.entities.tenant import Tenant
-from src.admin.domain.exceptions import ConflictError, NotFoundError, ValidationError
+from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 
@@ -32,10 +33,21 @@ class ManageTenant:
     async def list(self) -> list[Tenant]:
         return await self._tenants.list_all()
 
-    async def get(self, tenant_id: str) -> Tenant:
+    async def get(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        tenant_id: str,
+    ) -> Tenant:
         t = await self._tenants.get_by_id(tenant_id)
         if not t:
             raise NotFoundError("tenant não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=t.id,
+        )
         return t
 
     async def create(self, name: str, alias: str) -> Tenant:
@@ -53,10 +65,22 @@ class ManageTenant:
         await self._tenants.save(tenant)
         return tenant
 
-    async def update(self, tenant_id: str, data: dict) -> Tenant:
+    async def update(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        tenant_id: str,
+        data: dict,
+    ) -> Tenant:
         t = await self._tenants.get_by_id(tenant_id)
         if not t:
             raise NotFoundError("tenant não encontrado")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=t.id,
+        )
         new_name = data["name"].strip() if "name" in data else t.name
         new_alias = data["alias"] if "alias" in data else t.alias
         if "alias" in data:

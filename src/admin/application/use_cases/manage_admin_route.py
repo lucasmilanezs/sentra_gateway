@@ -3,8 +3,9 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
 from src.admin.domain.entities.admin_route import AdminRoute
-from src.admin.domain.exceptions import NotFoundError, ValidationError
+from src.admin.domain.exceptions import AuthError, NotFoundError, ValidationError
 from src.admin.domain.services.route_validation import validate_path_pattern
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
@@ -48,34 +49,65 @@ class ManageAdminRoute:
         self._tenants = tenants
         self._publisher = publisher
 
-    async def list(self, tenant_id: str | None = None) -> list[AdminRoute]:
-        return await self._routes.list_all(tenant_id=tenant_id)
+    async def list(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        tenant_id: str | None = None,
+    ) -> list[AdminRoute]:
+        # superuser pode filtrar por qualquer tenant via query param;
+        # todos os outros ficam presos ao próprio tenant.
+        effective_tenant = (
+            tenant_id if caller_role == "superuser" else caller_tenant_id
+        )
+        return await self._routes.list_all(tenant_id=effective_tenant)
 
-    async def get(self, route_id: str) -> AdminRoute:
+    async def get(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        route_id: str,
+    ) -> AdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=r.tenant_id,
+        )
         return r
 
     async def create(
         self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
         tenant_id: str,
         path_pattern: str,
         methods: list[HttpMethod],
         backend_url: str,
     ) -> AdminRoute:
-        if not await self._tenants.get_by_id(tenant_id):
+        # superuser pode criar em qualquer tenant via body;
+        # admin/member ficam presos ao próprio tenant (body.tenant_id ignorado).
+        effective_tenant = (
+            tenant_id if caller_role == "superuser" else caller_tenant_id
+        )
+        if not effective_tenant:
+            raise AuthError("caller sem tenant vinculado não pode criar rotas")
+        if not await self._tenants.get_by_id(effective_tenant):
             raise NotFoundError("tenant não encontrado")
 
         path_pattern = validate_path_pattern(path_pattern)
-
         parsed_methods = _parse_methods(methods)
         _validate_backend_url(backend_url.strip())
 
         now = _utcnow()
         route = AdminRoute(
             id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
+            tenant_id=effective_tenant,
             path_pattern=path_pattern,
             methods=parsed_methods,
             backend_url=backend_url.strip().rstrip("/"),
@@ -89,10 +121,22 @@ class ManageAdminRoute:
 
         return route
 
-    async def update(self, route_id: str, data: dict) -> AdminRoute:
+    async def update(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        route_id: str,
+        data: dict,
+    ) -> AdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=r.tenant_id,
+        )
 
         new_path = (
             validate_path_pattern(data["path_pattern"]) if "path_pattern" in data else r.path_pattern
@@ -124,9 +168,22 @@ class ManageAdminRoute:
 
         return updated
 
-    async def delete(self, route_id: str) -> None:
-        if not await self._routes.delete(route_id):
+    async def delete(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        route_id: str,
+    ) -> None:
+        r = await self._routes.get_by_id(route_id)
+        if not r:
             raise NotFoundError("rota não encontrada")
+        TenantOwnershipGuard.assert_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=r.tenant_id,
+        )
+        await self._routes.delete(route_id)
 
         if self._publisher:
             await self._publisher.notify_config_updated()
