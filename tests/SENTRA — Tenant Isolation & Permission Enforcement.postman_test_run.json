@@ -1,0 +1,2110 @@
+{
+	"id": "ad8d7625-f969-4e17-964c-33c09340c95f",
+	"name": "SENTRA — Tenant Isolation & Permission Enforcement",
+	"timestamp": "2026-05-21T16:52:37.715Z",
+	"collection_id": "31674885-448d4230-af31-41ed-aac8-5ec68404769e",
+	"folder_id": 0,
+	"environment_id": "31674885-d671137f-239f-4f9a-b980-06b43d2bb3dd",
+	"totalPass": 73,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2026-05-21T16:52:30.433Z",
+	"totalFail": 0,
+	"results": [
+		{
+			"id": "b8b04eb7-4a67-46ec-96ef-b1d602de2280",
+			"name": "Login superuser",
+			"url": "http://localhost:8001/api/v1/auth/login",
+			"time": 218,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				218
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "597cc398-3ad1-4f9d-9870-231174f05976",
+			"name": "Register Tenant A + admin_a",
+			"url": "http://localhost:8001/api/v1/auth/register",
+			"time": 208,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				208
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "132372f6-a59c-4fcc-88a1-7d20a246dda7",
+			"name": "Register Tenant B + admin_b",
+			"url": "http://localhost:8001/api/v1/auth/register",
+			"time": 202,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				202
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "e3495218-e761-4f7a-8745-94ce39d6aa28",
+			"name": "Create route in Tenant A (superuser)",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 13,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				13
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "7f1d5875-1a1f-435a-83ec-01d71f475d02",
+			"name": "Create route in Tenant B (superuser)",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 8,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "567a96ed-57a2-4c63-99ae-dcdbfd859cb3",
+			"name": "Create domain in Tenant A (superuser)",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains",
+			"time": 11,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				11
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "2ab4fb54-457c-49ae-9c17-a6a53ec33a85",
+			"name": "Create domain in Tenant B (superuser)",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains",
+			"time": 11,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				11
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "93025429-54aa-4e13-a130-6c09b2a2075d",
+			"name": "Create member_routes in Tenant A (admin_a)",
+			"url": "http://localhost:8001/api/v1/sub-users",
+			"time": 214,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				214
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "e0349b24-9130-4b7a-beef-24a365f2461c",
+			"name": "Login member_routes",
+			"url": "http://localhost:8001/api/v1/auth/login",
+			"time": 200,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				200
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "d1b84bc0-067c-436b-80d3-0b94f9355b88",
+			"name": "Create member_domains in Tenant A (admin_a)",
+			"url": "http://localhost:8001/api/v1/sub-users",
+			"time": 203,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				203
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "23c58739-aafa-4e37-bb50-62ea501808ef",
+			"name": "Login member_domains",
+			"url": "http://localhost:8001/api/v1/auth/login",
+			"time": 200,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				200
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "d5aac363-4150-4e57-8887-b52f609f468a",
+			"name": "Create member_no_perms in Tenant A (admin_a)",
+			"url": "http://localhost:8001/api/v1/sub-users",
+			"time": 201,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				201
+			],
+			"allTests": [
+				{
+					"Status 201": true
+				}
+			]
+		},
+		{
+			"id": "ca1b1809-38a4-4fad-9bbc-2bf3cbc4fbc1",
+			"name": "Login member_no_perms",
+			"url": "http://localhost:8001/api/v1/auth/login",
+			"time": 198,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				198
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "d67daea9-e1fc-46e9-b990-2dedbad18d06",
+			"name": "[BLOCK] GET route_b with admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "19b38a3f-e8d1-4bc6-b015-53ede3b49988",
+			"name": "[BLOCK] PATCH route_b with admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "699b405b-ed2f-4dd2-a0aa-62845e213d4f",
+			"name": "[BLOCK] DELETE route_b with admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 7,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "afce4c89-c27d-411b-b9e9-03de74f18492",
+			"name": "[BLOCK] POST route into Tenant B with admin_a token",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 7,
+			"responseCode": {
+				"code": 201,
+				"name": "Created"
+			},
+			"tests": {
+				"Status 201": true,
+				"Route created in caller tenant, not body tenant_id": true
+			},
+			"testPassFailCounts": {
+				"Status 201": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Route created in caller tenant, not body tenant_id": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 201": true,
+					"Route created in caller tenant, not body tenant_id": true
+				}
+			]
+		},
+		{
+			"id": "f4c6b6d4-aa6a-41db-8f05-8843c2f6647c",
+			"name": "[BLOCK] GET Tenant B via admin_a token",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "bb42471d-c8fd-4189-839c-6b0a018864f2",
+			"name": "[BLOCK] PATCH Tenant B via admin_a token",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "4c2fe89a-9c03-4d2c-a871-4a98dbee162b",
+			"name": "[BLOCK] GET domain_b via admin_a token",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains",
+			"time": 4,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "6beaa98b-cbb0-4fd8-b265-b76edf1045d8",
+			"name": "[BLOCK] POST domain into Tenant B via admin_a token",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains",
+			"time": 4,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "bc299a99-a99c-497a-8031-1efcc99170cb",
+			"name": "[BLOCK] DELETE domain_b via admin_a token",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains/81b86ec6-5822-4532-83a7-e8cd39d1b811",
+			"time": 5,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "23d07c2f-7ce8-4ea5-b456-89391909ab0d",
+			"name": "[BLOCK] GET policy of route_b via admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d/policy",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "dc7b455a-6fee-42bb-8558-39849ed2387f",
+			"name": "[BLOCK] PUT policy on route_b via admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d/policy",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "54b25618-caaf-45ba-8b23-8e74f1ab6591",
+			"name": "[BLOCK] DELETE policy on route_b via admin_a token",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d/policy",
+			"time": 5,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "4f3abf81-4ffe-40a6-aa5f-c45500ce4ee6",
+			"name": "Cleanup injected route (superuser)",
+			"url": "http://localhost:8001/api/v1/routes/3521459d-b2a8-4841-9ab0-e1224d8eb1d8",
+			"time": 7,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"Status 204": true
+			},
+			"testPassFailCounts": {
+				"Status 204": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 204": true
+				}
+			]
+		},
+		{
+			"id": "7a917a28-e517-4f16-b890-49979727ad72",
+			"name": "[ALLOW] GET route_b as superuser",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "b0c1c35b-7236-4873-8240-4dc437ce1774",
+			"name": "[ALLOW] GET Tenant B as superuser",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "709e67ba-f536-43d0-ba00-95cf51b0b9fe",
+			"name": "[ALLOW] GET domains of Tenant B as superuser",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "e56d79ec-84b8-4e49-b6db-3833f6aa4961",
+			"name": "[ALLOW] PUT policy on route_b as superuser",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d/policy",
+			"time": 11,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				11
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "a87bd9da-3db7-46bc-867b-8309313635c2",
+			"name": "[ALLOW] List routes filtered by Tenant B as superuser",
+			"url": "http://localhost:8001/api/v1/routes?tenant_id=56ead98c-822b-4de1-a436-45129265f561",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"All routes belong to Tenant B": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"All routes belong to Tenant B": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"All routes belong to Tenant B": true
+				}
+			]
+		},
+		{
+			"id": "2c87d065-8f6d-4417-b122-00ee367b6c20",
+			"name": "[ALLOW] member_routes can list routes",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Only Tenant A routes returned": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Only Tenant A routes returned": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Only Tenant A routes returned": true
+				}
+			]
+		},
+		{
+			"id": "ec1a846a-c68c-4636-983a-4e3c85974d54",
+			"name": "[ALLOW] member_routes can GET route_a",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "d3ff9767-4e97-4629-852a-a7234a2e7cf2",
+			"name": "[ALLOW] member_routes can PUT policy on route_a",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885/policy",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "77337eaf-34f8-489a-b820-7e832ac60c1c",
+			"name": "[BLOCK] member_routes cannot GET route_b (cross-tenant)",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 6,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "65ed329e-6e7f-42fe-931f-7f6ce032456f",
+			"name": "[BLOCK] member_routes cannot access domains (wrong permission)",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "c0bf2e56-802b-4e6e-aec6-61a8053f04ad",
+			"name": "[BLOCK] member_routes cannot access audit (wrong permission)",
+			"url": "http://localhost:8001/api/v1/audit",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "be06865a-8e3f-4961-9cd3-7031e218243b",
+			"name": "[BLOCK] member_routes cannot access metrics (wrong permission)",
+			"url": "http://localhost:8001/api/v1/metrics/summary",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "02fd1a6b-1d84-4522-83a1-6f3972b04db5",
+			"name": "[ALLOW] member_domains can list domains of Tenant A",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "8bfd9c40-d4f1-4ffa-ab4c-41b820b92d57",
+			"name": "[ALLOW] member_domains can PUT domain policy",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains/29597a6b-ae07-420c-9822-c7480b718763/policy",
+			"time": 12,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				12
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "1573b4f9-2fb1-4068-99d9-817071514e56",
+			"name": "[BLOCK] member_domains cannot list domains of Tenant B (cross-tenant)",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains",
+			"time": 3,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "e480fd8a-caab-43dc-9ff1-42f34c7689cd",
+			"name": "[BLOCK] member_domains cannot access routes (wrong permission)",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "946ddf90-01d9-4d04-a5a3-5957ea7aa2cf",
+			"name": "[BLOCK] member_domains cannot access routes policy (wrong permission)",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885/policy",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "4a336fd3-72a0-4bb8-91e6-b1c378f3a62c",
+			"name": "[BLOCK] member_noperms cannot access routes",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "54b32722-8e1b-4f0e-a0e5-97cc999b1dd0",
+			"name": "[BLOCK] member_noperms cannot access domains",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains",
+			"time": 2,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "b45d3215-ff68-40f8-83d2-92eba5248182",
+			"name": "[BLOCK] member_noperms cannot manage sub-users (requires admin role)",
+			"url": "http://localhost:8001/api/v1/sub-users/e32b3bc8-35fb-422c-9719-6b4551e18aa8",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "570c34fe-73cb-436a-a08e-e103d7d100a8",
+			"name": "[BLOCK] GET routes without token",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 2,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "8596da45-3ff7-4a45-95f2-f2c3677ac5cd",
+			"name": "[BLOCK] GET routes with garbage token",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 3,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "0c75e309-633e-435f-9d68-a565e685ad20",
+			"name": "[BLOCK] POST route without token",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 3,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "d6863c7d-422c-49a4-852d-ca76187d593c",
+			"name": "[BLOCK] DELETE route without token",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885",
+			"time": 2,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				2
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "15bd0546-5d95-4470-a5d6-e1d4469cf1a5",
+			"name": "[BLOCK] PUT policy without token",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885/policy",
+			"time": 3,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "c3e3bdfc-4933-4e83-9b5a-b8f6ed08ca89",
+			"name": "admin_a lists routes — only Tenant A",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 7,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"All routes belong to Tenant A": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"All routes belong to Tenant A": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"All routes belong to Tenant A": true
+				}
+			]
+		},
+		{
+			"id": "c94fbbf3-f75c-459d-9369-3bcd03d52b48",
+			"name": "admin_b lists routes — only Tenant B",
+			"url": "http://localhost:8001/api/v1/routes",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"All routes belong to Tenant B": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"All routes belong to Tenant B": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"All routes belong to Tenant B": true
+				}
+			]
+		},
+		{
+			"id": "0569f0e6-1e7b-4463-9a04-9b78f9a13ce2",
+			"name": "admin_a passes tenant_b_id as query param — must be ignored",
+			"url": "http://localhost:8001/api/v1/routes?tenant_id=56ead98c-822b-4de1-a436-45129265f561",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Query param tenant_id ignored for non-superuser": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Query param tenant_id ignored for non-superuser": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Query param tenant_id ignored for non-superuser": true
+				}
+			]
+		},
+		{
+			"id": "07f650ac-d2ae-4471-afa4-0d3cc51e29dd",
+			"name": "superuser lists routes with tenant_b filter — only Tenant B",
+			"url": "http://localhost:8001/api/v1/routes?tenant_id=56ead98c-822b-4de1-a436-45129265f561",
+			"time": 5,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true,
+				"Superuser filter returns only Tenant B routes": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Superuser filter returns only Tenant B routes": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				5
+			],
+			"allTests": [
+				{
+					"Status 200": true,
+					"Superuser filter returns only Tenant B routes": true
+				}
+			]
+		},
+		{
+			"id": "6f0de155-deac-4508-8415-f78cc8c8f62c",
+			"name": "audit scoped to Tenant A for admin_a",
+			"url": "http://localhost:8001/api/v1/audit",
+			"time": 8,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				8
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "10a720ad-b80c-4bed-8ae3-966ed240c458",
+			"name": "[ALLOW] admin_a lists members of Tenant A",
+			"url": "http://localhost:8001/api/v1/sub-users/e32b3bc8-35fb-422c-9719-6b4551e18aa8",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"Status 200": true
+			},
+			"testPassFailCounts": {
+				"Status 200": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 200": true
+				}
+			]
+		},
+		{
+			"id": "1e0b0511-a93a-4bf7-8b38-9711687a5727",
+			"name": "[BLOCK] admin_a lists members of Tenant B",
+			"url": "http://localhost:8001/api/v1/sub-users/56ead98c-822b-4de1-a436-45129265f561",
+			"time": 4,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				4
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "e863c1dc-838d-46cb-9af2-73bf5d041b12",
+			"name": "[BLOCK] admin_a deletes member of Tenant B (if id known)",
+			"url": "http://localhost:8001/api/v1/sub-users/d588a0a4-961f-4888-ae71-c4fbd1d12696",
+			"time": 7,
+			"responseCode": {
+				"code": 401,
+				"name": "Unauthorized"
+			},
+			"tests": {
+				"Status 401": true
+			},
+			"testPassFailCounts": {
+				"Status 401": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 401": true
+				}
+			]
+		},
+		{
+			"id": "b692cbe2-e1f0-4f29-a751-40ba53dac6d5",
+			"name": "[BLOCK] member cannot create sub-users",
+			"url": "http://localhost:8001/api/v1/sub-users",
+			"time": 3,
+			"responseCode": {
+				"code": 403,
+				"name": "Forbidden"
+			},
+			"tests": {
+				"Status 403": true
+			},
+			"testPassFailCounts": {
+				"Status 403": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				3
+			],
+			"allTests": [
+				{
+					"Status 403": true
+				}
+			]
+		},
+		{
+			"id": "02551d72-6082-46c5-970e-3f5f96458292",
+			"name": "Delete domain_a (superuser)",
+			"url": "http://localhost:8001/api/v1/tenants/e32b3bc8-35fb-422c-9719-6b4551e18aa8/domains/29597a6b-ae07-420c-9822-c7480b718763",
+			"time": 7,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"Status 204": true
+			},
+			"testPassFailCounts": {
+				"Status 204": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				7
+			],
+			"allTests": [
+				{
+					"Status 204": true
+				}
+			]
+		},
+		{
+			"id": "76f9c846-3f59-4491-abf4-e1e4a3fbe087",
+			"name": "Delete domain_b (superuser)",
+			"url": "http://localhost:8001/api/v1/tenants/56ead98c-822b-4de1-a436-45129265f561/domains/81b86ec6-5822-4532-83a7-e8cd39d1b811",
+			"time": 6,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"Status 204": true
+			},
+			"testPassFailCounts": {
+				"Status 204": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 204": true
+				}
+			]
+		},
+		{
+			"id": "b613f7b3-3ba5-47a0-9b1b-367a04bdec66",
+			"name": "Delete route_a policy (superuser)",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885/policy",
+			"time": 6,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"204 or 404 acceptable (policy may not exist)": true
+			},
+			"testPassFailCounts": {
+				"204 or 404 acceptable (policy may not exist)": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"204 or 404 acceptable (policy may not exist)": true
+				}
+			]
+		},
+		{
+			"id": "290c3940-91b4-4cc7-a47c-3d2271d862d5",
+			"name": "Delete route_b policy (superuser)",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d/policy",
+			"time": 6,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"204 or 404 acceptable": true
+			},
+			"testPassFailCounts": {
+				"204 or 404 acceptable": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"204 or 404 acceptable": true
+				}
+			]
+		},
+		{
+			"id": "3abef3b0-ac99-48dd-9fc8-a52b28500224",
+			"name": "Delete route_a (superuser)",
+			"url": "http://localhost:8001/api/v1/routes/3f163312-ed61-4129-be64-5d067004e885",
+			"time": 6,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"Status 204": true
+			},
+			"testPassFailCounts": {
+				"Status 204": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 204": true
+				}
+			]
+		},
+		{
+			"id": "5496a4ef-0073-44a6-a8f4-5bddd9bf820c",
+			"name": "Delete route_b (superuser)",
+			"url": "http://localhost:8001/api/v1/routes/09c33476-8904-43c8-84dd-7ffec7e7e99d",
+			"time": 6,
+			"responseCode": {
+				"code": 204,
+				"name": "No Content"
+			},
+			"tests": {
+				"Status 204": true
+			},
+			"testPassFailCounts": {
+				"Status 204": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				6
+			],
+			"allTests": [
+				{
+					"Status 204": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 2160,
+	"collection": {
+		"requests": [
+			{
+				"id": "b8b04eb7-4a67-46ec-96ef-b1d602de2280",
+				"method": "POST"
+			},
+			{
+				"id": "597cc398-3ad1-4f9d-9870-231174f05976",
+				"method": "POST"
+			},
+			{
+				"id": "132372f6-a59c-4fcc-88a1-7d20a246dda7",
+				"method": "POST"
+			},
+			{
+				"id": "e3495218-e761-4f7a-8745-94ce39d6aa28",
+				"method": "POST"
+			},
+			{
+				"id": "7f1d5875-1a1f-435a-83ec-01d71f475d02",
+				"method": "POST"
+			},
+			{
+				"id": "567a96ed-57a2-4c63-99ae-dcdbfd859cb3",
+				"method": "POST"
+			},
+			{
+				"id": "2ab4fb54-457c-49ae-9c17-a6a53ec33a85",
+				"method": "POST"
+			},
+			{
+				"id": "93025429-54aa-4e13-a130-6c09b2a2075d",
+				"method": "POST"
+			},
+			{
+				"id": "e0349b24-9130-4b7a-beef-24a365f2461c",
+				"method": "POST"
+			},
+			{
+				"id": "d1b84bc0-067c-436b-80d3-0b94f9355b88",
+				"method": "POST"
+			},
+			{
+				"id": "23c58739-aafa-4e37-bb50-62ea501808ef",
+				"method": "POST"
+			},
+			{
+				"id": "d5aac363-4150-4e57-8887-b52f609f468a",
+				"method": "POST"
+			},
+			{
+				"id": "ca1b1809-38a4-4fad-9bbc-2bf3cbc4fbc1",
+				"method": "POST"
+			},
+			{
+				"id": "d67daea9-e1fc-46e9-b990-2dedbad18d06",
+				"method": "GET"
+			},
+			{
+				"id": "19b38a3f-e8d1-4bc6-b015-53ede3b49988",
+				"method": "PATCH"
+			},
+			{
+				"id": "699b405b-ed2f-4dd2-a0aa-62845e213d4f",
+				"method": "DELETE"
+			},
+			{
+				"id": "afce4c89-c27d-411b-b9e9-03de74f18492",
+				"method": "POST"
+			},
+			{
+				"id": "f4c6b6d4-aa6a-41db-8f05-8843c2f6647c",
+				"method": "GET"
+			},
+			{
+				"id": "bb42471d-c8fd-4189-839c-6b0a018864f2",
+				"method": "PATCH"
+			},
+			{
+				"id": "4c2fe89a-9c03-4d2c-a871-4a98dbee162b",
+				"method": "GET"
+			},
+			{
+				"id": "6beaa98b-cbb0-4fd8-b265-b76edf1045d8",
+				"method": "POST"
+			},
+			{
+				"id": "bc299a99-a99c-497a-8031-1efcc99170cb",
+				"method": "DELETE"
+			},
+			{
+				"id": "23d07c2f-7ce8-4ea5-b456-89391909ab0d",
+				"method": "GET"
+			},
+			{
+				"id": "dc7b455a-6fee-42bb-8558-39849ed2387f",
+				"method": "PUT"
+			},
+			{
+				"id": "54b25618-caaf-45ba-8b23-8e74f1ab6591",
+				"method": "DELETE"
+			},
+			{
+				"id": "4f3abf81-4ffe-40a6-aa5f-c45500ce4ee6",
+				"method": "DELETE"
+			},
+			{
+				"id": "7a917a28-e517-4f16-b890-49979727ad72",
+				"method": "GET"
+			},
+			{
+				"id": "b0c1c35b-7236-4873-8240-4dc437ce1774",
+				"method": "GET"
+			},
+			{
+				"id": "709e67ba-f536-43d0-ba00-95cf51b0b9fe",
+				"method": "GET"
+			},
+			{
+				"id": "e56d79ec-84b8-4e49-b6db-3833f6aa4961",
+				"method": "PUT"
+			},
+			{
+				"id": "a87bd9da-3db7-46bc-867b-8309313635c2",
+				"method": "GET"
+			},
+			{
+				"id": "2c87d065-8f6d-4417-b122-00ee367b6c20",
+				"method": "GET"
+			},
+			{
+				"id": "ec1a846a-c68c-4636-983a-4e3c85974d54",
+				"method": "GET"
+			},
+			{
+				"id": "d3ff9767-4e97-4629-852a-a7234a2e7cf2",
+				"method": "PUT"
+			},
+			{
+				"id": "77337eaf-34f8-489a-b820-7e832ac60c1c",
+				"method": "GET"
+			},
+			{
+				"id": "65ed329e-6e7f-42fe-931f-7f6ce032456f",
+				"method": "GET"
+			},
+			{
+				"id": "c0bf2e56-802b-4e6e-aec6-61a8053f04ad",
+				"method": "GET"
+			},
+			{
+				"id": "be06865a-8e3f-4961-9cd3-7031e218243b",
+				"method": "GET"
+			},
+			{
+				"id": "02fd1a6b-1d84-4522-83a1-6f3972b04db5",
+				"method": "GET"
+			},
+			{
+				"id": "8bfd9c40-d4f1-4ffa-ab4c-41b820b92d57",
+				"method": "PUT"
+			},
+			{
+				"id": "1573b4f9-2fb1-4068-99d9-817071514e56",
+				"method": "GET"
+			},
+			{
+				"id": "e480fd8a-caab-43dc-9ff1-42f34c7689cd",
+				"method": "GET"
+			},
+			{
+				"id": "946ddf90-01d9-4d04-a5a3-5957ea7aa2cf",
+				"method": "PUT"
+			},
+			{
+				"id": "4a336fd3-72a0-4bb8-91e6-b1c378f3a62c",
+				"method": "GET"
+			},
+			{
+				"id": "54b32722-8e1b-4f0e-a0e5-97cc999b1dd0",
+				"method": "GET"
+			},
+			{
+				"id": "b45d3215-ff68-40f8-83d2-92eba5248182",
+				"method": "GET"
+			},
+			{
+				"id": "570c34fe-73cb-436a-a08e-e103d7d100a8",
+				"method": "GET"
+			},
+			{
+				"id": "8596da45-3ff7-4a45-95f2-f2c3677ac5cd",
+				"method": "GET"
+			},
+			{
+				"id": "0c75e309-633e-435f-9d68-a565e685ad20",
+				"method": "POST"
+			},
+			{
+				"id": "d6863c7d-422c-49a4-852d-ca76187d593c",
+				"method": "DELETE"
+			},
+			{
+				"id": "15bd0546-5d95-4470-a5d6-e1d4469cf1a5",
+				"method": "PUT"
+			},
+			{
+				"id": "c3e3bdfc-4933-4e83-9b5a-b8f6ed08ca89",
+				"method": "GET"
+			},
+			{
+				"id": "c94fbbf3-f75c-459d-9369-3bcd03d52b48",
+				"method": "GET"
+			},
+			{
+				"id": "0569f0e6-1e7b-4463-9a04-9b78f9a13ce2",
+				"method": "GET"
+			},
+			{
+				"id": "07f650ac-d2ae-4471-afa4-0d3cc51e29dd",
+				"method": "GET"
+			},
+			{
+				"id": "6f0de155-deac-4508-8415-f78cc8c8f62c",
+				"method": "GET"
+			},
+			{
+				"id": "10a720ad-b80c-4bed-8ae3-966ed240c458",
+				"method": "GET"
+			},
+			{
+				"id": "1e0b0511-a93a-4bf7-8b38-9711687a5727",
+				"method": "GET"
+			},
+			{
+				"id": "e863c1dc-838d-46cb-9af2-73bf5d041b12",
+				"method": "DELETE"
+			},
+			{
+				"id": "b692cbe2-e1f0-4f29-a751-40ba53dac6d5",
+				"method": "POST"
+			},
+			{
+				"id": "02551d72-6082-46c5-970e-3f5f96458292",
+				"method": "DELETE"
+			},
+			{
+				"id": "76f9c846-3f59-4491-abf4-e1e4a3fbe087",
+				"method": "DELETE"
+			},
+			{
+				"id": "b613f7b3-3ba5-47a0-9b1b-367a04bdec66",
+				"method": "DELETE"
+			},
+			{
+				"id": "290c3940-91b4-4cc7-a47c-3d2271d862d5",
+				"method": "DELETE"
+			},
+			{
+				"id": "3abef3b0-ac99-48dd-9fc8-a52b28500224",
+				"method": "DELETE"
+			},
+			{
+				"id": "5496a4ef-0073-44a6-a8f4-5bddd9bf820c",
+				"method": "DELETE"
+			}
+		]
+	}
+}
