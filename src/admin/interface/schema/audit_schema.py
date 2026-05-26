@@ -17,6 +17,9 @@ class AuditRequestResponse(BaseModel):
     outcome: str = "SUCCESS"
     denial_reason: str | None = None
     denial_check: str | None = None
+    tenant_label: str | None = None
+    route_label: str | None = None
+    route_methods: str | None = None
 
 
 class AuditFilteredResponse(BaseModel):
@@ -36,6 +39,9 @@ class ChangeEventResponse(BaseModel):
     resource_summary: str
     timestamp: datetime
     detail: str | None
+    tenant_label: str | None = None
+    actor_label: str | None = None
+    resource_label: str | None = None
 
 
 class ChangeEventFilteredResponse(BaseModel):
@@ -70,6 +76,13 @@ class RawGatewayLogResponse(BaseModel):
     latency_ms: float | None
     summary: str
     payload: dict
+    tenant_label: str | None = None
+    route_label: str | None = None
+    policy_summary: str | None = None
+    header_checks: list[dict] = Field(default_factory=list)
+    param_checks: list[dict] = Field(default_factory=list)
+    policy_checks: list[dict] = Field(default_factory=list)
+    layer_errors: dict = Field(default_factory=dict)
 
 
 class RawGatewayLogFilteredResponse(BaseModel):

@@ -17,3 +17,6 @@ class AuditRequest:
     outcome: str = "SUCCESS"
     denial_reason: str | None = None
     denial_check: str | None = None
+    tenant_label: str | None = None
+    route_label: str | None = None
+    route_methods: str | None = None

@@ -1,5 +1,4 @@
 from datetime import datetime
-from src.admin.domain.entities.audit_request import AuditRequest
 from src.admin.domain.ports.audit_repository import AuditRepositoryPort
 
 
@@ -11,10 +10,10 @@ class QueryAudit:
         return await self._audit.list_recent(tenant_id=tenant_id, limit=min(limit, 100))
 
     async def list_filtered(self, *, tenant_id=None, route_id=None, outcome=None,
-                            method=None, date_from=None, date_to=None, limit=50, offset=0):
+                            method=None, path_contains=None, date_from=None, date_to=None, limit=50, offset=0):
         return await self._audit.list_filtered(
             tenant_id=tenant_id, route_id=route_id, outcome=outcome,
-            method=method, date_from=date_from, date_to=date_to,
+            method=method, path_contains=path_contains, date_from=date_from, date_to=date_to,
             limit=min(limit, 200), offset=offset)
 
     async def metrics_summary(self, *, tenant_id=None, hours=24):

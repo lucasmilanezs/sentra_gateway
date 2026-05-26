@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from src.admin.domain.entities.user import User
-from src.admin.domain.exceptions import AuthError, ValidationError
+from src.admin.domain.exceptions import AuthError
 from src.admin.domain.ports.email_sender import EmailSenderPort
 from src.admin.domain.ports.password_reset_repository import PasswordResetRecord, PasswordResetRepositoryPort
 from src.admin.domain.ports.user_repository import UserRepositoryPort
@@ -27,7 +27,7 @@ class AuthenticateUser:
         self._tokens = tokens
 
     async def login(self, email: str, password: str) -> tuple[str, User]:
-        email_n = email.strip().lower()
+        email_n = User.canonical_email(email)
         user = await self._users.get_by_email(email_n)
         if not user or not self._hasher.verify(password, user.password_hash):
             raise AuthError("email ou senha inválidos")
@@ -66,8 +66,7 @@ class ChangePassword:
         self._hasher = hasher
 
     async def execute(self, user_id: str, current_password: str, new_password: str) -> None:
-        if len(new_password) < 8:
-            raise ValidationError("nova senha deve ter pelo menos 8 caracteres")
+        User.ensure_valid_password(new_password, message="nova senha deve ter pelo menos 8 caracteres")
         user = await self._users.get_by_id(user_id)
         if not user:
             raise AuthError("usuário não encontrado")
@@ -102,7 +101,7 @@ class RequestPasswordReset:
 
     async def execute(self, email: str) -> None:
         """Sempre responde de forma uniforme (não revela se o email existe)."""
-        email_n = email.strip().lower()
+        email_n = User.canonical_email(email)
         user = await self._users.get_by_email(email_n)
         if user:
             code = f"{secrets.randbelow(1_000_000):06d}"
@@ -126,9 +125,8 @@ class ResetPasswordWithCode:
         self._hasher = hasher
 
     async def execute(self, email: str, code: str, new_password: str) -> None:
-        if len(new_password) < 8:
-            raise ValidationError("nova senha deve ter pelo menos 8 caracteres")
-        email_n = email.strip().lower()
+        User.ensure_valid_password(new_password, message="nova senha deve ter pelo menos 8 caracteres")
+        email_n = User.canonical_email(email)
         record = await self._resets.get_for_email(email_n)
         if not record:
             raise AuthError("código inválido ou expirado")

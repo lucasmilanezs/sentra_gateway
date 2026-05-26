@@ -12,11 +12,6 @@ from src.admin.interface.schema.audit_schema import RawGatewayLogFilteredRespons
 router = APIRouter(tags=["logs"])
 
 
-def _tenant_scope(claims: JwtClaims, tenant_id: str | None) -> str | None:
-    if claims.role == "superuser":
-        return tenant_id
-    return claims.tenant_id
-
 
 @router.get("/logs", response_model=RawGatewayLogFilteredResponse)
 async def list_gateway_logs(
@@ -31,7 +26,7 @@ async def list_gateway_logs(
     This is observability data, not formal governance/request audit evidence.
     Non-superusers are always restricted to their own tenant scope.
     """
-    scope = _tenant_scope(claims, tenant_id)
+    scope = claims.resolve_tenant_scope(tenant_id)
     items = await uc.list_recent(tenant_id=scope, limit=limit)
     return RawGatewayLogFilteredResponse(
         items=[RawGatewayLogResponse(**item.__dict__) for item in items],

@@ -14,3 +14,6 @@ class AdminChangeEvent:
     resource_summary: str
     timestamp: datetime
     detail: str | None = None
+    tenant_label: str | None = None
+    actor_label: str | None = None
+    resource_label: str | None = None

@@ -148,14 +148,13 @@ class ForwardRequest(GatewayRequestPort):
                 upstream_url=upstream_url, upstream_status_code=upstream_response.status_code,
                 latency_ms=latency_ms))
 
-            body_preview = self._body_preview(upstream_response.body)
             self._schedule_log(
                 request=request, upstream_url=upstream_url,
                 status_code=upstream_response.status_code, latency_ms=latency_ms,
                 route_id=route.id, tenant_id=tenant.id, outcome="SUCCESS",
                 policy_result=policy_result,
                 upstream_response_headers=dict(upstream_response.headers),
-                upstream_response_body_preview=body_preview,
+                upstream_response_body=upstream_response.body,
             )
 
             return GatewayResponse(
@@ -197,18 +196,15 @@ class ForwardRequest(GatewayRequestPort):
         error: Optional[str] = None, outcome: str = "SUCCESS",
         policy_result: PolicyResult | None = None,
         upstream_response_headers: Optional[dict[str, str]] = None,
-        upstream_response_body_preview: str = "",
+        upstream_response_body: bytes | None = None,
         layer_errors: Optional[dict[str, str]] = None,
     ) -> None:
-        checks = []
-        if policy_result and policy_result.checks:
-            checks = [{"check": c.check, "passed": c.passed, "detail": c.detail} for c in policy_result.checks]
         event = self._log_event_builder.build(
             request=request, upstream_url=upstream_url, status_code=status_code,
             latency_ms=latency_ms, route_id=route_id, tenant_id=tenant_id,
-            error=error, outcome=outcome, policy_checks=checks,
+            error=error, outcome=outcome, policy_result=policy_result,
             upstream_response_headers=upstream_response_headers or {},
-            upstream_response_body_preview=upstream_response_body_preview,
+            upstream_response_body=upstream_response_body,
             layer_errors=layer_errors or {},
         )
         asyncio.create_task(self._safe_log_write(event))
@@ -223,9 +219,3 @@ class ForwardRequest(GatewayRequestPort):
     def _elapsed(start: float) -> float:
         return (time.monotonic() - start) * 1000
 
-    @staticmethod
-    def _body_preview(body: bytes) -> str:
-        try:
-            return body[:512].decode("utf-8", errors="replace")
-        except Exception:
-            return ""

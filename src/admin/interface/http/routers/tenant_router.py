@@ -108,13 +108,8 @@ async def domain_suggestions(
         caller_tenant_id=claims.tenant_id,
         tenant_id=tenant_id,
     )
-    suggestions = [
-        f"api.{t.alias}.local",
-        f"gateway.{t.alias}.corp",
-        f"{t.alias}.internal",
-    ]
     return DomainSuggestionsResponse(
-        suggestions=suggestions,
+        suggestions=t.domain_suggestions(),
         group_label=f"{t.name} ({t.alias})",
     )
 

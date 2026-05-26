@@ -3,13 +3,7 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class JwtClaims:
-    """
-    Claims validados a partir do token JWT.
-
-    permissions é uma tupla de strings (imutável, como o dataclass exige)
-    contendo as permissões granulares do usuário. Vazia para superuser e
-    admin (acesso total implícito). Populada para role="member".
-    """
+    """Validated JWT claims used by the admin plane."""
 
     sub: str
     email: str
@@ -17,13 +11,21 @@ class JwtClaims:
     role: str | None = None
     permissions: tuple[str, ...] = field(default_factory=tuple)
 
-    def has_permission(self, permission: str) -> bool:
-        """
-        Retorna True se o usuário tem acesso à permissão solicitada.
+    def is_superuser(self) -> bool:
+        return self.role == "superuser"
 
-        superuser e admin têm acesso total implícito.
-        member precisa ter a permissão explicitamente listada.
-        """
-        if self.role in ("superuser", "admin"):
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+
+    def is_admin_like(self) -> bool:
+        return self.is_superuser() or self.is_admin()
+
+    def has_permission(self, permission: str) -> bool:
+        if self.is_admin_like():
             return True
         return permission in self.permissions
+
+    def resolve_tenant_scope(self, requested_tenant_id: str | None) -> str | None:
+        if self.is_superuser():
+            return requested_tenant_id
+        return self.tenant_id

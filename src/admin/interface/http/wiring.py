@@ -154,7 +154,7 @@ class AdminWiring:
         w._redis_client = self._redis_client
         w.publisher = self.publisher
         w.raw_gateway_log_repository = self.raw_gateway_log_repository
-        w.query_gateway_logs = self.query_gateway_logs
+        w.query_gateway_logs = None
         w.postgres_connected = True
 
         w.user_repository = PgUserRepository(session)
@@ -199,6 +199,7 @@ class AdminWiring:
         )
         w.audit_repository = PgAuditRepository(session)
         w.query_audit = QueryAudit(w.audit_repository)
+        w.query_gateway_logs = QueryGatewayLogs(w.raw_gateway_log_repository, routes=w.route_repository, tenants=w.tenant_repository)
         w.manage_sub_user = ManageSubUser(
             users=w.user_repository,
             tenants=w.tenant_repository,

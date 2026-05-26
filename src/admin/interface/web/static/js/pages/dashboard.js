@@ -30,49 +30,76 @@ document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
   btn.addEventListener('click', () => navigate(btn.dataset.page));
 });
 
-// ── Audit polling ─────────────────────────────────────────────────────────
-// Only gateway request audit is polled. Governance audit is loaded on demand.
+// ── Audit polling / filtros ─────────────────────────────────────────────
+// O polling só roda quando não há filtros ativos, para não sobrescrever uma consulta refinada.
 const AUDIT_POLL_MS = 8000;
 let _auditPollTimer  = null;
 let _auditNewestTs   = null;
 let _auditView = 'gateway';
+let _lastGatewayAuditRows = [];
+let _lastGovernanceAuditRows = [];
+let _lastRawLogRows = [];
+
+function _tenantLabel() {
+  return tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : 'Todos os tenants';
+}
+
+function _dateTimeStart(value) {
+  return value ? `${value}T00:00:00` : '';
+}
+
+function _dateTimeEnd(value) {
+  return value ? `${value}T23:59:59` : '';
+}
+
+function _gatewayAuditFilters() {
+  return {
+    tenantId: tenant?.id || null,
+    pathContains: document.getElementById('audit-filter-path')?.value || '',
+    method: document.getElementById('audit-filter-method')?.value || '',
+    outcome: document.getElementById('audit-filter-outcome')?.value || '',
+    dateFrom: _dateTimeStart(document.getElementById('audit-filter-from')?.value || ''),
+    dateTo: _dateTimeEnd(document.getElementById('audit-filter-to')?.value || ''),
+    limit: 100,
+  };
+}
+
+function _governanceAuditFilters() {
+  return {
+    tenantId: tenant?.id || null,
+    search: document.getElementById('governance-filter-search')?.value || '',
+    resourceType: document.getElementById('governance-filter-resource')?.value || '',
+    action: document.getElementById('governance-filter-action')?.value || '',
+    actorRole: document.getElementById('governance-filter-role')?.value || '',
+    dateFrom: _dateTimeStart(document.getElementById('governance-filter-from')?.value || ''),
+    dateTo: _dateTimeEnd(document.getElementById('governance-filter-to')?.value || ''),
+    limit: 100,
+  };
+}
+
+function _hasActiveGatewayFilters() {
+  const f = _gatewayAuditFilters();
+  return Boolean(f.pathContains || f.method || f.outcome || f.dateFrom || f.dateTo);
+}
 
 async function _auditPollTick() {
-  if (_auditView !== 'gateway') return;
+  if (_auditView !== 'gateway' || _hasActiveGatewayFilters()) return;
   const tbody = document.getElementById('tbody-audit');
   if (!tbody) return;
   try {
-    const rows = await auditApi.list(tenant?.id || null, 100);
+    const data = await auditApi.requests({ tenantId: tenant?.id || null, limit: 100 });
+    const rows = data.items || [];
     if (!rows.length) {
       document.getElementById('audit-empty').style.display = 'block';
       tbody.innerHTML = '';
       return;
     }
 
-    const newRows = _auditNewestTs
-      ? rows.filter(r => r.created_at > _auditNewestTs)
-      : rows;
-
+    const newRows = _auditNewestTs ? rows.filter(r => r.created_at > _auditNewestTs) : rows;
     if (!newRows.length) return;
-
     _auditNewestTs = rows[0].created_at;
-
-    if (tbody.querySelector('td[colspan]') || tbody.rows.length === 0) {
-      tbody.innerHTML = '';
-      rows.forEach(r => tbody.appendChild(_auditRow(r)));
-      document.getElementById('audit-empty').style.display = rows.length ? 'none' : 'block';
-      return;
-    }
-
-    newRows.slice().reverse().forEach(r => {
-      const tr = _auditRow(r);
-      tr.style.transition = 'background 1.2s ease';
-      tr.style.background = 'rgba(82,196,138,.15)';
-      tbody.prepend(tr);
-      requestAnimationFrame(() => { tr.style.background = ''; });
-    });
-
-    while (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
+    _lastGatewayAuditRows = rows;
+    _renderGatewayAuditRows(rows);
   } catch { /* keep previous audit state */ }
 }
 
@@ -81,26 +108,29 @@ function _auditRow(r) {
   const when = new Date(r.created_at).toLocaleString('pt-BR');
   const cls  = ['GET','POST','PUT','PATCH','DELETE'].includes(r.method) ? `m-${r.method}` : 'm-OTHER';
   tr.innerHTML = `
-    <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
+    <td style="font-size:.8rem;color:var(--text-secondary)">${when}</td>
     <td><span class="badge ${cls}">${r.method}</span></td>
     <td style="font-family:monospace;font-size:.8rem">${escHtml(r.path)}</td>
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-secondary)">${escHtml(r.route_label || 'rota não resolvida')}</td>
     <td style="font-family:monospace">${r.status_code}</td>
-    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${escHtml(r.outcome || 'SUCCESS')}</td>
-    <td style="color:var(--text-sub)">${Math.round(r.latency_ms)} ms</td>
-    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${escHtml(r.client_ip)}</td>`;
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-secondary)">${escHtml(r.outcome || 'SUCCESS')}</td>
+    <td style="color:var(--text-secondary)">${Math.round(r.latency_ms)} ms</td>
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-secondary)">${escHtml(r.client_ip)}</td>`;
   return tr;
 }
 
 function _governanceAuditRow(r) {
   const tr = document.createElement('tr');
   const when = new Date(r.timestamp).toLocaleString('pt-BR');
+  const actor = r.actor_label || r.actor_role || 'ator desconhecido';
+  const resource = r.resource_label || r.resource_summary || r.resource_type || 'recurso';
   tr.innerHTML = `
-    <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
-    <td style="font-family:monospace;font-size:.75rem">${escHtml((r.actor_role || '?') + ' · ' + (r.actor_id || '').slice(0, 8))}</td>
+    <td style="font-size:.8rem;color:var(--text-secondary)">${when}</td>
+    <td style="font-family:monospace;font-size:.75rem">${escHtml(actor)}<br><span style="color:var(--text-secondary)">${escHtml(r.actor_role || '—')}</span></td>
     <td><span class="policy-on" style="font-size:.72rem;padding:2px 7px">${escHtml(r.action || '—')}</span></td>
-    <td style="font-family:monospace;font-size:.78rem">${escHtml(r.resource_type || '—')}<br><span style="color:var(--text-sub)">${escHtml((r.resource_id || '').slice(0, 12))}</span></td>
+    <td style="font-family:monospace;font-size:.78rem">${escHtml(r.resource_type || '—')}<br><span style="color:var(--text-secondary)">${escHtml(resource)}</span></td>
     <td style="font-size:.8rem">${escHtml(r.resource_summary || '—')}</td>
-    <td style="font-size:.78rem;color:var(--text-sub)">${escHtml(r.detail || '—')}</td>`;
+    <td style="font-size:.78rem;color:var(--text-secondary)">${escHtml(r.detail || '—')}</td>`;
   return tr;
 }
 
@@ -117,17 +147,74 @@ function _stopAuditPoll() {
   _auditPollTimer = null;
 }
 
+function _groupLabel(row, groupBy, kind) {
+  const dateValue = kind === 'governance' ? row.timestamp : row.created_at;
+  if (groupBy === 'day') return new Date(dateValue).toLocaleDateString('pt-BR');
+  if (groupBy === 'year') return String(new Date(dateValue).getFullYear());
+  if (groupBy === 'method') return row.method || 'Sem método';
+  if (groupBy === 'outcome') return row.outcome || 'Sem outcome';
+  if (groupBy === 'resource_type') return row.resource_type || 'Sem recurso';
+  if (groupBy === 'action') return row.action || 'Sem ação';
+  return '';
+}
+
+function _appendGroupedRows(tbody, rows, rowBuilder, groupBy, kind, colspan) {
+  let currentGroup = null;
+  rows.forEach(row => {
+    const label = _groupLabel(row, groupBy, kind);
+    if (groupBy !== 'none' && label !== currentGroup) {
+      currentGroup = label;
+      const groupRow = document.createElement('tr');
+      groupRow.innerHTML = `<td colspan="${colspan}" class="group-row">${escHtml(label)}</td>`;
+      tbody.appendChild(groupRow);
+    }
+    tbody.appendChild(rowBuilder(row));
+  });
+}
+
+function _renderGatewayAuditRows(rows) {
+  const tbody = document.getElementById('tbody-audit');
+  const empty = document.getElementById('audit-empty');
+  tbody.innerHTML = '';
+  if (!rows.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  const groupBy = document.getElementById('audit-group-by')?.value || 'none';
+  _appendGroupedRows(tbody, rows, _auditRow, groupBy, 'gateway', 8);
+}
+
+function _renderGovernanceAuditRows(rows) {
+  const tbody = document.getElementById('tbody-governance-audit');
+  const empty = document.getElementById('governance-audit-empty');
+  tbody.innerHTML = '';
+  if (!rows.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  const groupBy = document.getElementById('governance-group-by')?.value || 'none';
+  _appendGroupedRows(tbody, rows, _governanceAuditRow, groupBy, 'governance', 6);
+}
+
+async function _loadGatewayAudit() {
+  const tbody = document.getElementById('tbody-audit');
+  const empty = document.getElementById('audit-empty');
+  tbody.innerHTML = '<tr><td colspan="8" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+  try {
+    const data = await auditApi.requests(_gatewayAuditFilters());
+    _lastGatewayAuditRows = data.items || [];
+    _renderGatewayAuditRows(_lastGatewayAuditRows);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#a03030;font-style:italic">${escHtml(err.detail || 'Erro')}</td></tr>`;
+  }
+}
+
 async function _loadGovernanceAudit() {
   const tbody = document.getElementById('tbody-governance-audit');
   const empty = document.getElementById('governance-audit-empty');
-  tbody.innerHTML = '<tr><td colspan="6" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
   try {
-    const data = await auditApi.changes(tenant?.id || null, 100);
-    const rows = data.items || [];
-    tbody.innerHTML = '';
-    if (!rows.length) { empty.style.display = 'block'; return; }
-    rows.forEach(r => tbody.appendChild(_governanceAuditRow(r)));
+    const data = await auditApi.changeEvents(_governanceAuditFilters());
+    _lastGovernanceAuditRows = data.items || [];
+    _renderGovernanceAuditRows(_lastGovernanceAuditRows);
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6" style="color:#a03030;font-style:italic">${escHtml(err.detail || 'Erro')}</td></tr>`;
   }
@@ -135,13 +222,14 @@ async function _loadGovernanceAudit() {
 
 function setAuditView(view) {
   const badge = document.getElementById('audit-tenant-badge');
-  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  if (badge) badge.textContent = _tenantLabel();
   _auditView = view;
   document.querySelectorAll('.audit-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.auditView === view));
   document.getElementById('audit-gateway-panel').style.display = view === 'gateway' ? '' : 'none';
   document.getElementById('audit-governance-panel').style.display = view === 'governance' ? '' : 'none';
   if (view === 'gateway') {
-    _startAuditPoll();
+    if (_hasActiveGatewayFilters()) { _stopAuditPoll(); _loadGatewayAudit(); }
+    else { _startAuditPoll(); }
   } else {
     _stopAuditPoll();
     _loadGovernanceAudit();
@@ -151,6 +239,19 @@ function setAuditView(view) {
 document.querySelectorAll('.audit-tab').forEach(btn => {
   btn.addEventListener('click', () => setAuditView(btn.dataset.auditView));
 });
+
+document.getElementById('audit-apply-filters')?.addEventListener('click', () => { _stopAuditPoll(); _loadGatewayAudit(); });
+document.getElementById('audit-clear-filters')?.addEventListener('click', () => {
+  ['audit-filter-path','audit-filter-method','audit-filter-outcome','audit-filter-from','audit-filter-to'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _startAuditPoll();
+});
+document.getElementById('audit-group-by')?.addEventListener('change', () => _renderGatewayAuditRows(_lastGatewayAuditRows));
+document.getElementById('governance-apply-filters')?.addEventListener('click', _loadGovernanceAudit);
+document.getElementById('governance-clear-filters')?.addEventListener('click', () => {
+  ['governance-filter-search','governance-filter-resource','governance-filter-action','governance-filter-role','governance-filter-from','governance-filter-to'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _loadGovernanceAudit();
+});
+document.getElementById('governance-group-by')?.addEventListener('change', () => _renderGovernanceAuditRows(_lastGovernanceAuditRows));
 
 function navigate(pageId) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -210,7 +311,7 @@ function navigate(pageId) {
     document.getElementById('profile-email').textContent = me.email;
     document.getElementById('profile-role').textContent  = me.role || '—';
     document.getElementById('profile-tenant').textContent =
-      tenant ? (tenant.name || tenant.alias || tenant.id) : 'Superuser — sem tenant fixo';
+      tenant ? (tenant.name || tenant.alias || 'Tenant atual') : 'Superuser — sem tenant fixo';
 
     if (me.role === 'member' && me.permissions?.length) {
       document.getElementById('profile-perms-row').style.display = '';
@@ -271,7 +372,7 @@ async function loadOverview() {
 async function loadTenants() {
   const tbody = document.getElementById('tbody-tenants');
   const empty = document.getElementById('tenants-empty');
-  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -291,9 +392,9 @@ async function loadTenants() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${t.name}</td>
-        <td style="font-style:italic;color:var(--text-sub)">${t.alias}</td>
+        <td style="font-style:italic;color:var(--text-secondary)">${t.alias}</td>
         <td>${domHtml}</td>
-        <td style="font-size:.78rem;color:var(--text-sub)">${t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+        <td style="font-size:.78rem;color:var(--text-secondary)">${t.created_at ? new Date(t.created_at).toLocaleDateString('pt-BR') : '—'}</td>
         <td>
           <button class="btn-icon" onclick="_editTenant('${t.id}','${esc(t.name)}','${esc(t.alias)}')">Editar</button>
           <button class="btn-icon danger" onclick="_deleteTenant('${t.id}','${esc(t.name)}')">Excluir</button>
@@ -347,14 +448,14 @@ async function loadDomains() {
   const tbody  = document.getElementById('tbody-domains');
   const empty  = document.getElementById('domains-empty');
 
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : '';
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : '';
 
   if (!tenantId) {
-    tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Selecione um tenant para ver os domains.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Selecione um tenant para ver os domains.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -378,7 +479,7 @@ async function loadDomains() {
       tr.innerHTML = `
         <td style="font-family:monospace;font-size:.88rem">${d.domain}</td>
         <td>${pHtml}</td>
-        <td style="font-size:.78rem;color:var(--text-sub)">${d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '—'}</td>
+        <td style="font-size:.78rem;color:var(--text-secondary)">${d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '—'}</td>
         <td>
           <button class="btn-icon danger" onclick="_deleteDomain('${d.id}','${esc(d.domain)}')">Remover</button>
         </td>`;
@@ -490,8 +591,8 @@ async function loadRoutes() {
   const tbody = document.getElementById('tbody-routes');
   const empty = document.getElementById('routes-empty');
   const badge = document.getElementById('routes-tenant-badge');
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : '';
-  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : '';
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -520,7 +621,7 @@ async function loadRoutes() {
       tr.innerHTML = `
         <td>${methodBadges}</td>
         <td style="font-family:monospace;font-size:.85rem">${r.path_pattern}</td>
-        <td style="font-size:.8rem;color:var(--text-sub);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.backend_url}">${r.backend_url}</td>
+        <td style="font-size:.8rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.backend_url}">${r.backend_url}</td>
         <td>${policyHtml}</td>
         <td>
           <button class="btn-icon" onclick="_openPolicyModal('${r.id}','${esc(r.path_pattern)}')">Política</button>
@@ -675,7 +776,7 @@ document.getElementById('p-delete').addEventListener('click', async () => {
 async function loadMembers() {
   if (!tenant) {
     document.getElementById('tbody-members').innerHTML =
-      '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Selecione um tenant para ver os membros.</td></tr>';
+      '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Selecione um tenant para ver os membros.</td></tr>';
     return;
   }
 
@@ -683,8 +784,8 @@ async function loadMembers() {
   const empty = document.getElementById('members-empty');
   const badge = document.getElementById('members-tenant-badge');
 
-  badge.textContent = `Tenant: ${tenant.name || tenant.alias || tenant.id}`;
-  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  badge.textContent = `Tenant: ${tenant.name || tenant.alias || 'atual'}`;
+  tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -700,8 +801,8 @@ async function loadMembers() {
       const when = new Date(m.created_at).toLocaleDateString('pt-BR');
       tr.innerHTML = `
         <td>${m.email}</td>
-        <td>${perms || '<span style="color:var(--text-sub);font-size:.8rem;font-style:italic">nenhuma</span>'}</td>
-        <td style="color:var(--text-sub);font-size:.85rem">${when}</td>
+        <td>${perms || '<span style="color:var(--text-secondary);font-size:.8rem;font-style:italic">nenhuma</span>'}</td>
+        <td style="color:var(--text-secondary);font-size:.85rem">${when}</td>
         <td>
           <button class="btn-icon"
             data-member-id="${m.id}"
@@ -805,7 +906,7 @@ document.getElementById('m-delete').addEventListener('click', async () => {
 // ── AUDITORIA ─────────────────────────────────────────────────────────────
 function loadAudit() {
   const badge = document.getElementById('audit-tenant-badge');
-  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  if (badge) badge.textContent = _tenantLabel();
   setAuditView(_auditView || 'gateway');
 }
 
@@ -814,40 +915,110 @@ async function loadRawLogs() {
   const tbody = document.getElementById('tbody-raw-logs');
   const empty = document.getElementById('raw-logs-empty');
   const badge = document.getElementById('raw-logs-tenant-badge');
-  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
-  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  if (badge) badge.textContent = _tenantLabel();
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
   try {
     const data = await rawLogsApi.list(tenant?.id || null, 100);
-    const rows = data.items || [];
-    tbody.innerHTML = '';
-    if (!rows.length) { empty.style.display = 'block'; return; }
-
-    rows.forEach((r, idx) => {
-      const tr = document.createElement('tr');
-      tr.className = 'raw-log-row';
-      tr.dataset.rawLogIndex = String(idx);
-      const when = r.timestamp ? new Date(r.timestamp).toLocaleString('pt-BR') : '—';
-      tr.innerHTML = `
-        <td style="font-size:.78rem;color:var(--text-sub)">${when}</td>
-        <td style="font-family:monospace;font-size:.78rem">${escHtml(r.summary || `${r.method || '?'} ${r.path || '?'}`)}</td>
-        <td><span class="policy-on" style="font-size:.72rem;padding:2px 7px">${escHtml(r.outcome || 'UNKNOWN')}</span></td>
-        <td style="color:var(--text-sub)">${r.latency_ms != null ? Math.round(r.latency_ms) + ' ms' : '—'}</td>
-        <td style="font-family:monospace;font-size:.75rem;color:var(--text-sub)">${escHtml((r.route_id || '—').slice(0, 12))}</td>`;
-      tr.addEventListener('click', () => _openRawLogModal(r));
-      tbody.appendChild(tr);
-    });
+    _lastRawLogRows = data.items || [];
+    _renderRawLogs();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro'}</td></tr>`;
   }
 }
 
+function _sortedRawLogs() {
+  const sortBy = document.getElementById('logs-sort-by')?.value || 'created_desc';
+  const rows = [..._lastRawLogRows];
+  const ts = r => r.timestamp ? new Date(r.timestamp).getTime() : 0;
+  const latency = r => r.latency_ms ?? -1;
+  if (sortBy === 'created_asc') rows.sort((a, b) => ts(a) - ts(b));
+  else if (sortBy === 'latency_desc') rows.sort((a, b) => latency(b) - latency(a));
+  else if (sortBy === 'latency_asc') rows.sort((a, b) => latency(a) - latency(b));
+  else if (sortBy === 'method') rows.sort((a, b) => String(a.method || '').localeCompare(String(b.method || '')) || ts(b) - ts(a));
+  else rows.sort((a, b) => ts(b) - ts(a));
+  return rows;
+}
+
+function _rawLogGroupLabel(row, groupBy) {
+  if (groupBy === 'day') return row.timestamp ? new Date(row.timestamp).toLocaleDateString('pt-BR') : 'Sem data';
+  if (groupBy === 'year') return row.timestamp ? String(new Date(row.timestamp).getFullYear()) : 'Sem data';
+  if (groupBy === 'method') return row.method || 'Sem método';
+  if (groupBy === 'outcome') return row.outcome || 'Sem outcome';
+  if (groupBy === 'route') return row.route_label || row.path || 'Rota não resolvida';
+  return '';
+}
+
+function _rawLogRow(r) {
+  const tr = document.createElement('tr');
+  tr.className = 'raw-log-row';
+  const when = r.timestamp ? new Date(r.timestamp).toLocaleString('pt-BR') : '—';
+  const routeLabel = r.route_label || r.path || 'rota não resolvida';
+  tr.innerHTML = `
+    <td style="font-size:.78rem;color:var(--text-secondary)">${when}</td>
+    <td style="font-family:monospace;font-size:.78rem">${escHtml(r.summary || `${r.method || '?'} ${r.path || '?'}`)}</td>
+    <td><span class="policy-on" style="font-size:.72rem;padding:2px 7px">${escHtml(r.outcome || 'UNKNOWN')}</span></td>
+    <td style="color:var(--text-secondary)">${r.latency_ms != null ? Math.round(r.latency_ms) + ' ms' : '—'}</td>
+    <td style="font-family:monospace;font-size:.75rem;color:var(--text-secondary)">${escHtml(routeLabel)}</td>`;
+  tr.addEventListener('click', () => _openRawLogModal(r));
+  return tr;
+}
+
+function _renderRawLogs() {
+  const tbody = document.getElementById('tbody-raw-logs');
+  const empty = document.getElementById('raw-logs-empty');
+  tbody.innerHTML = '';
+  const rows = _sortedRawLogs();
+  if (!rows.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  const groupBy = document.getElementById('logs-group-by')?.value || 'none';
+  let currentGroup = null;
+  rows.forEach(row => {
+    const label = _rawLogGroupLabel(row, groupBy);
+    if (groupBy !== 'none' && label !== currentGroup) {
+      currentGroup = label;
+      const groupRow = document.createElement('tr');
+      groupRow.innerHTML = `<td colspan="5" class="group-row">${escHtml(label)}</td>`;
+      tbody.appendChild(groupRow);
+    }
+    tbody.appendChild(_rawLogRow(row));
+  });
+}
+
+function _checkListHtml(title, checks) {
+  if (!checks?.length) return '';
+  const items = checks.map(c => `<li><span class="${c.passed ? 'check-ok' : 'check-fail'}">${c.passed ? '✓' : '✗'}</span> <code>${escHtml(c.check || 'check')}</code> — ${escHtml(c.detail || '')}</li>`).join('');
+  return `<div class="semantic-block"><strong>${title}</strong><ul>${items}</ul></div>`;
+}
+
 function _openRawLogModal(record) {
-  document.getElementById('raw-log-detail').textContent = JSON.stringify(record, null, 2);
+  const semantic = document.getElementById('raw-log-semantic');
+  const routeLabel = record.route_label || record.path || 'rota não resolvida';
+  const layerErrors = record.layer_errors || {};
+  const layerHtml = Object.keys(layerErrors).length
+    ? `<div class="semantic-block"><strong>Erros por camada</strong><ul>${Object.entries(layerErrors).map(([k,v]) => `<li><code>${escHtml(k)}</code> — ${escHtml(v)}</li>`).join('')}</ul></div>`
+    : '';
+  semantic.innerHTML = `
+    <div class="semantic-grid">
+      <div><span>Método</span><strong>${escHtml(record.method || '—')}</strong></div>
+      <div><span>Path</span><strong>${escHtml(record.path || '—')}</strong></div>
+      <div><span>Rota</span><strong>${escHtml(routeLabel)}</strong></div>
+      <div><span>Status</span><strong>${escHtml(record.status_code ?? '—')}</strong></div>
+      <div><span>Outcome</span><strong>${escHtml(record.outcome || 'UNKNOWN')}</strong></div>
+      <div><span>Latência</span><strong>${record.latency_ms != null ? Math.round(record.latency_ms) + ' ms' : '—'}</strong></div>
+    </div>
+    <div class="semantic-block"><strong>Resumo de política</strong><p>${escHtml(record.policy_summary || 'Sem checks de política registrados')}</p></div>
+    ${_checkListHtml('Headers e matches', record.header_checks)}
+    ${_checkListHtml('Params e matches', record.param_checks)}
+    ${layerHtml}`;
+  document.getElementById('raw-log-detail').textContent = JSON.stringify(record.payload || record, null, 2);
   document.getElementById('modal-raw-log').style.display = 'flex';
 }
 
+document.getElementById('logs-group-by')?.addEventListener('change', _renderRawLogs);
+document.getElementById('logs-sort-by')?.addEventListener('change', _renderRawLogs);
+document.getElementById('logs-refresh')?.addEventListener('click', loadRawLogs);
 document.getElementById('raw-log-close')?.addEventListener('click', () => { document.getElementById('modal-raw-log').style.display = 'none'; });
 document.getElementById('modal-raw-log')?.addEventListener('click', e => { if (e.target.id === 'modal-raw-log') document.getElementById('modal-raw-log').style.display = 'none'; });
 
@@ -859,7 +1030,7 @@ async function loadMetrics() {
     document.getElementById('mt-status').textContent    = `${m.status_2xx} / ${m.status_4xx} / ${m.status_5xx}`;
     document.getElementById('mt-avg-lat').textContent   = `${m.avg_latency_ms} ms`;
     document.getElementById('mt-p95-lat').textContent   = m.p95_latency_ms ? `p95: ${m.p95_latency_ms} ms` : '';
-    const top = (m.top_routes || []).map(t => `${(t.route_id||'?').slice(0,8)}… (${t.count})`).join(', ');
+    const top = (m.top_routes || []).map(t => `${t.route_label || 'rota não resolvida'} (${t.count})`).join(', ');
     document.getElementById('mt-top-routes').textContent = top || '—';
   } catch {
     document.getElementById('mt-total').textContent = '—';

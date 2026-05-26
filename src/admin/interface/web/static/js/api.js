@@ -83,20 +83,49 @@ export const healthApi = {
   check: () => request('GET', '/health'),
 };
 
+function appendQuery(q, values = {}) {
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      q.set(key, String(value).trim());
+    }
+  });
+  return q;
+}
+
 export const auditApi = {
   list: (tenantId = null, limit = 100) => {
-    const q = new URLSearchParams({ limit: String(limit) });
-    if (tenantId) q.set('tenant_id', tenantId);
+    const q = appendQuery(new URLSearchParams({ limit: String(limit) }), { tenant_id: tenantId });
     return request('GET', `/audit?${q}`);
   },
+  requests: (filters = {}) => {
+    const q = appendQuery(new URLSearchParams({ limit: String(filters.limit || 100), offset: String(filters.offset || 0) }), {
+      tenant_id: filters.tenantId,
+      method: filters.method,
+      outcome: filters.outcome,
+      path_contains: filters.pathContains,
+      date_from: filters.dateFrom,
+      date_to: filters.dateTo,
+    });
+    return request('GET', `/audit/requests?${q}`);
+  },
   changes: (tenantId = null, limit = 100) => {
-    const q = new URLSearchParams({ limit: String(limit) });
-    if (tenantId) q.set('tenant_id', tenantId);
+    const q = appendQuery(new URLSearchParams({ limit: String(limit) }), { tenant_id: tenantId });
+    return request('GET', `/audit/changes?${q}`);
+  },
+  changeEvents: (filters = {}) => {
+    const q = appendQuery(new URLSearchParams({ limit: String(filters.limit || 100), offset: String(filters.offset || 0) }), {
+      tenant_id: filters.tenantId,
+      resource_type: filters.resourceType,
+      action: filters.action,
+      actor_role: filters.actorRole,
+      search: filters.search,
+      date_from: filters.dateFrom,
+      date_to: filters.dateTo,
+    });
     return request('GET', `/audit/changes?${q}`);
   },
   metrics: (tenantId = null, hours = 24) => {
-    const q = new URLSearchParams({ hours: String(hours) });
-    if (tenantId) q.set('tenant_id', tenantId);
+    const q = appendQuery(new URLSearchParams({ hours: String(hours) }), { tenant_id: tenantId });
     return request('GET', `/metrics/summary?${q}`);
   },
 };

@@ -860,9 +860,9 @@ html, body {
 }
 
 .audit-tab {
-  border: 1px solid var(--border-soft);
-  background: var(--surface-1);
-  color: var(--text-sub);
+  border: 1px solid var(--border-hi);
+  background: var(--surface);
+  color: var(--text-secondary);
   border-radius: 999px;
   padding: 8px 14px;
   cursor: pointer;
@@ -874,3 +874,96 @@ html, body {
   color: var(--text-primary);
   border-color: var(--accent);
 }
+
+
+/* ── Query bars / semantic log details ───────────────────────────────── */
+.query-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.query-bar input,
+.query-bar select {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hi);
+  color: var(--text-primary);
+  border-radius: var(--r-xs);
+  padding: 7px 9px;
+  font-family: var(--mono);
+  font-size: .72rem;
+  min-height: 32px;
+}
+
+.query-bar input::placeholder { color: var(--text-dim); }
+
+.group-row {
+  background: rgba(255,255,255,.035);
+  color: var(--accent-hi) !important;
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 8px 10px !important;
+}
+
+.semantic-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.semantic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.semantic-grid > div,
+.semantic-block {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 10px;
+}
+
+.semantic-grid span {
+  display: block;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  margin-bottom: 4px;
+}
+
+.semantic-grid strong,
+.semantic-block strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.semantic-block p,
+.semantic-block li {
+  color: var(--text-secondary);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.semantic-block ul {
+  list-style: none;
+  margin-top: 6px;
+  display: grid;
+  gap: 5px;
+}
+
+.semantic-block code {
+  font-family: var(--mono);
+  color: var(--accent-hi);
+}
+
+.check-ok { color: var(--ok); margin-right: 4px; }
+.check-fail { color: var(--err); margin-right: 4px; }

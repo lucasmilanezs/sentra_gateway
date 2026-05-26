@@ -216,15 +216,50 @@
         <button class="audit-tab" id="audit-tab-governance" data-audit-view="governance">Governança do admin</button>
       </div>
       <div class="card" id="audit-gateway-panel">
+        <div class="query-bar">
+          <input id="audit-filter-path" type="text" placeholder="Filtrar path contém…" />
+          <select id="audit-filter-method">
+            <option value="">Todos os métodos</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+          </select>
+          <select id="audit-filter-outcome">
+            <option value="">Todos os outcomes</option><option>SUCCESS</option><option>POLICY_DENIED</option><option>TENANT_NOT_FOUND</option><option>ROUTE_NOT_FOUND</option><option>DOMAIN_NOT_FOUND</option><option>UNEXPECTED_ERROR</option>
+          </select>
+          <input id="audit-filter-from" type="date" title="A partir de" />
+          <input id="audit-filter-to" type="date" title="Até" />
+          <select id="audit-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="method">Agrupar por método</option><option value="outcome">Agrupar por outcome</option>
+          </select>
+          <button class="btn-icon" id="audit-apply-filters">Aplicar</button>
+          <button class="btn-icon" id="audit-clear-filters">Limpar</button>
+        </div>
         <table class="data-table">
           <thead><tr>
-            <th>Quando</th><th>Método</th><th>Path</th><th>Status</th><th>Outcome</th><th>Latência</th><th>IP</th>
+            <th>Quando</th><th>Método</th><th>Path</th><th>Rota</th><th>Status</th><th>Outcome</th><th>Latência</th><th>IP</th>
           </tr></thead>
           <tbody id="tbody-audit"></tbody>
         </table>
         <p class="tbl-empty" id="audit-empty" style="display:none">Nenhuma requisição registrada ainda.</p>
       </div>
       <div class="card" id="audit-governance-panel" style="display:none">
+        <div class="query-bar">
+          <input id="governance-filter-search" type="text" placeholder="Buscar recurso, ator ou detalhe…" />
+          <select id="governance-filter-resource">
+            <option value="">Todos os recursos</option><option value="tenant">Tenant</option><option value="domain">Domain</option><option value="domain_policy">Domain policy</option><option value="route">Rota</option><option value="policy">Policy</option><option value="member">Membro</option><option value="member_permissions">Permissões</option>
+          </select>
+          <select id="governance-filter-action">
+            <option value="">Todas as ações</option><option value="create">create</option><option value="update">update</option><option value="delete">delete</option><option value="upsert">upsert</option>
+          </select>
+          <select id="governance-filter-role">
+            <option value="">Todos os atores</option><option value="superuser">superuser</option><option value="admin">admin</option><option value="member">member</option>
+          </select>
+          <input id="governance-filter-from" type="date" title="A partir de" />
+          <input id="governance-filter-to" type="date" title="Até" />
+          <select id="governance-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="resource_type">Agrupar por recurso</option><option value="action">Agrupar por ação</option>
+          </select>
+          <button class="btn-icon" id="governance-apply-filters">Aplicar</button>
+          <button class="btn-icon" id="governance-clear-filters">Limpar</button>
+        </div>
         <table class="data-table">
           <thead><tr>
             <th>Quando</th><th>Ator</th><th>Ação</th><th>Recurso</th><th>Resumo</th><th>Detalhe</th>
@@ -243,9 +278,18 @@
         Esta tela mostra logs operacionais densos do gateway vindos do Redis Streams. Eles têm retenção curta e são separados da auditoria formal. Clique em uma linha para abrir o registro completo.
       </div>
       <div class="card">
+        <div class="query-bar">
+          <select id="logs-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="method">Agrupar por método</option><option value="outcome">Agrupar por outcome</option><option value="route">Agrupar por rota</option>
+          </select>
+          <select id="logs-sort-by">
+            <option value="created_desc">Mais recentes</option><option value="created_asc">Mais antigos</option><option value="latency_desc">Maior latência</option><option value="latency_asc">Menor latência</option><option value="method">Método</option>
+          </select>
+          <button class="btn-icon" id="logs-refresh">Atualizar</button>
+        </div>
         <table class="data-table raw-log-table">
           <thead><tr>
-            <th>Quando</th><th>Resumo</th><th>Outcome</th><th>Latência</th><th>Route</th>
+            <th>Quando</th><th>Resumo</th><th>Outcome</th><th>Latência</th><th>Rota</th>
           </tr></thead>
           <tbody id="tbody-raw-logs"></tbody>
         </table>
@@ -519,6 +563,7 @@
 <div class="modal-overlay" id="modal-raw-log" style="display:none">
   <div class="modal-box modal-box-wide">
     <h2 class="modal-title">Detalhe do log</h2>
+    <div class="semantic-detail" id="raw-log-semantic"></div>
     <pre class="json-detail" id="raw-log-detail"></pre>
     <div class="modal-actions">
       <button class="btn-ghost" id="raw-log-close">Fechar</button>

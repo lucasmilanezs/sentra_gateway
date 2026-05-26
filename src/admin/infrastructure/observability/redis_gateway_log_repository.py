@@ -53,7 +53,10 @@ class RedisGatewayLogRepository(RawGatewayLogRepositoryPort):
         except json.JSONDecodeError:
             payload = {"raw": event_raw, "outcome": "MALFORMED_LOG_ENTRY"}
         timestamp = self._parse_datetime(payload.get("timestamp"))
-        summary = payload.get("summary") or self._summary(payload)
+        policy_checks = self._policy_checks(payload)
+        header_checks = [c for c in policy_checks if "header" in str(c.get("check", ""))]
+        param_checks = [c for c in policy_checks if "param" in str(c.get("check", ""))]
+        layer_errors = payload.get("layer_errors") if isinstance(payload.get("layer_errors"), dict) else {}
         return RawGatewayLog(
             id=decoded_id,
             timestamp=timestamp,
@@ -64,8 +67,13 @@ class RedisGatewayLogRepository(RawGatewayLogRepositoryPort):
             status_code=payload.get("status_code"),
             outcome=payload.get("outcome") or "UNKNOWN",
             latency_ms=payload.get("latency_ms"),
-            summary=summary,
+            summary=payload.get("summary") or self._summary(payload),
             payload={**payload, "redis_id": decoded_id},
+            policy_summary=self._policy_summary(policy_checks),
+            header_checks=header_checks,
+            param_checks=param_checks,
+            policy_checks=policy_checks,
+            layer_errors=layer_errors,
         )
 
     def _field(self, fields: dict, name: str) -> str | None:
@@ -82,10 +90,20 @@ class RedisGatewayLogRepository(RawGatewayLogRepositoryPort):
         except ValueError:
             return None
 
+    def _policy_checks(self, payload: dict) -> list[dict]:
+        raw = payload.get("policy_checks")
+        return raw if isinstance(raw, list) else []
+
+    def _policy_summary(self, checks: list[dict]) -> str:
+        if not checks:
+            return "Sem checks de política registrados"
+        passed = sum(1 for check in checks if check.get("passed"))
+        failed = len(checks) - passed
+        return f"{passed} check(s) passaram, {failed} falharam"
+
     def _summary(self, payload: dict) -> str:
         method = payload.get("method") or "?"
         path = payload.get("path") or "?"
         status = payload.get("status_code") or "?"
         outcome = payload.get("outcome") or "UNKNOWN"
-        route = str(payload.get("route_id") or "no-route")[:8]
-        return f"{method} {path} → {status} · {outcome} · {route}"
+        return f"{method} {path} → {status} · {outcome}"

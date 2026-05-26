@@ -94,7 +94,7 @@ def require_admin():
     async def _guard(
         claims: Annotated[JwtClaims, Depends(get_current_claims)],
     ) -> JwtClaims:
-        if claims.role not in ("superuser", "admin"):
+        if not claims.is_admin_like():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="acesso restrito a administradores",
@@ -109,7 +109,7 @@ def require_superuser():
     async def _guard(
         claims: Annotated[JwtClaims, Depends(get_current_claims)],
     ) -> JwtClaims:
-        if claims.role != "superuser":
+        if not claims.is_superuser():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="acesso restrito ao superuser",

@@ -33,10 +33,10 @@ class RateLimitChecker:
         )
         client_ip = client_ip.split(",")[0].strip()
 
-        key = f"rate:{tenant_id}:{route_id}:{client_ip}"
-
         allowed = await self._port.is_allowed(
-            key=key,
+            tenant_id=tenant_id,
+            route_id=route_id,
+            client_ip=client_ip,
             limit=policy.rate_limit_per_minute,
             window_seconds=60,
         )
