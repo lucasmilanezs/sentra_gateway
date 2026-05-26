@@ -1,28 +1,20 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from urllib.parse import urlparse
-
-from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
+from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.entities.admin_route import AdminRoute
 from src.admin.domain.exceptions import AuthError, NotFoundError, ValidationError
-from src.admin.domain.services.route_validation import validate_path_pattern
+from src.admin.domain.services.route_validation import validate_backend_url, validate_path_pattern
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.value_objects.http_method import HttpMethod
-from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.config_notifier import ConfigNotifier
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
+from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _validate_backend_url(url: str) -> None:
-    p = urlparse(url)
-    if p.scheme not in ("http", "https") or not p.netloc:
-        raise ValidationError("backend_url deve ser uma URL http(s) válida")
 
 
 def _parse_methods(raw: list[str] | list[HttpMethod]) -> list[HttpMethod]:
@@ -45,7 +37,7 @@ class ManageAdminRoute:
         self,
         routes: AdminRouteRepositoryPort,
         tenants: TenantRepositoryPort,
-        publisher: RedisPublisher | None = None,
+        publisher: ConfigNotifier | None = None,
         change_audit: ChangeAuditRepositoryPort | None = None,
     ) -> None:
         self._routes = routes
@@ -77,7 +69,7 @@ class ManageAdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=r.tenant_id,
@@ -107,7 +99,7 @@ class ManageAdminRoute:
 
         path_pattern = validate_path_pattern(path_pattern)
         parsed_methods = _parse_methods(methods)
-        _validate_backend_url(backend_url.strip())
+        backend_url = validate_backend_url(backend_url)
 
         now = _utcnow()
         route = AdminRoute(
@@ -115,7 +107,7 @@ class ManageAdminRoute:
             tenant_id=effective_tenant,
             path_pattern=path_pattern,
             methods=parsed_methods,
-            backend_url=backend_url.strip().rstrip("/"),
+            backend_url=backend_url,
             created_at=now,
             updated_at=now,
         )
@@ -139,7 +131,7 @@ class ManageAdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=r.tenant_id,
@@ -150,9 +142,8 @@ class ManageAdminRoute:
         )
 
         new_url = (
-            data["backend_url"].strip().rstrip("/") if "backend_url" in data else r.backend_url
+            validate_backend_url(data["backend_url"]) if "backend_url" in data else r.backend_url
         )
-        _validate_backend_url(new_url)
 
         if "methods" in data:
             new_methods = _parse_methods(data["methods"])
@@ -187,7 +178,7 @@ class ManageAdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=r.tenant_id,
@@ -201,4 +192,4 @@ class ManageAdminRoute:
     async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
         if not self._change_audit:
             return
-        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))
+        await self._change_audit.record(GovernanceAuditEventFactory.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

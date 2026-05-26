@@ -2,13 +2,13 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
+from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.entities.tenant import Tenant
 from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
+from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
 
 _alias_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -47,7 +47,7 @@ class ManageTenant:
         t = await self._tenants.get_by_id(tenant_id)
         if not t:
             raise NotFoundError("tenant não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=t.id,
@@ -82,7 +82,7 @@ class ManageTenant:
         t = await self._tenants.get_by_id(tenant_id)
         if not t:
             raise NotFoundError("tenant não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=t.id,
@@ -120,4 +120,4 @@ class ManageTenant:
     async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
         if not self._change_audit:
             return
-        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))
+        await self._change_audit.record(GovernanceAuditEventFactory.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

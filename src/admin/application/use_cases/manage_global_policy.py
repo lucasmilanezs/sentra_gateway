@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 
 from src.admin.domain.entities.global_policy import GlobalPolicy
 from src.admin.domain.exceptions import NotFoundError, ValidationError
+from src.admin.domain.services.policy_validation import ensure_valid_rate_limit
 from src.admin.domain.ports.global_policy_repository import GlobalPolicyRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
-from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.config_notifier import ConfigNotifier
 
 
 def _utcnow() -> datetime:
@@ -25,7 +26,7 @@ class ManageGlobalPolicy:
         self,
         global_policies: GlobalPolicyRepositoryPort,
         tenants: TenantRepositoryPort,
-        publisher: RedisPublisher | None = None,
+        publisher: ConfigNotifier | None = None,
     ) -> None:
         self._global_policies = global_policies
         self._tenants = tenants
@@ -45,8 +46,7 @@ class ManageGlobalPolicy:
     ) -> GlobalPolicy:
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
-        if rate_limit_per_minute is not None and rate_limit_per_minute <= 0:
-            raise ValidationError("rate_limit_per_minute deve ser maior que zero")
+        ensure_valid_rate_limit(rate_limit_per_minute)
 
         existing = await self._global_policies.get_by_tenant_id(tenant_id)
         now = _utcnow()

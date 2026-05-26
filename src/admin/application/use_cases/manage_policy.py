@@ -1,13 +1,14 @@
 import uuid
 from datetime import datetime, timezone
-from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
+from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.entities.policy import Policy
 from src.admin.domain.exceptions import NotFoundError, ValidationError
+from src.admin.domain.services.policy_validation import ensure_valid_rate_limit
 from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPort
 from src.admin.domain.ports.policy_repository import PolicyRepositoryPort
-from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.config_notifier import ConfigNotifier
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
+from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
 
 def _utcnow():
     return datetime.now(timezone.utc)
@@ -23,7 +24,7 @@ class ManagePolicy:
         route = await self._routes.get_by_id(route_id)
         if not route:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
+        TenantAccessControl.ensure_tenant_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
         return await self._policies.get_by_route_id(route_id)
 
     async def upsert(self, *, caller_role, caller_tenant_id, route_id, requires_auth, rate_limit_per_minute, allowed_roles,
@@ -33,9 +34,8 @@ class ManagePolicy:
         route = await self._routes.get_by_id(route_id)
         if not route:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
-        if rate_limit_per_minute is not None and rate_limit_per_minute <= 0:
-            raise ValidationError("rate_limit_per_minute deve ser maior que zero")
+        TenantAccessControl.ensure_tenant_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
+        ensure_valid_rate_limit(rate_limit_per_minute)
         existing = await self._policies.get_by_route_id(route_id)
         now = _utcnow()
         policy = Policy(
@@ -62,7 +62,7 @@ class ManagePolicy:
         route = await self._routes.get_by_id(route_id)
         if not route:
             raise NotFoundError("rota não encontrada")
-        TenantOwnershipGuard.assert_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
+        TenantAccessControl.ensure_tenant_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
         deleted = await self._policies.delete_by_route_id(route_id)
         if not deleted:
             raise NotFoundError("política não encontrada para esta rota")
@@ -77,7 +77,7 @@ class ManagePolicy:
     async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
         if not self._change_audit:
             return
-        await self._change_audit.record(AdminChangeEventBuilder.build(
+        await self._change_audit.record(GovernanceAuditEventFactory.build(
             tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown",
             action=action, resource_type=resource_type, resource_id=resource_id,
             resource_summary=resource_summary, detail=detail,

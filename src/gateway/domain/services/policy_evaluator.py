@@ -6,13 +6,20 @@ from jose import JWTError, jwt
 from src.gateway.domain.models.policy import Policy
 from src.gateway.domain.models.policy_result import PolicyEvaluationDetail, PolicyResult
 from src.gateway.domain.models.request import Request
+from src.gateway.domain.services.policy_components import DEFAULT_POLICY_COMPONENTS, PolicyComponent
 
 
 class PolicyEvaluator:
 
-    def __init__(self, jwt_secret: Optional[str] = None, jwt_algorithms: tuple[str, ...] = ("HS256",)) -> None:
+    def __init__(
+        self,
+        jwt_secret: Optional[str] = None,
+        jwt_algorithms: tuple[str, ...] = ("HS256",),
+        policy_components: tuple[PolicyComponent, ...] = DEFAULT_POLICY_COMPONENTS,
+    ) -> None:
         self._jwt_secret = jwt_secret
         self._jwt_algorithms = jwt_algorithms
+        self._policy_components = policy_components
 
     def evaluate(self, policy: Policy, request: Request) -> PolicyResult:
         checks: List[PolicyEvaluationDetail] = []
@@ -25,18 +32,13 @@ class PolicyEvaluator:
             if not auth_result.allowed:
                 return PolicyResult(allowed=False, status_code=auth_result.status_code, reason=auth_result.reason, checks=tuple(checks))
 
-        for name, method in [
-            ("required_headers", self._check_required_headers),
-            ("forbidden_headers", self._check_forbidden_headers),
-            ("required_params", self._check_required_params),
-            ("forbidden_params", self._check_forbidden_params),
-        ]:
-            field_val = getattr(policy, name)
-            if field_val:
-                detail = method(policy, request)
-                checks.append(detail)
-                if not detail.passed:
-                    return PolicyResult(allowed=False, status_code=400, reason=detail.detail, checks=tuple(checks))
+        for component in self._policy_components:
+            if not component.is_enabled(policy):
+                continue
+            detail = component.evaluate(policy, request)
+            checks.append(detail)
+            if not detail.passed:
+                return PolicyResult(allowed=False, status_code=400, reason=detail.detail, checks=tuple(checks))
 
         return PolicyResult(allowed=True, checks=tuple(checks))
 
@@ -93,36 +95,6 @@ class PolicyEvaluator:
             checks.append(PolicyEvaluationDetail(check="role_authorization", passed=True, detail=f"Role '{role}' allowed."))
 
         return PolicyResult(allowed=True, checks=tuple(checks))
-
-    @staticmethod
-    def _check_required_headers(policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        headers_lower = {k.lower() for k in request.headers}
-        missing = [h for h in policy.required_headers if h.lower() not in headers_lower]
-        if missing:
-            return PolicyEvaluationDetail(check="required_headers", passed=False, detail=f"Headers obrigatórios ausentes: {', '.join(missing)}")
-        return PolicyEvaluationDetail(check="required_headers", passed=True, detail=f"Todos presentes: {', '.join(policy.required_headers)}")
-
-    @staticmethod
-    def _check_forbidden_headers(policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        headers_lower = {k.lower() for k in request.headers}
-        blocked = [h for h in policy.forbidden_headers if h.lower() in headers_lower]
-        if blocked:
-            return PolicyEvaluationDetail(check="forbidden_headers", passed=False, detail=f"Headers proibidos presentes: {', '.join(blocked)}")
-        return PolicyEvaluationDetail(check="forbidden_headers", passed=True, detail="Nenhum header proibido encontrado.")
-
-    @staticmethod
-    def _check_required_params(policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        missing = [p for p in policy.required_params if p not in request.query_params]
-        if missing:
-            return PolicyEvaluationDetail(check="required_params", passed=False, detail=f"Query params obrigatórios ausentes: {', '.join(missing)}")
-        return PolicyEvaluationDetail(check="required_params", passed=True, detail=f"Todos presentes: {', '.join(policy.required_params)}")
-
-    @staticmethod
-    def _check_forbidden_params(policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        blocked = [p for p in policy.forbidden_params if p in request.query_params]
-        if blocked:
-            return PolicyEvaluationDetail(check="forbidden_params", passed=False, detail=f"Query params proibidos presentes: {', '.join(blocked)}")
-        return PolicyEvaluationDetail(check="forbidden_params", passed=True, detail="Nenhum param proibido encontrado.")
 
     @staticmethod
     def _validate_exp(payload: dict[str, Any], skew_seconds: int) -> None:

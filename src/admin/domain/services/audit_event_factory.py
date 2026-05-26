@@ -8,7 +8,9 @@ from typing import Any
 from src.admin.domain.entities.admin_change_event import AdminChangeEvent
 
 
-class AdminChangeEventBuilder:
+class GovernanceAuditEventFactory:
+    """Builds semantic governance audit events for admin-plane changes."""
+
     @staticmethod
     def build(
         *,
@@ -19,12 +21,8 @@ class AdminChangeEventBuilder:
         resource_type: str,
         resource_id: str,
         resource_summary: str,
-        detail: dict[str, Any] | str | None = None,
+        detail: dict[str, Any] | None = None,
     ) -> AdminChangeEvent:
-        if isinstance(detail, dict):
-            detail_text = json.dumps(detail, ensure_ascii=False, default=str)
-        else:
-            detail_text = detail
         return AdminChangeEvent(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
@@ -35,5 +33,5 @@ class AdminChangeEventBuilder:
             resource_id=resource_id,
             resource_summary=resource_summary,
             timestamp=datetime.now(timezone.utc),
-            detail=detail_text,
+            detail=json.dumps(detail, ensure_ascii=False) if detail is not None else None,
         )

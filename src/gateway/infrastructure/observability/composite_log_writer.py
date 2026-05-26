@@ -3,7 +3,7 @@ from src.gateway.domain.ports.log_port import LogPort
 
 
 class CompositeLogWriter(LogPort):
-    """Writes log events to multiple backends (file + Postgres audit)."""
+    """Writes operational log events to multiple observability backends."""
 
     def __init__(self, *writers: LogPort) -> None:
         self._writers = writers

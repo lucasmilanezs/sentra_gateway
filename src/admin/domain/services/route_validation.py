@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse
 
 from src.admin.domain.exceptions import ValidationError
 
@@ -30,3 +31,11 @@ def path_pattern_warnings(path: str) -> list[str]:
     if not _VERSION_HINT_RE.match(path):
         warnings.append("considere versionar o path, ex: /v1/recurso")
     return warnings
+
+
+def validate_backend_url(url: str) -> str:
+    clean = url.strip().rstrip("/")
+    parsed = urlparse(clean)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValidationError("backend_url deve ser uma URL http(s) válida")
+    return clean

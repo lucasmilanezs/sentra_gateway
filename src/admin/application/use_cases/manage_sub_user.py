@@ -23,7 +23,7 @@ from src.admin.domain.ports.user_repository import UserRepositoryPort
 from src.admin.domain.services.password_hasher import PasswordHasherPort
 from src.admin.domain.value_objects.permission import Permission
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
+from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
 
 
 _VALID_PERMISSIONS = {p.value for p in Permission}
@@ -179,4 +179,4 @@ class ManageSubUser:
     async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
         if not self._change_audit:
             return
-        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))
+        await self._change_audit.record(GovernanceAuditEventFactory.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

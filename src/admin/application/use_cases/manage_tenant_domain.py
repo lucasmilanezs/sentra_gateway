@@ -2,16 +2,17 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from src.admin.application.services.tenant_ownership_guard import TenantOwnershipGuard
+from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.entities.domain_policy import DomainPolicy
 from src.admin.domain.entities.tenant_domain import TenantDomain
 from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
+from src.admin.domain.services.policy_validation import ensure_valid_rate_limit
 from src.admin.domain.ports.domain_policy_repository import DomainPolicyRepositoryPort
 from src.admin.domain.ports.tenant_domain_repository import TenantDomainRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
-from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.config_notifier import ConfigNotifier
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
+from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
 
 
 def _utcnow() -> datetime:
@@ -34,7 +35,7 @@ class ManageTenantDomain:
         domains: TenantDomainRepositoryPort,
         domain_policies: DomainPolicyRepositoryPort,
         tenants: TenantRepositoryPort,
-        publisher: RedisPublisher | None = None,
+        publisher: ConfigNotifier | None = None,
         change_audit: ChangeAuditRepositoryPort | None = None,
     ) -> None:
         self._domains = domains
@@ -52,7 +53,7 @@ class ManageTenantDomain:
         caller_tenant_id: str | None,
         tenant_id: str,
     ) -> list[TenantDomain]:
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=tenant_id,
@@ -76,7 +77,7 @@ class ManageTenantDomain:
         domain: str,
         caller_user_id: str | None = None,
     ) -> TenantDomain:
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=tenant_id,
@@ -120,7 +121,7 @@ class ManageTenantDomain:
         d = await self._domains.get_by_id(domain_id)
         if not d:
             raise NotFoundError("domain não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=d.tenant_id,
@@ -143,7 +144,7 @@ class ManageTenantDomain:
         d = await self._domains.get_by_id(domain_id)
         if not d:
             raise NotFoundError("domain não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=d.tenant_id,
@@ -172,14 +173,13 @@ class ManageTenantDomain:
         d = await self._domains.get_by_id(domain_id)
         if not d:
             raise NotFoundError("domain não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=d.tenant_id,
         )
 
-        if rate_limit_per_minute is not None and rate_limit_per_minute <= 0:
-            raise ValidationError("rate_limit_per_minute deve ser maior que zero")
+        ensure_valid_rate_limit(rate_limit_per_minute)
 
         existing = await self._domain_policies.get_by_domain_id(domain_id)
         now = _utcnow()
@@ -220,7 +220,7 @@ class ManageTenantDomain:
         d = await self._domains.get_by_id(domain_id)
         if not d:
             raise NotFoundError("domain não encontrado")
-        TenantOwnershipGuard.assert_access(
+        TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
             resource_tenant_id=d.tenant_id,
@@ -236,4 +236,4 @@ class ManageTenantDomain:
     async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
         if not self._change_audit:
             return
-        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))
+        await self._change_audit.record(GovernanceAuditEventFactory.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

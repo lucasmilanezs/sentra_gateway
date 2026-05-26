@@ -19,7 +19,7 @@ from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.infrastructure.config.settings import AdminSettings
 from src.admin.infrastructure.email.console_email_sender import ConsoleEmailSender
 from src.admin.infrastructure.email.smtp_email_sender import SmtpEmailSender
-from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.infrastructure.pubsub.redis_notifier import RedisConfigNotifier
 from src.admin.infrastructure.observability.redis_gateway_log_repository import RedisGatewayLogRepository
 
 # JSON adapters
@@ -68,7 +68,7 @@ class AdminWiring:
             )
 
         self._redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-        self.publisher = RedisPublisher(client=self._redis_client)
+        self.publisher = RedisConfigNotifier(client=self._redis_client)
         self.raw_gateway_log_repository = RedisGatewayLogRepository(client=self._redis_client)
         self.query_gateway_logs = QueryGatewayLogs(self.raw_gateway_log_repository)
 
