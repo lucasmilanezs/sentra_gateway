@@ -825,3 +825,30 @@ html, body {
   padding: 1px 5px;
   border-radius: var(--r-xs);
 }
+
+/* ── Raw log detail ── */
+.modal-box-wide {
+  max-width: 920px;
+}
+
+.json-detail {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-sm);
+  padding: 14px;
+  color: var(--text-primary);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 62vh;
+}
+
+.raw-log-row {
+  cursor: pointer;
+}
+
+.raw-log-row:hover {
+  background: rgba(255,255,255,0.035);
+}

@@ -7,17 +7,29 @@ from src.admin.domain.ports.domain_policy_repository import DomainPolicyReposito
 from src.admin.infrastructure.persistence.postgres.models import DomainPolicyORM
 
 
+def _csv(values: list[str] | None) -> str:
+    return ",".join(values or [])
+
+
+def _from_csv(raw: str | None) -> list[str]:
+    return [item.strip() for item in (raw or "").split(",") if item.strip()]
+
+
 def _orm_to_entity(row: DomainPolicyORM) -> DomainPolicy:
     return DomainPolicy(
         id=row.id,
         domain_id=row.domain_id,
         requires_auth=row.requires_auth,
         rate_limit_per_minute=row.rate_limit_per_minute,
-        allowed_roles=[r for r in row.allowed_roles.split(",") if r] if row.allowed_roles else [],
+        allowed_roles=_from_csv(row.allowed_roles),
         jwt_validate_exp=row.jwt_validate_exp,
         jwt_issuer=row.jwt_issuer,
         jwt_audience=row.jwt_audience,
         jwt_clock_skew_seconds=row.jwt_clock_skew_seconds,
+        required_headers=_from_csv(row.required_headers),
+        forbidden_headers=_from_csv(row.forbidden_headers),
+        required_params=_from_csv(row.required_params),
+        forbidden_params=_from_csv(row.forbidden_params),
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -29,11 +41,15 @@ def _entity_to_orm(policy: DomainPolicy) -> DomainPolicyORM:
         domain_id=policy.domain_id,
         requires_auth=policy.requires_auth,
         rate_limit_per_minute=policy.rate_limit_per_minute,
-        allowed_roles=",".join(policy.allowed_roles),
+        allowed_roles=_csv(policy.allowed_roles),
         jwt_validate_exp=policy.jwt_validate_exp,
         jwt_issuer=policy.jwt_issuer,
         jwt_audience=policy.jwt_audience,
         jwt_clock_skew_seconds=policy.jwt_clock_skew_seconds,
+        required_headers=_csv(policy.required_headers),
+        forbidden_headers=_csv(policy.forbidden_headers),
+        required_params=_csv(policy.required_params),
+        forbidden_params=_csv(policy.forbidden_params),
         created_at=policy.created_at,
         updated_at=policy.updated_at,
     )
@@ -55,11 +71,15 @@ class DomainPolicyRepository(DomainPolicyRepositoryPort):
         if existing:
             existing.requires_auth = policy.requires_auth
             existing.rate_limit_per_minute = policy.rate_limit_per_minute
-            existing.allowed_roles = ",".join(policy.allowed_roles)
+            existing.allowed_roles = _csv(policy.allowed_roles)
             existing.jwt_validate_exp = policy.jwt_validate_exp
             existing.jwt_issuer = policy.jwt_issuer
             existing.jwt_audience = policy.jwt_audience
             existing.jwt_clock_skew_seconds = policy.jwt_clock_skew_seconds
+            existing.required_headers = _csv(policy.required_headers)
+            existing.forbidden_headers = _csv(policy.forbidden_headers)
+            existing.required_params = _csv(policy.required_params)
+            existing.forbidden_params = _csv(policy.forbidden_params)
             existing.updated_at = policy.updated_at
         else:
             self._session.add(_entity_to_orm(policy))

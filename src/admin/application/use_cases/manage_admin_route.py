@@ -11,6 +11,8 @@ from src.admin.domain.ports.admin_route_repository import AdminRouteRepositoryPo
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.value_objects.http_method import HttpMethod
 from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
+from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
 
 
 def _utcnow() -> datetime:
@@ -44,10 +46,12 @@ class ManageAdminRoute:
         routes: AdminRouteRepositoryPort,
         tenants: TenantRepositoryPort,
         publisher: RedisPublisher | None = None,
+        change_audit: ChangeAuditRepositoryPort | None = None,
     ) -> None:
         self._routes = routes
         self._tenants = tenants
         self._publisher = publisher
+        self._change_audit = change_audit
 
     async def list(
         self,
@@ -89,6 +93,7 @@ class ManageAdminRoute:
         path_pattern: str,
         methods: list[HttpMethod],
         backend_url: str,
+        caller_user_id: str | None = None,
     ) -> AdminRoute:
         # superuser pode criar em qualquer tenant via body;
         # admin/member ficam presos ao próprio tenant (body.tenant_id ignorado).
@@ -115,6 +120,7 @@ class ManageAdminRoute:
             updated_at=now,
         )
         await self._routes.save(route)
+        await self._record_change(tenant_id=route.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="CREATE", resource_type="route", resource_id=route.id, resource_summary=route.path_pattern, detail={"methods": [m.value for m in route.methods], "backend_url": route.backend_url})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
@@ -128,6 +134,7 @@ class ManageAdminRoute:
         caller_tenant_id: str | None,
         route_id: str,
         data: dict,
+        caller_user_id: str | None = None,
     ) -> AdminRoute:
         r = await self._routes.get_by_id(route_id)
         if not r:
@@ -162,6 +169,7 @@ class ManageAdminRoute:
             updated_at=_utcnow(),
         )
         await self._routes.save(updated)
+        await self._record_change(tenant_id=updated.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE", resource_type="route", resource_id=updated.id, resource_summary=updated.path_pattern, detail={"changed_fields": sorted(data.keys()), "methods": [m.value for m in updated.methods], "backend_url": updated.backend_url})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
@@ -174,6 +182,7 @@ class ManageAdminRoute:
         caller_role: str,
         caller_tenant_id: str | None,
         route_id: str,
+        caller_user_id: str | None = None,
     ) -> None:
         r = await self._routes.get_by_id(route_id)
         if not r:
@@ -184,6 +193,12 @@ class ManageAdminRoute:
             resource_tenant_id=r.tenant_id,
         )
         await self._routes.delete(route_id)
+        await self._record_change(tenant_id=r.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="route", resource_id=r.id, resource_summary=r.path_pattern, detail={"backend_url": r.backend_url})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
+
+    async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
+        if not self._change_audit:
+            return
+        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

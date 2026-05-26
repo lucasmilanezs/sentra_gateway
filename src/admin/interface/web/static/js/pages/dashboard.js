@@ -1,7 +1,7 @@
 // Lógica extraída do dashboard.html
 // Fix aplicado: hidratação do tenant (name/alias) para admin/member
 
-import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi, auditApi, subUsersApi } from '../api.js';
+import { authApi, tenantsApi, domainsApi, routesApi, policiesApi, healthApi, auditApi, rawLogsApi, subUsersApi } from '../api.js';
 import { requireAuth, logout, currentTenant, currentUser, saveCurrentUser, isSuperUser, isAdmin, hasPermission } from '../auth.js';
 
 if (!requireAuth()) throw new Error('not authenticated');
@@ -23,6 +23,7 @@ const PAGE_LOADERS = {
   metrics:  loadMetrics,
   conta:    loadConta,
   audit:    loadAudit,
+  'raw-logs': loadRawLogs,
 };
 
 document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
@@ -179,6 +180,7 @@ function navigate(pageId) {
       'nav-domains':  'domains',
       'nav-routes':   'routes',
       'nav-audit':    'audit',
+      'nav-raw-logs': 'audit',
       'nav-metrics':  'metrics',
     };
     for (const [id, perm] of Object.entries(permMap)) {
@@ -319,7 +321,7 @@ async function loadDomains() {
     list.forEach((d, i) => {
       const p = policies[i];
       const pHtml = p
-        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}</span>
+        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}${_policyConstraintSummary(p)}</span>
            <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Editar</button>`
         : `<span class="policy-off">sem política</span>
            <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Configurar</button>`;
@@ -375,6 +377,10 @@ window._openDomainPolicyModal = async function(domainId, domainName) {
   document.getElementById('dp-jwt-validate-exp').checked = true;
   document.getElementById('dp-jwt-issuer').value = '';
   document.getElementById('dp-jwt-audience').value = '';
+  _setCsvInput('dp-required-headers', []);
+  _setCsvInput('dp-forbidden-headers', []);
+  _setCsvInput('dp-required-params', []);
+  _setCsvInput('dp-forbidden-params', []);
   document.getElementById('dp-error').style.display = 'none';
   document.getElementById('modal-domain-policy').style.display = 'flex';
   try {
@@ -386,6 +392,10 @@ window._openDomainPolicyModal = async function(domainId, domainName) {
       document.getElementById('dp-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
       document.getElementById('dp-jwt-issuer').value = p.jwt_issuer || '';
       document.getElementById('dp-jwt-audience').value = p.jwt_audience || '';
+      _setCsvInput('dp-required-headers', p.required_headers || []);
+      _setCsvInput('dp-forbidden-headers', p.forbidden_headers || []);
+      _setCsvInput('dp-required-params', p.required_params || []);
+      _setCsvInput('dp-forbidden-params', p.forbidden_params || []);
     }
   } catch {}
 };
@@ -408,6 +418,10 @@ document.getElementById('dp-save').addEventListener('click', async () => {
       jwt_validate_exp: document.getElementById('dp-jwt-validate-exp').checked,
       jwt_issuer:   document.getElementById('dp-jwt-issuer').value.trim()   || null,
       jwt_audience: document.getElementById('dp-jwt-audience').value.trim() || null,
+      required_headers: _csvInput('dp-required-headers'),
+      forbidden_headers: _csvInput('dp-forbidden-headers'),
+      required_params: _csvInput('dp-required-params'),
+      forbidden_params: _csvInput('dp-forbidden-params'),
     });
     document.getElementById('modal-domain-policy').style.display = 'none';
     loadDomains();
@@ -450,7 +464,7 @@ async function loadRoutes() {
       }).join('');
 
       const policyHtml = p
-        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}</span>`
+        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}${_policyConstraintSummary(p)}</span>`
         : `<span class="policy-off">sem política</span>`;
 
       const methodsJson = esc(JSON.stringify(methods));
@@ -550,6 +564,10 @@ window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-jwt-validate-exp').checked = true;
   document.getElementById('p-jwt-issuer').value = '';
   document.getElementById('p-jwt-audience').value = '';
+  _setCsvInput('p-required-headers', []);
+  _setCsvInput('p-forbidden-headers', []);
+  _setCsvInput('p-required-params', []);
+  _setCsvInput('p-forbidden-params', []);
   document.getElementById('modal-policy').style.display = 'flex';
   try {
     const p = await policiesApi.get(routeId);
@@ -560,6 +578,10 @@ window._openPolicyModal = async function(routeId, routePath) {
       document.getElementById('p-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
       document.getElementById('p-jwt-issuer').value = p.jwt_issuer || '';
       document.getElementById('p-jwt-audience').value = p.jwt_audience || '';
+      _setCsvInput('p-required-headers', p.required_headers || []);
+      _setCsvInput('p-forbidden-headers', p.forbidden_headers || []);
+      _setCsvInput('p-required-params', p.required_params || []);
+      _setCsvInput('p-forbidden-params', p.forbidden_params || []);
     }
   } catch {}
 };
@@ -582,6 +604,10 @@ document.getElementById('p-save').addEventListener('click', async () => {
       jwt_validate_exp: document.getElementById('p-jwt-validate-exp').checked,
       jwt_issuer:   document.getElementById('p-jwt-issuer').value.trim()   || null,
       jwt_audience: document.getElementById('p-jwt-audience').value.trim() || null,
+      required_headers: _csvInput('p-required-headers'),
+      forbidden_headers: _csvInput('p-forbidden-headers'),
+      required_params: _csvInput('p-required-params'),
+      forbidden_params: _csvInput('p-forbidden-params'),
     });
     document.getElementById('modal-policy').style.display = 'none';
     loadRoutes();
@@ -737,6 +763,48 @@ function loadAudit() {
   if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
 }
 
+// ── LOGS BRUTOS ───────────────────────────────────────────────────────────
+async function loadRawLogs() {
+  const tbody = document.getElementById('tbody-raw-logs');
+  const empty = document.getElementById('raw-logs-empty');
+  const badge = document.getElementById('raw-logs-tenant-badge');
+  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const data = await rawLogsApi.list(tenant?.id || null, 100);
+    const rows = data.items || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { empty.style.display = 'block'; return; }
+
+    rows.forEach((r, idx) => {
+      const tr = document.createElement('tr');
+      tr.className = 'raw-log-row';
+      tr.dataset.rawLogIndex = String(idx);
+      const when = r.timestamp ? new Date(r.timestamp).toLocaleString('pt-BR') : '—';
+      tr.innerHTML = `
+        <td style="font-size:.78rem;color:var(--text-sub)">${when}</td>
+        <td style="font-family:monospace;font-size:.78rem">${escHtml(r.summary || `${r.method || '?'} ${r.path || '?'}`)}</td>
+        <td><span class="policy-on" style="font-size:.72rem;padding:2px 7px">${escHtml(r.outcome || 'UNKNOWN')}</span></td>
+        <td style="color:var(--text-sub)">${r.latency_ms != null ? Math.round(r.latency_ms) + ' ms' : '—'}</td>
+        <td style="font-family:monospace;font-size:.75rem;color:var(--text-sub)">${escHtml((r.route_id || '—').slice(0, 12))}</td>`;
+      tr.addEventListener('click', () => _openRawLogModal(r));
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#a03030;font-style:italic">${err.detail||'Erro'}</td></tr>`;
+  }
+}
+
+function _openRawLogModal(record) {
+  document.getElementById('raw-log-detail').textContent = JSON.stringify(record, null, 2);
+  document.getElementById('modal-raw-log').style.display = 'flex';
+}
+
+document.getElementById('raw-log-close')?.addEventListener('click', () => { document.getElementById('modal-raw-log').style.display = 'none'; });
+document.getElementById('modal-raw-log')?.addEventListener('click', e => { if (e.target.id === 'modal-raw-log') document.getElementById('modal-raw-log').style.display = 'none'; });
+
 // ── MÉTRICAS ──────────────────────────────────────────────────────────────
 async function loadMetrics() {
   try {
@@ -775,4 +843,22 @@ function loadConta() {
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────
-function esc(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+function esc(s) { return (s||'').replace(/'/g, "\'").replace(/"/g, '&quot;'); }
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function _csvInput(id) {
+  return document.getElementById(id).value.split(',').map(s => s.trim()).filter(Boolean);
+}
+function _setCsvInput(id, values) {
+  const el = document.getElementById(id);
+  if (el) el.value = (values || []).join(', ');
+}
+function _policyConstraintSummary(p) {
+  const parts = [];
+  if (p.required_headers?.length) parts.push(`reqH:${p.required_headers.length}`);
+  if (p.forbidden_headers?.length) parts.push(`forbH:${p.forbidden_headers.length}`);
+  if (p.required_params?.length) parts.push(`reqP:${p.required_params.length}`);
+  if (p.forbidden_params?.length) parts.push(`forbP:${p.forbidden_params.length}`);
+  return parts.length ? ` · ${parts.join(' · ')}` : '';
+}

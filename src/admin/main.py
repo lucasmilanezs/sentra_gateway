@@ -35,7 +35,8 @@ from src.admin.interface.http.routers import (  # noqa: E402
     health_router,
     tenant_router,
     policy_router,
-    sub_user_router
+    sub_user_router,
+    raw_log_router
 )
 from src.admin.interface.http.wiring import AdminWiring # noqa: E402
 
@@ -93,5 +94,6 @@ app.include_router(admin_route_router.router, prefix="/api/v1/routes", tags=["Ro
 app.include_router(policy_router.router, prefix="/api/v1/routes", tags=["Policies"])
 app.include_router(audit_router.router, prefix="/api/v1", tags=["Audit"])
 app.include_router(sub_user_router.router, prefix="/api/v1/sub-users", tags=["Sub-Users"])
+app.include_router(raw_log_router.router, prefix="/api/v1", tags=["Raw Logs"])
 # StaticFiles por último
 app.mount("/", StaticFiles(directory="src/admin/interface/web/static", html=True), name="frontend")

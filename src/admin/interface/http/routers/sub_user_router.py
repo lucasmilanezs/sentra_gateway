@@ -38,6 +38,7 @@ async def create_sub_user(
         password=body.password,
         permissions=body.permissions,
         target_tenant_id=body.tenant_id,  # só usado por superuser
+        caller_user_id=claims.sub,
     )
     return _to_response(user)
 
@@ -68,6 +69,7 @@ async def update_permissions(
         caller_tenant_id=claims.tenant_id,
         user_id=user_id,
         permissions=body.permissions,
+        caller_user_id=claims.sub,
     )
     return _to_response(user)
 
@@ -82,4 +84,5 @@ async def delete_sub_user(
         caller_role=claims.role,
         caller_tenant_id=claims.tenant_id,
         user_id=user_id,
+        caller_user_id=claims.sub,
     )

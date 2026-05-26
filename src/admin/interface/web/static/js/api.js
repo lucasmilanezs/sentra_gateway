@@ -96,6 +96,14 @@ export const auditApi = {
   },
 };
 
+export const rawLogsApi = {
+  list: (tenantId = null, limit = 100) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (tenantId) q.set('tenant_id', tenantId);
+    return request('GET', `/logs/raw?${q}`);
+  },
+};
+
 export const subUsersApi = {
   create:            (payload)             => request('POST',   '/sub-users', payload),
   listByTenant:      (tenantId)            => request('GET',    `/sub-users/${tenantId}`),

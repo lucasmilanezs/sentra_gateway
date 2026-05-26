@@ -81,6 +81,13 @@
       </svg>
       Auditoria
     </button>
+    <button class="nav-item" id="nav-raw-logs" data-page="raw-logs" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+        <path d="M5 6h6M5 9h6M5 12h3"/>
+      </svg>
+      Logs brutos
+    </button>
     <button class="nav-item" id="nav-metrics" data-page="metrics" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
         <path d="M1 13l4-5 3 3 3-6 4 2"/>
@@ -215,6 +222,24 @@
       </div>
     </section>
 
+    <!-- LOGS BRUTOS -->
+    <section class="page" id="page-raw-logs">
+      <div class="page-header"><h1 class="page-title">Logs brutos</h1></div>
+      <p class="context-badge" id="raw-logs-tenant-badge"></p>
+      <div class="domain-hint">
+        Esta tela mostra o log operacional agregado em JSON Lines. A tabela é resumida de propósito; clique em uma linha para abrir o registro bruto completo.
+      </div>
+      <div class="card">
+        <table class="data-table raw-log-table">
+          <thead><tr>
+            <th>Quando</th><th>Resumo</th><th>Outcome</th><th>Latência</th><th>Route</th>
+          </tr></thead>
+          <tbody id="tbody-raw-logs"></tbody>
+        </table>
+        <p class="tbl-empty" id="raw-logs-empty" style="display:none">Nenhum log bruto disponível.</p>
+      </div>
+    </section>
+
     <!-- MÉTRICAS -->
     <section class="page" id="page-metrics">
       <div class="page-header"><h1 class="page-title">Métricas</h1></div>
@@ -345,6 +370,22 @@
       <input type="text" id="dp-roles" placeholder="admin, user" />
     </div>
     <div class="modal-field">
+      <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="dp-required-headers" placeholder="x-client-id, authorization" />
+    </div>
+    <div class="modal-field">
+      <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="dp-forbidden-headers" placeholder="x-debug-token" />
+    </div>
+    <div class="modal-field">
+      <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="dp-required-params" placeholder="client_id" />
+    </div>
+    <div class="modal-field">
+      <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="dp-forbidden-params" placeholder="debug" />
+    </div>
+    <div class="modal-field">
       <label class="modal-check">
         <input type="checkbox" id="dp-jwt-validate-exp" checked />
         Validar expiração do JWT (exp)
@@ -423,6 +464,22 @@
       <input type="text" id="p-roles" placeholder="admin, user" />
     </div>
     <div class="modal-field">
+      <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="p-required-headers" placeholder="x-client-id, authorization" />
+    </div>
+    <div class="modal-field">
+      <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="p-forbidden-headers" placeholder="x-debug-token" />
+    </div>
+    <div class="modal-field">
+      <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="p-required-params" placeholder="client_id" />
+    </div>
+    <div class="modal-field">
+      <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+      <input type="text" id="p-forbidden-params" placeholder="debug" />
+    </div>
+    <div class="modal-field">
       <label class="modal-check">
         <input type="checkbox" id="p-jwt-validate-exp" checked />
         Validar expiração do JWT (exp)
@@ -441,6 +498,17 @@
       <button class="btn-danger-ghost" id="p-delete">Remover política</button>
       <button class="btn-ghost" id="p-cancel">Cancelar</button>
       <button class="btn-primary" id="p-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Log bruto -->
+<div class="modal-overlay" id="modal-raw-log" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <h2 class="modal-title">Detalhe do log bruto</h2>
+    <pre class="json-detail" id="raw-log-detail"></pre>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="raw-log-close">Fechar</button>
     </div>
   </div>
 </div>

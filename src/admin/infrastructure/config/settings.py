@@ -21,6 +21,7 @@ class AdminSettings(BaseSettings):
     use_postgres: bool = Field(default=False, alias="ADMIN_USE_POSTGRES")
     database_url: str = Field(default="", alias="ADMIN_DATABASE_URL")
     json_data_path: str = Field(default="data/admin_local.json", alias="ADMIN_JSON_DATA_PATH")
+    gateway_log_path: str = Field(default="logs/gateway.log", alias="GATEWAY_LOG_PATH")
 
     # Postgres
     postgres_user: str = Field(default="sentra", alias="POSTGRES_USER")

@@ -22,6 +22,8 @@ from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.domain.ports.user_repository import UserRepositoryPort
 from src.admin.domain.services.password_hasher import PasswordHasherPort
 from src.admin.domain.value_objects.permission import Permission
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
+from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
 
 
 _VALID_PERMISSIONS = {p.value for p in Permission}
@@ -48,10 +50,12 @@ class ManageSubUser:
         users: UserRepositoryPort,
         tenants: TenantRepositoryPort,
         hasher: PasswordHasherPort,
+        change_audit: ChangeAuditRepositoryPort | None = None,
     ) -> None:
         self._users = users
         self._tenants = tenants
         self._hasher = hasher
+        self._change_audit = change_audit
 
     async def create(
         self,
@@ -62,6 +66,7 @@ class ManageSubUser:
         password: str,
         permissions: list[str],
         target_tenant_id: str | None = None,
+        caller_user_id: str | None = None,
     ) -> User:
         """
         Cria um sub-usuário (role=member) dentro de um tenant.
@@ -110,6 +115,7 @@ class ManageSubUser:
             permissions=validated_permissions,
         )
         await self._users.save(user)
+        await self._record_change(tenant_id=user.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="CREATE", resource_type="member", resource_id=user.id, resource_summary=user.email, detail={"permissions": user.permissions})
         return user
 
     async def list_by_tenant(self, *, caller_role: str, caller_tenant_id: str | None, tenant_id: str) -> list[User]:
@@ -120,7 +126,7 @@ class ManageSubUser:
             raise AuthError("acesso negado")
         return await self._users.list_members_by_tenant(tenant_id)
 
-    async def delete(self, *, caller_role: str, caller_tenant_id: str | None, user_id: str) -> None:
+    async def delete(self, *, caller_role: str, caller_tenant_id: str | None, user_id: str, caller_user_id: str | None = None) -> None:
         """Remove um sub-usuário. Admin só pode remover members do próprio tenant."""
         target = await self._users.get_by_id(user_id)
         if not target:
@@ -133,6 +139,7 @@ class ManageSubUser:
         elif caller_role != "superuser":
             raise AuthError("acesso negado")
         await self._users.delete(user_id)
+        await self._record_change(tenant_id=target.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="member", resource_id=target.id, resource_summary=target.email, detail={"permissions": target.permissions})
 
     async def update_permissions(
         self,
@@ -141,6 +148,7 @@ class ManageSubUser:
         caller_tenant_id: str | None,
         user_id: str,
         permissions: list[str],
+        caller_user_id: str | None = None,
     ) -> User:
         """Atualiza as permissões de um member existente."""
         target = await self._users.get_by_id(user_id)
@@ -166,4 +174,9 @@ class ManageSubUser:
             permissions=validated_permissions,
         )
         await self._users.save(updated)
+        await self._record_change(tenant_id=updated.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE", resource_type="member", resource_id=updated.id, resource_summary=updated.email, detail={"permissions": updated.permissions})
         return updated
+    async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
+        if not self._change_audit:
+            return
+        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

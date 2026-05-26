@@ -53,6 +53,7 @@ async def create_route(
         path_pattern=body.path_pattern,
         methods=body.methods,
         backend_url=body.backend_url,
+        caller_user_id=claims.sub,
     )
     return _to_response(r)
 
@@ -91,6 +92,7 @@ async def patch_route(
         caller_tenant_id=claims.tenant_id,
         route_id=route_id,
         data=data,
+        caller_user_id=claims.sub,
     )
     return _to_response(r)
 
@@ -105,4 +107,5 @@ async def delete_route(
         caller_role=claims.role,
         caller_tenant_id=claims.tenant_id,
         route_id=route_id,
+        caller_user_id=claims.sub,
     )

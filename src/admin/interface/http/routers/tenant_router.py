@@ -51,10 +51,10 @@ async def list_tenants(
 @router.post("", response_model=TenantResponse, status_code=status.HTTP_201_CREATED)
 async def create_tenant(
     body: TenantCreate,
-    _: Annotated[JwtClaims, Depends(require_superuser())],
+    claims: Annotated[JwtClaims, Depends(require_superuser())],
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
 ):
-    t = await uc.create(body.name, body.alias)
+    t = await uc.create(body.name, body.alias, caller_user_id=claims.sub, caller_role=claims.role or "superuser")
     return _to_response(t)
 
 
@@ -92,6 +92,7 @@ async def patch_tenant(
         caller_tenant_id=claims.tenant_id,
         tenant_id=tenant_id,
         data=data,
+        caller_user_id=claims.sub,
     )
     return _to_response(t)
 
@@ -121,10 +122,10 @@ async def domain_suggestions(
 @router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tenant(
     tenant_id: str,
-    _: Annotated[JwtClaims, Depends(require_superuser())],
+    claims: Annotated[JwtClaims, Depends(require_superuser())],
     uc: Annotated[ManageTenant, Depends(get_manage_tenant)],
 ):
-    await uc.delete(tenant_id)
+    await uc.delete(tenant_id, caller_user_id=claims.sub, caller_role=claims.role or "superuser")
 
 
 # ── TenantDomain — requer permissão "domains" ────────────────────────────
@@ -162,6 +163,7 @@ async def create_domain(
         caller_tenant_id=claims.tenant_id,
         tenant_id=tenant_id,
         domain=body.domain,
+        caller_user_id=claims.sub,
     )
     return TenantDomainResponse(
         id=d.id, tenant_id=d.tenant_id, domain=d.domain,
@@ -180,6 +182,7 @@ async def delete_domain(
         caller_role=claims.role,
         caller_tenant_id=claims.tenant_id,
         domain_id=domain_id,
+        caller_user_id=claims.sub,
     )
 
 
@@ -224,6 +227,11 @@ async def upsert_domain_policy(
         jwt_issuer=body.jwt_issuer,
         jwt_audience=body.jwt_audience,
         jwt_clock_skew_seconds=body.jwt_clock_skew_seconds,
+        required_headers=body.required_headers,
+        forbidden_headers=body.forbidden_headers,
+        required_params=body.required_params,
+        forbidden_params=body.forbidden_params,
+        caller_user_id=claims.sub,
     )
     return DomainPolicyResponse.model_validate(p)
 
@@ -242,4 +250,5 @@ async def delete_domain_policy(
         caller_role=claims.role,
         caller_tenant_id=claims.tenant_id,
         domain_id=domain_id,
+        caller_user_id=claims.sub,
     )

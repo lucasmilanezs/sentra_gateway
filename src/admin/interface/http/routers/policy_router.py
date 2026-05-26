@@ -21,8 +21,9 @@ async def upsert_policy(route_id: str, body: PolicyUpsert, claims: Annotated[Jwt
         jwt_clock_skew_seconds=body.jwt_clock_skew_seconds,
         required_headers=body.required_headers, forbidden_headers=body.forbidden_headers,
         required_params=body.required_params, forbidden_params=body.forbidden_params,
+        caller_user_id=claims.sub,
     )
 
 @router.delete("/{route_id}/policy", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_policy(route_id: str, claims: Annotated[JwtClaims, Depends(require_permission("routes"))], uc: Annotated[ManagePolicy, Depends(get_manage_policy)]):
-    await uc.delete(caller_role=claims.role, caller_tenant_id=claims.tenant_id, route_id=route_id)
+    await uc.delete(caller_role=claims.role, caller_tenant_id=claims.tenant_id, route_id=route_id, caller_user_id=claims.sub)

@@ -114,13 +114,13 @@ class AdminWiring:
         self.postgres_connected = settings.use_postgres
 
     def _build_use_cases_json(self) -> None:
-        self.manage_tenant = ManageTenant(self.tenant_repository, self.route_repository)
+        self.manage_tenant = ManageTenant(self.tenant_repository, self.route_repository, change_audit=None)
         self.manage_tenant_domain = None  # JSON mode não suporta domains
         self.manage_route = ManageAdminRoute(
-            self.route_repository, self.tenant_repository, publisher=self.publisher
+            self.route_repository, self.tenant_repository, publisher=self.publisher, change_audit=None
         )
         self.manage_policy = ManagePolicy(
-            self.policy_repository, self.route_repository, publisher=self.publisher
+            self.policy_repository, self.route_repository, publisher=self.publisher, change_audit=None
         )
         self.authenticate_user = AuthenticateUser(
             self.user_repository, self.hasher, self.token_service
@@ -160,19 +160,21 @@ class AdminWiring:
         w.reset_repository = JsonPasswordResetRepository(
             DocumentStore(self.settings.json_data_path)
         )
+        w.change_audit_repository = PgChangeAuditRepository(session)
 
-        w.manage_tenant = ManageTenant(w.tenant_repository, w.route_repository)
+        w.manage_tenant = ManageTenant(w.tenant_repository, w.route_repository, change_audit=w.change_audit_repository)
         w.manage_tenant_domain = ManageTenantDomain(
             w.tenant_domain_repository,
             w.domain_policy_repository,
             w.tenant_repository,
             publisher=w.publisher,
+            change_audit=w.change_audit_repository,
         )
         w.manage_route = ManageAdminRoute(
-            w.route_repository, w.tenant_repository, publisher=w.publisher
+            w.route_repository, w.tenant_repository, publisher=w.publisher, change_audit=w.change_audit_repository
         )
         w.manage_policy = ManagePolicy(
-            w.policy_repository, w.route_repository, publisher=w.publisher
+            w.policy_repository, w.route_repository, publisher=w.publisher, change_audit=w.change_audit_repository
         )
         w.authenticate_user = AuthenticateUser(
             w.user_repository, w.hasher, w.token_service
@@ -189,13 +191,13 @@ class AdminWiring:
         w.reset_password_with_code = ResetPasswordWithCode(
             w.user_repository, w.reset_repository, w.hasher
         )
-        w.change_audit_repository = PgChangeAuditRepository(session)
         w.audit_repository = PgAuditRepository(session)
         w.query_audit = QueryAudit(w.audit_repository)
         w.manage_sub_user = ManageSubUser(
             users=w.user_repository,
             tenants=w.tenant_repository,
             hasher=w.hasher,
+            change_audit=w.change_audit_repository,
         )
 
         return w

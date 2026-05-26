@@ -10,6 +10,8 @@ from src.admin.domain.ports.domain_policy_repository import DomainPolicyReposito
 from src.admin.domain.ports.tenant_domain_repository import TenantDomainRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
 from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
+from src.admin.domain.services.admin_change_event_builder import AdminChangeEventBuilder
 
 
 def _utcnow() -> datetime:
@@ -33,11 +35,13 @@ class ManageTenantDomain:
         domain_policies: DomainPolicyRepositoryPort,
         tenants: TenantRepositoryPort,
         publisher: RedisPublisher | None = None,
+        change_audit: ChangeAuditRepositoryPort | None = None,
     ) -> None:
         self._domains = domains
         self._domain_policies = domain_policies
         self._tenants = tenants
         self._publisher = publisher
+        self._change_audit = change_audit
 
     # ── Domains ────────────────────────────────────────────────────────
 
@@ -70,6 +74,7 @@ class ManageTenantDomain:
         caller_tenant_id: str | None,
         tenant_id: str,
         domain: str,
+        caller_user_id: str | None = None,
     ) -> TenantDomain:
         TenantOwnershipGuard.assert_access(
             caller_role=caller_role,
@@ -97,6 +102,7 @@ class ManageTenantDomain:
             updated_at=now,
         )
         await self._domains.save(td)
+        await self._record_change(tenant_id=tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="CREATE", resource_type="domain", resource_id=td.id, resource_summary=td.domain, detail={"domain": td.domain})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
@@ -109,6 +115,7 @@ class ManageTenantDomain:
         caller_role: str,
         caller_tenant_id: str | None,
         domain_id: str,
+        caller_user_id: str | None = None,
     ) -> None:
         d = await self._domains.get_by_id(domain_id)
         if not d:
@@ -119,6 +126,7 @@ class ManageTenantDomain:
             resource_tenant_id=d.tenant_id,
         )
         await self._domains.delete(domain_id)
+        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="domain", resource_id=d.id, resource_summary=d.domain, detail={"domain": d.domain})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
@@ -155,6 +163,11 @@ class ManageTenantDomain:
         jwt_issuer: str | None = None,
         jwt_audience: str | None = None,
         jwt_clock_skew_seconds: int = 30,
+        required_headers: list[str] | None = None,
+        forbidden_headers: list[str] | None = None,
+        required_params: list[str] | None = None,
+        forbidden_params: list[str] | None = None,
+        caller_user_id: str | None = None,
     ) -> DomainPolicy:
         d = await self._domains.get_by_id(domain_id)
         if not d:
@@ -181,10 +194,15 @@ class ManageTenantDomain:
             jwt_issuer=jwt_issuer,
             jwt_audience=jwt_audience,
             jwt_clock_skew_seconds=jwt_clock_skew_seconds,
+            required_headers=required_headers or [],
+            forbidden_headers=forbidden_headers or [],
+            required_params=required_params or [],
+            forbidden_params=forbidden_params or [],
             created_at=existing.created_at if existing else now,
             updated_at=now,
         )
         await self._domain_policies.save(policy)
+        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE" if existing else "CREATE", resource_type="domain_policy", resource_id=policy.id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id, "requires_auth": requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "allowed_roles": allowed_roles, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
@@ -197,6 +215,7 @@ class ManageTenantDomain:
         caller_role: str,
         caller_tenant_id: str | None,
         domain_id: str,
+        caller_user_id: str | None = None,
     ) -> None:
         d = await self._domains.get_by_id(domain_id)
         if not d:
@@ -209,6 +228,12 @@ class ManageTenantDomain:
         deleted = await self._domain_policies.delete_by_domain_id(domain_id)
         if not deleted:
             raise NotFoundError("política não encontrada para este domain")
+        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="domain_policy", resource_id=domain_id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id})
 
         if self._publisher:
             await self._publisher.notify_config_updated()
+
+    async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
+        if not self._change_audit:
+            return
+        await self._change_audit.record(AdminChangeEventBuilder.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))
