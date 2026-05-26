@@ -4,16 +4,6 @@ from typing import Optional, Tuple
 
 @dataclass(frozen=True)
 class Policy:
-    """
-    Security and control policy attached to a Route.
-
-    Defined in the admin plane, evaluated by the gateway on every request.
-    The gateway reads policies as configuration — it never writes them.
-
-    Evaluation is fail-closed: if any check fails, the request is denied.
-    Routes without an associated policy allow all requests through.
-    """
-
     id: str
     route_id: str
     requires_auth: bool = False
@@ -23,3 +13,7 @@ class Policy:
     jwt_issuer: Optional[str] = None
     jwt_audience: Optional[str] = None
     jwt_clock_skew_seconds: int = 30
+    required_headers: Tuple[str, ...] = field(default_factory=tuple)
+    forbidden_headers: Tuple[str, ...] = field(default_factory=tuple)
+    required_params: Tuple[str, ...] = field(default_factory=tuple)
+    forbidden_params: Tuple[str, ...] = field(default_factory=tuple)

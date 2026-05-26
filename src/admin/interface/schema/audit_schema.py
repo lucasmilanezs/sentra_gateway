@@ -1,11 +1,9 @@
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuditRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     tenant_id: str | None
     route_id: str | None
@@ -16,12 +14,43 @@ class AuditRequestResponse(BaseModel):
     latency_ms: float
     client_ip: str
     created_at: datetime
+    outcome: str = "SUCCESS"
+    denial_reason: str | None = None
+    denial_check: str | None = None
+
+
+class AuditFilteredResponse(BaseModel):
+    items: list[AuditRequestResponse]
+    total: int
+
+
+class ChangeEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    tenant_id: str | None
+    actor_id: str
+    actor_role: str
+    action: str
+    resource_type: str
+    resource_id: str
+    resource_summary: str
+    timestamp: datetime
+    detail: str | None
+
+
+class ChangeEventFilteredResponse(BaseModel):
+    items: list[ChangeEventResponse]
+    total: int
 
 
 class MetricsSummaryResponse(BaseModel):
     total_requests: int
     avg_latency_ms: float
     p95_latency_ms: float
+    success_count: int = 0
+    denied_count: int = 0
+    upstream_errors: int = 0
+    resolution_errors: int = 0
     status_2xx: int
     status_4xx: int
     status_5xx: int

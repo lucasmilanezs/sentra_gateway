@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.application.use_cases.query_audit import QueryAudit
 from src.admin.domain.exceptions import AuthError
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
 from src.admin.interface.http.wiring import AdminWiring
 
@@ -189,3 +190,8 @@ def get_manage_sub_user(
     w: Annotated[AdminWiring, Depends(get_request_wiring)],
 ) -> ManageSubUser:
     return w.manage_sub_user
+
+def get_change_audit(
+    w: Annotated[AdminWiring, Depends(get_request_wiring)],
+) -> ChangeAuditRepositoryPort | None:
+    return getattr(w, "change_audit_repository", None)

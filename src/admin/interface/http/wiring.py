@@ -36,6 +36,7 @@ from src.admin.infrastructure.persistence.postgres.domain_policy import DomainPo
 from src.admin.infrastructure.persistence.postgres.user import UserRepository as PgUserRepository
 from src.admin.infrastructure.persistence.postgres.policy import PolicyRepository as PgPolicyRepository
 from src.admin.infrastructure.persistence.postgres.audit import AuditRepository as PgAuditRepository
+from src.admin.infrastructure.persistence.postgres.change_audit import ChangeAuditRepository as PgChangeAuditRepository
 
 from src.admin.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
 from src.admin.infrastructure.security.jwt_token_service import JwtTokenService
@@ -93,6 +94,7 @@ class AdminWiring:
             self.request_password_reset = None
             self.reset_password_with_code = None
             self.query_audit = None
+            self.change_audit_repository = None
         else:
             self._engine = None
             self._session_factory = None
@@ -106,6 +108,7 @@ class AdminWiring:
             self.reset_repository = JsonPasswordResetRepository(store)
             self.manage_sub_user = None 
             self.query_audit = None
+            self.change_audit_repository = None
             self._build_use_cases_json()
 
         self.postgres_connected = settings.use_postgres
@@ -186,6 +189,7 @@ class AdminWiring:
         w.reset_password_with_code = ResetPasswordWithCode(
             w.user_repository, w.reset_repository, w.hasher
         )
+        w.change_audit_repository = PgChangeAuditRepository(session)
         w.audit_repository = PgAuditRepository(session)
         w.query_audit = QueryAudit(w.audit_repository)
         w.manage_sub_user = ManageSubUser(

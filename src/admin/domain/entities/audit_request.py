@@ -14,3 +14,6 @@ class AuditRequest:
     latency_ms: float
     client_ip: str
     created_at: datetime
+    outcome: str = "SUCCESS"
+    denial_reason: str | None = None
+    denial_check: str | None = None

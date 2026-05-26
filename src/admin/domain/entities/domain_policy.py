@@ -3,17 +3,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 
-
 @dataclass
 class DomainPolicy:
-    """
-    Política global vinculada a um TenantDomain.
-
-    Funciona como fallback: aplicada a qualquer rota do tenant
-    que não possua uma Policy individual configurada.
-    Relação 1-to-1 com TenantDomain.
-    """
-
     id: str
     domain_id: str
     requires_auth: bool = False
@@ -23,5 +14,9 @@ class DomainPolicy:
     jwt_issuer: str | None = None
     jwt_audience: str | None = None
     jwt_clock_skew_seconds: int = 30
+    required_headers: list[str] = field(default_factory=list)
+    forbidden_headers: list[str] = field(default_factory=list)
+    required_params: list[str] = field(default_factory=list)
+    forbidden_params: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)

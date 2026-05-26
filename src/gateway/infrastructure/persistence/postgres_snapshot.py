@@ -1,19 +1,11 @@
 """
-PostgresSnapshotRepository
-
-Carrega rotas, políticas, tenant domains e domain policies do plano Admin
-ao startup do Gateway e os serve a partir de um snapshot em memória.
-
-Multi-tenant: cada requisição é resolvida por Host header →
-admin_tenant_domains → tenant_id → filtra rotas pelo tenant.
+PostgresSnapshotRepository — loads admin config into in-memory snapshot.
 """
-
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-
 from src.gateway.domain.models.domain import Domain
 from src.gateway.domain.models.policy import Policy
 from src.gateway.domain.models.route import Route
@@ -26,170 +18,100 @@ from src.gateway.domain.value_objects.http_method import HttpMethod
 
 logger = logging.getLogger(__name__)
 
-
 def _parse_methods(raw: str) -> Tuple[HttpMethod, ...]:
     result = []
     for m in raw.split(","):
         m = m.strip().upper()
-        if not m:
-            continue
-        try:
-            result.append(HttpMethod(m))
-        except ValueError:
-            logger.warning("Método inválido ignorado no snapshot: %s", m)
+        if not m: continue
+        try: result.append(HttpMethod(m))
+        except ValueError: logger.warning("Método inválido ignorado: %s", m)
     return tuple(result)
 
+def _csv(raw) -> Tuple[str, ...]:
+    if not raw: return ()
+    return tuple(r for r in str(raw).split(",") if r)
 
-def _policy_from_row(
-    policy_id: str,
-    route_id: str,
-    requires_auth,
-    rate_limit_per_minute,
-    allowed_roles,
-    jwt_validate_exp,
-    jwt_issuer,
-    jwt_audience,
-    jwt_clock_skew_seconds,
-) -> Policy:
+def _policy_from_row(pid, rid, auth, rlimit, roles, jexp, jiss, jaud, jskew,
+                     rh=None, fh=None, rp=None, fp=None) -> Policy:
     return Policy(
-        id=policy_id,
-        route_id=route_id,
-        requires_auth=bool(requires_auth),
-        rate_limit_per_minute=rate_limit_per_minute,
-        allowed_roles=tuple(r for r in allowed_roles.split(",") if r) if allowed_roles else (),
-        jwt_validate_exp=bool(jwt_validate_exp) if jwt_validate_exp is not None else True,
-        jwt_issuer=jwt_issuer,
-        jwt_audience=jwt_audience,
-        jwt_clock_skew_seconds=int(jwt_clock_skew_seconds or 30),
+        id=pid, route_id=rid, requires_auth=bool(auth),
+        rate_limit_per_minute=rlimit, allowed_roles=_csv(roles),
+        jwt_validate_exp=bool(jexp) if jexp is not None else True,
+        jwt_issuer=jiss, jwt_audience=jaud, jwt_clock_skew_seconds=int(jskew or 30),
+        required_headers=_csv(rh), forbidden_headers=_csv(fh),
+        required_params=_csv(rp), forbidden_params=_csv(fp),
     )
 
-
-class PostgresSnapshotRepository(
-    RouteRepository, DomainRepository, PolicyRepository, TenantRepository
-):
-    """
-    Implementação única que satisfaz RouteRepository, DomainRepository,
-    PolicyRepository e TenantRepository a partir de um snapshot do Postgres.
-    """
-
-    def __init__(self) -> None:
+class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyRepository, TenantRepository):
+    def __init__(self):
         self._routes: List[Route] = []
         self._domains: Dict[str, Domain] = {}
-        self._policies: Dict[str, Policy] = {}          # route_id → Policy
-        self._domain_policies: Dict[str, Policy] = {}   # hostname → domain Policy
-        self._tenant_by_domain: Dict[str, GatewayTenant] = {}  # domain → GatewayTenant
+        self._policies: Dict[str, Policy] = {}
+        self._domain_policies: Dict[str, Policy] = {}
+        self._tenant_by_domain: Dict[str, GatewayTenant] = {}
+        self._loaded_at: Optional[datetime] = None
+
+    @property
+    def loaded_at(self): return self._loaded_at
+    def route_count(self): return len(self._routes)
+    def tenant_count(self): return len(self._tenant_by_domain)
+    def policy_count(self): return len(self._policies)
 
     async def load(self, database_url: str) -> None:
         engine = create_async_engine(database_url, echo=False)
         try:
             async with engine.connect() as conn:
-
-                tenant_domain_rows = (await conn.execute(text(
-                    "SELECT td.id, td.tenant_id, td.domain "
-                    "FROM admin_tenant_domains td"
-                ))).fetchall()
-
-                route_rows = (await conn.execute(text(
-                    "SELECT id, tenant_id, path_pattern, methods, backend_url "
-                    "FROM admin_routes "
-                    "ORDER BY length(path_pattern) DESC"
-                ))).fetchall()
-
-                policy_rows = (await conn.execute(text(
-                    "SELECT id, route_id, requires_auth, "
-                    "rate_limit_per_minute, allowed_roles, "
-                    "jwt_validate_exp, jwt_issuer, jwt_audience, jwt_clock_skew_seconds "
-                    "FROM admin_policies"
-                ))).fetchall()
-
-                domain_policy_rows = (await conn.execute(text(
-                    "SELECT dp.id, td.domain, dp.requires_auth, "
-                    "dp.rate_limit_per_minute, dp.allowed_roles, "
-                    "dp.jwt_validate_exp, dp.jwt_issuer, dp.jwt_audience, dp.jwt_clock_skew_seconds "
-                    "FROM admin_domain_policies dp "
-                    "JOIN admin_tenant_domains td ON td.id = dp.domain_id"
-                ))).fetchall()
-
+                td_rows = (await conn.execute(text(
+                    "SELECT td.id, td.tenant_id, td.domain FROM admin_tenant_domains td"))).fetchall()
+                rt_rows = (await conn.execute(text(
+                    "SELECT id, tenant_id, path_pattern, methods, backend_url FROM admin_routes ORDER BY length(path_pattern) DESC"))).fetchall()
+                pol_rows = (await conn.execute(text(
+                    "SELECT id, route_id, requires_auth, rate_limit_per_minute, allowed_roles, "
+                    "jwt_validate_exp, jwt_issuer, jwt_audience, jwt_clock_skew_seconds, "
+                    "required_headers, forbidden_headers, required_params, forbidden_params "
+                    "FROM admin_policies"))).fetchall()
+                dp_rows = (await conn.execute(text(
+                    "SELECT dp.id, td.domain, dp.requires_auth, dp.rate_limit_per_minute, dp.allowed_roles, "
+                    "dp.jwt_validate_exp, dp.jwt_issuer, dp.jwt_audience, dp.jwt_clock_skew_seconds, "
+                    "dp.required_headers, dp.forbidden_headers, dp.required_params, dp.forbidden_params "
+                    "FROM admin_domain_policies dp JOIN admin_tenant_domains td ON td.id = dp.domain_id"))).fetchall()
         finally:
             await engine.dispose()
 
-        # ── Monta índice domain → GatewayTenant ──────────────────────────
-        tenant_by_domain: Dict[str, GatewayTenant] = {}
-        for row in tenant_domain_rows:
-            domain_id, tenant_id, domain = row
-            tenant_by_domain[domain] = GatewayTenant(id=tenant_id, domain=domain)
+        tbd: Dict[str, GatewayTenant] = {}
+        for row in td_rows:
+            did, tid, dom = row
+            tbd[dom] = GatewayTenant(id=tid, domain=dom)
+        routes, domains = [], {}
+        for row in rt_rows:
+            rid, tid, pp, mraw, burl = row
+            did = f"domain-{rid}"
+            routes.append(Route(id=rid, tenant_id=tid, path_prefix=pp, domain_id=did, methods=_parse_methods(mraw)))
+            domains[did] = Domain(id=did, name=f"backend-{rid}", backend_url=BackendUrl(burl))
+        policies = {}
+        for row in pol_rows:
+            policies[row[1]] = _policy_from_row(*row)
+        dp = {}
+        for row in dp_rows:
+            dp[row[1].lower()] = _policy_from_row(row[0], "", *row[2:])
 
-        routes: List[Route] = []
-        domains: Dict[str, Domain] = {}
-
-        for row in route_rows:
-            route_id, tenant_id, path_pattern, methods_raw, backend_url = row
-            domain_id = f"domain-{route_id}"
-            methods = _parse_methods(methods_raw)
-
-            routes.append(Route(
-                id=route_id,
-                tenant_id=tenant_id,
-                path_prefix=path_pattern,
-                domain_id=domain_id,
-                methods=methods,
-            ))
-            domains[domain_id] = Domain(
-                id=domain_id,
-                name=f"backend-{route_id}",
-                backend_url=BackendUrl(backend_url),
-            )
-
-        policies: Dict[str, Policy] = {}
-        for row in policy_rows:
-            policy_id, route_id, requires_auth, rate_limit, roles, jwt_exp, iss, aud, skew = row
-            policies[route_id] = _policy_from_row(
-                policy_id, route_id, requires_auth, rate_limit, roles, jwt_exp, iss, aud, skew
-            )
-
-        domain_policies: Dict[str, Policy] = {}
-        for row in domain_policy_rows:
-            gp_id, domain_host, requires_auth, rate_limit, roles, jwt_exp, iss, aud, skew = row
-            domain_policies[domain_host.lower()] = _policy_from_row(
-                gp_id, "", requires_auth, rate_limit, roles, jwt_exp, iss, aud, skew
-            )
-
-        self._tenant_by_domain = tenant_by_domain
+        self._tenant_by_domain = tbd
         self._routes = routes
         self._domains = domains
         self._policies = policies
-        self._domain_policies = domain_policies
+        self._domain_policies = dp
+        self._loaded_at = datetime.now(tz=timezone.utc)
+        logger.info("Snapshot: %d domain(s), %d rota(s), %d política(s), %d dp(s).",
+            len(tbd), len(routes), len(policies), len(dp))
 
-        logger.info(
-            "Gateway snapshot: %d domain(s), %d rota(s), %d política(s), %d política(s) de domain.",
-            len(self._tenant_by_domain),
-            len(self._routes),
-            len(self._policies),
-            len(self._domain_policies),
-        )
-
-    async def reload(self, database_url: str) -> None:
-        await self.load(database_url)
-
-    async def get_by_domain(self, host: str) -> Optional[GatewayTenant]:
-        clean = host.split(":")[0].lower()
-        return self._tenant_by_domain.get(clean)
-
-    async def get_by_path(self, path: str, method: str, tenant_id: str) -> Optional[Route]:
-        for route in self._routes:
-            if route.tenant_id == tenant_id and route.matches(path, method):
-                return route
+    async def reload(self, database_url): await self.load(database_url)
+    async def get_by_domain(self, host):
+        return self._tenant_by_domain.get(host.split(":")[0].lower())
+    async def get_by_path(self, path, method, tenant_id):
+        for r in self._routes:
+            if r.tenant_id == tenant_id and r.matches(path, method): return r
         return None
-
-    async def list_all(self) -> List[Route]:
-        return list(self._routes)
-
-    async def get_by_id(self, domain_id: str) -> Optional[Domain]:
-        return self._domains.get(domain_id)
-
-    async def get_by_route_id(self, route_id: str) -> Optional[Policy]:
-        return self._policies.get(route_id)
-
-    def get_domain_policy(self, host: str) -> Optional[Policy]:
-        clean = host.split(":")[0].lower()
-        return self._domain_policies.get(clean)
+    async def list_all(self): return list(self._routes)
+    async def get_by_id(self, domain_id): return self._domains.get(domain_id)
+    async def get_by_route_id(self, route_id): return self._policies.get(route_id)
+    def get_domain_policy(self, host): return self._domain_policies.get(host.split(":")[0].lower())

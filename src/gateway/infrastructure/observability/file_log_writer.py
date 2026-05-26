@@ -1,24 +1,11 @@
 import asyncio
 import json
 from pathlib import Path
-
 from src.gateway.domain.models.log_event import LogEvent
 from src.gateway.domain.ports.log_port import LogPort
 
 
 class FileLogWriter(LogPort):
-    """
-    Writes operational log events to a line-delimited JSON (NDJSON) file.
-
-    Each event is appended as a single JSON line, making the log trivially
-    parseable by tools such as jq, Filebeat, or any log aggregator.
-
-    File I/O runs in a thread-pool via asyncio.to_thread so it never blocks
-    the event loop. A lock serialises concurrent writes within the same process.
-
-    The parent directory is created on first write if it does not exist.
-    """
-
     def __init__(self, log_path: Path) -> None:
         self._log_path = log_path
         self._lock = asyncio.Lock()
@@ -26,13 +13,18 @@ class FileLogWriter(LogPort):
     async def write(self, event: LogEvent) -> None:
         record = {
             "timestamp": event.timestamp.isoformat(),
-            "method": event.method,
-            "path": event.path,
-            "upstream_url": event.upstream_url,
-            "status_code": event.status_code,
+            "method": event.method, "path": event.path,
+            "upstream_url": event.upstream_url, "status_code": event.status_code,
             "latency_ms": round(event.latency_ms, 2),
-            "route_id": event.route_id,
-            "error": event.error,
+            "route_id": event.route_id, "tenant_id": event.tenant_id,
+            "client_ip": event.client_ip, "error": event.error,
+            "outcome": event.outcome,
+            "request_headers": event.request_headers,
+            "query_params": event.query_params,
+            "policy_checks": event.policy_checks,
+            "upstream_response_headers": event.upstream_response_headers,
+            "upstream_response_body_preview": event.upstream_response_body_preview,
+            "layer_errors": event.layer_errors,
         }
         line = json.dumps(record, ensure_ascii=False) + "\n"
         async with self._lock:
