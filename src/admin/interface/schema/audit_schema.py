@@ -56,3 +56,23 @@ class MetricsSummaryResponse(BaseModel):
     status_5xx: int
     top_routes: list[dict]
     window_hours: int = Field(default=24)
+
+
+class RawGatewayLogResponse(BaseModel):
+    id: str
+    timestamp: datetime | None
+    tenant_id: str | None
+    route_id: str | None
+    method: str | None
+    path: str | None
+    status_code: int | None
+    outcome: str
+    latency_ms: float | None
+    summary: str
+    payload: dict
+
+
+class RawGatewayLogFilteredResponse(BaseModel):
+    items: list[RawGatewayLogResponse]
+    total: int
+    source: str = "redis_streams"

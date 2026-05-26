@@ -26,8 +26,17 @@ class GatewaySettings(BaseSettings):
         return f"redis://{self.redis_host}:{self.redis_port}/0"
 
     # Observabilidade
-    log_path: str = Field(default="logs/gateway.log", alias="GATEWAY_LOG_PATH")
     audit_to_postgres: bool = Field(default=True, alias="GATEWAY_AUDIT_TO_POSTGRES")
+    raw_log_retention_days: int = Field(default=7, alias="GATEWAY_RAW_LOG_RETENTION_DAYS")
+    raw_log_max_entries_per_tenant_per_day: int = Field(default=1000, alias="GATEWAY_RAW_LOG_MAX_ENTRIES_PER_TENANT_PER_DAY")
+    raw_log_redact_headers: str = Field(
+        default="authorization,cookie,set-cookie,x-api-key",
+        alias="GATEWAY_RAW_LOG_REDACT_HEADERS",
+    )
+
+    @property
+    def raw_log_redact_header_names(self) -> tuple[str, ...]:
+        return tuple(h.strip().lower() for h in self.raw_log_redact_headers.split(",") if h.strip())
 
     # JWT — mesma secret do admin para validação criptográfica opcional
     jwt_secret: str = Field(default="", alias="ADMIN_JWT_SECRET")

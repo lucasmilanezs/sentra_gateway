@@ -31,21 +31,24 @@ document.querySelectorAll('.nav-item[data-page]').forEach(btn => {
 });
 
 // ── Audit polling ─────────────────────────────────────────────────────────
-// Roda apenas enquanto a aba de auditoria está visível.
-// Polling diferencial: só insere linhas novas no topo — sem reescrever a
-// tabela inteira a cada tick.
+// Only gateway request audit is polled. Governance audit is loaded on demand.
 const AUDIT_POLL_MS = 8000;
 let _auditPollTimer  = null;
-let _auditNewestTs   = null;   // ISO string do registro mais recente exibido
+let _auditNewestTs   = null;
+let _auditView = 'gateway';
 
 async function _auditPollTick() {
+  if (_auditView !== 'gateway') return;
   const tbody = document.getElementById('tbody-audit');
   if (!tbody) return;
   try {
     const rows = await auditApi.list(tenant?.id || null, 100);
-    if (!rows.length) return;
+    if (!rows.length) {
+      document.getElementById('audit-empty').style.display = 'block';
+      tbody.innerHTML = '';
+      return;
+    }
 
-    // Quantos registros são mais novos que o último exibido
     const newRows = _auditNewestTs
       ? rows.filter(r => r.created_at > _auditNewestTs)
       : rows;
@@ -54,15 +57,13 @@ async function _auditPollTick() {
 
     _auditNewestTs = rows[0].created_at;
 
-    // Na primeira carga (placeholder ainda presente) substitui tudo
-    if (tbody.querySelector('td[colspan]')) {
+    if (tbody.querySelector('td[colspan]') || tbody.rows.length === 0) {
       tbody.innerHTML = '';
       rows.forEach(r => tbody.appendChild(_auditRow(r)));
       document.getElementById('audit-empty').style.display = rows.length ? 'none' : 'block';
       return;
     }
 
-    // Insere novas linhas no topo com highlight transitório
     newRows.slice().reverse().forEach(r => {
       const tr = _auditRow(r);
       tr.style.transition = 'background 1.2s ease';
@@ -71,10 +72,8 @@ async function _auditPollTick() {
       requestAnimationFrame(() => { tr.style.background = ''; });
     });
 
-    // Mantém no máximo 100 linhas
     while (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
-
-  } catch { /* falha silenciosa — estado anterior permanece */ }
+  } catch { /* keep previous audit state */ }
 }
 
 function _auditRow(r) {
@@ -84,10 +83,24 @@ function _auditRow(r) {
   tr.innerHTML = `
     <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
     <td><span class="badge ${cls}">${r.method}</span></td>
-    <td style="font-family:monospace;font-size:.8rem">${r.path}</td>
+    <td style="font-family:monospace;font-size:.8rem">${escHtml(r.path)}</td>
     <td style="font-family:monospace">${r.status_code}</td>
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${escHtml(r.outcome || 'SUCCESS')}</td>
     <td style="color:var(--text-sub)">${Math.round(r.latency_ms)} ms</td>
-    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${r.client_ip}</td>`;
+    <td style="font-family:monospace;font-size:.78rem;color:var(--text-sub)">${escHtml(r.client_ip)}</td>`;
+  return tr;
+}
+
+function _governanceAuditRow(r) {
+  const tr = document.createElement('tr');
+  const when = new Date(r.timestamp).toLocaleString('pt-BR');
+  tr.innerHTML = `
+    <td style="font-size:.8rem;color:var(--text-sub)">${when}</td>
+    <td style="font-family:monospace;font-size:.75rem">${escHtml((r.actor_role || '?') + ' · ' + (r.actor_id || '').slice(0, 8))}</td>
+    <td><span class="policy-on" style="font-size:.72rem;padding:2px 7px">${escHtml(r.action || '—')}</span></td>
+    <td style="font-family:monospace;font-size:.78rem">${escHtml(r.resource_type || '—')}<br><span style="color:var(--text-sub)">${escHtml((r.resource_id || '').slice(0, 12))}</span></td>
+    <td style="font-size:.8rem">${escHtml(r.resource_summary || '—')}</td>
+    <td style="font-size:.78rem;color:var(--text-sub)">${escHtml(r.detail || '—')}</td>`;
   return tr;
 }
 
@@ -104,6 +117,41 @@ function _stopAuditPoll() {
   _auditPollTimer = null;
 }
 
+async function _loadGovernanceAudit() {
+  const tbody = document.getElementById('tbody-governance-audit');
+  const empty = document.getElementById('governance-audit-empty');
+  tbody.innerHTML = '<tr><td colspan="6" style="font-style:italic;color:var(--text-sub)">Carregando…</td></tr>';
+  empty.style.display = 'none';
+  try {
+    const data = await auditApi.changes(tenant?.id || null, 100);
+    const rows = data.items || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { empty.style.display = 'block'; return; }
+    rows.forEach(r => tbody.appendChild(_governanceAuditRow(r)));
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:#a03030;font-style:italic">${escHtml(err.detail || 'Erro')}</td></tr>`;
+  }
+}
+
+function setAuditView(view) {
+  const badge = document.getElementById('audit-tenant-badge');
+  if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  _auditView = view;
+  document.querySelectorAll('.audit-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.auditView === view));
+  document.getElementById('audit-gateway-panel').style.display = view === 'gateway' ? '' : 'none';
+  document.getElementById('audit-governance-panel').style.display = view === 'governance' ? '' : 'none';
+  if (view === 'gateway') {
+    _startAuditPoll();
+  } else {
+    _stopAuditPoll();
+    _loadGovernanceAudit();
+  }
+}
+
+document.querySelectorAll('.audit-tab').forEach(btn => {
+  btn.addEventListener('click', () => setAuditView(btn.dataset.auditView));
+});
+
 function navigate(pageId) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -112,7 +160,7 @@ function navigate(pageId) {
   if (btn)  btn.classList.add('active');
   if (page) page.classList.add('active');
 
-  if (pageId === 'audit') { _startAuditPoll(); }
+  if (pageId === 'audit') { setAuditView(_auditView || 'gateway'); }
   else                    { _stopAuditPoll();  }
 
   if (pageId !== 'audit') PAGE_LOADERS[pageId]?.();
@@ -756,14 +804,12 @@ document.getElementById('m-delete').addEventListener('click', async () => {
 
 // ── AUDITORIA ─────────────────────────────────────────────────────────────
 function loadAudit() {
-  // A carga e atualização da auditoria é gerida pelo poll diferencial (_startAuditPoll).
-  // navigate() chama _startAuditPoll() diretamente quando a aba é selecionada;
-  // esta função existe apenas para compatibilidade com PAGE_LOADERS e não faz nada.
   const badge = document.getElementById('audit-tenant-badge');
   if (badge) badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || tenant.id}` : 'Todos os tenants';
+  setAuditView(_auditView || 'gateway');
 }
 
-// ── LOGS BRUTOS ───────────────────────────────────────────────────────────
+// ── LOGS ──────────────────────────────────────────────────────────────────
 async function loadRawLogs() {
   const tbody = document.getElementById('tbody-raw-logs');
   const empty = document.getElementById('raw-logs-empty');

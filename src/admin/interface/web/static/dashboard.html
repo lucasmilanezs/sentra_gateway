@@ -86,7 +86,7 @@
         <rect x="2" y="2" width="12" height="12" rx="1.5"/>
         <path d="M5 6h6M5 9h6M5 12h3"/>
       </svg>
-      Logs brutos
+      Logs
     </button>
     <button class="nav-item" id="nav-metrics" data-page="metrics" style="display:none">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
@@ -207,27 +207,40 @@
       </div>
     </section>
 
-    <!-- AUDITORIA -->
+      <!-- AUDITORIA -->
     <section class="page" id="page-audit">
       <div class="page-header"><h1 class="page-title">Auditoria</h1></div>
       <p class="context-badge" id="audit-tenant-badge"></p>
-      <div class="card">
+      <div class="audit-tabs">
+        <button class="audit-tab active" id="audit-tab-gateway" data-audit-view="gateway">Requisições do gateway</button>
+        <button class="audit-tab" id="audit-tab-governance" data-audit-view="governance">Governança do admin</button>
+      </div>
+      <div class="card" id="audit-gateway-panel">
         <table class="data-table">
           <thead><tr>
-            <th>Quando</th><th>Método</th><th>Path</th><th>Status</th><th>Latência</th><th>IP</th>
+            <th>Quando</th><th>Método</th><th>Path</th><th>Status</th><th>Outcome</th><th>Latência</th><th>IP</th>
           </tr></thead>
           <tbody id="tbody-audit"></tbody>
         </table>
         <p class="tbl-empty" id="audit-empty" style="display:none">Nenhuma requisição registrada ainda.</p>
       </div>
+      <div class="card" id="audit-governance-panel" style="display:none">
+        <table class="data-table">
+          <thead><tr>
+            <th>Quando</th><th>Ator</th><th>Ação</th><th>Recurso</th><th>Resumo</th><th>Detalhe</th>
+          </tr></thead>
+          <tbody id="tbody-governance-audit"></tbody>
+        </table>
+        <p class="tbl-empty" id="governance-audit-empty" style="display:none">Nenhum evento de governança registrado ainda.</p>
+      </div>
     </section>
 
-    <!-- LOGS BRUTOS -->
+    <!-- LOGS -->
     <section class="page" id="page-raw-logs">
-      <div class="page-header"><h1 class="page-title">Logs brutos</h1></div>
+      <div class="page-header"><h1 class="page-title">Logs</h1></div>
       <p class="context-badge" id="raw-logs-tenant-badge"></p>
       <div class="domain-hint">
-        Esta tela mostra o log operacional agregado em JSON Lines. A tabela é resumida de propósito; clique em uma linha para abrir o registro bruto completo.
+        Esta tela mostra logs operacionais densos do gateway vindos do Redis Streams. Eles têm retenção curta e são separados da auditoria formal. Clique em uma linha para abrir o registro completo.
       </div>
       <div class="card">
         <table class="data-table raw-log-table">
@@ -505,7 +518,7 @@
 <!-- Modal: Log bruto -->
 <div class="modal-overlay" id="modal-raw-log" style="display:none">
   <div class="modal-box modal-box-wide">
-    <h2 class="modal-title">Detalhe do log bruto</h2>
+    <h2 class="modal-title">Detalhe do log</h2>
     <pre class="json-detail" id="raw-log-detail"></pre>
     <div class="modal-actions">
       <button class="btn-ghost" id="raw-log-close">Fechar</button>

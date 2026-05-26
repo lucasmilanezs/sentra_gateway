@@ -852,3 +852,25 @@ html, body {
 .raw-log-row:hover {
   background: rgba(255,255,255,0.035);
 }
+
+.audit-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.audit-tab {
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  color: var(--text-sub);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: .82rem;
+}
+
+.audit-tab.active {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}

@@ -1,8 +1,6 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
-
 import httpx
 import redis.asyncio as aioredis
 from fastapi import FastAPI
@@ -14,7 +12,7 @@ from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
 from src.gateway.domain.services.rate_limit_checker import RateLimitChecker
 from src.gateway.infrastructure.config.settings import GatewaySettings
 from src.gateway.domain.services.audit_event_builder import AuditEventBuilder
-from src.gateway.infrastructure.observability.file_log_writer import FileLogWriter
+from src.gateway.infrastructure.observability.redis_log_writer import RedisLogWriter
 from src.gateway.infrastructure.observability.postgres_audit_writer import PostgresAuditWriter
 from src.gateway.infrastructure.persistence.postgres_snapshot import (
     PostgresSnapshotRepository,
@@ -49,7 +47,12 @@ async def lifespan(app: FastAPI):
         ),
     )
 
-    log_writer = FileLogWriter(log_path=Path(settings.log_path))
+    log_writer = RedisLogWriter(
+        client=redis_client,
+        retention_days=settings.raw_log_retention_days,
+        max_entries_per_tenant_per_day=settings.raw_log_max_entries_per_tenant_per_day,
+        redact_headers=settings.raw_log_redact_header_names,
+    )
 
     audit_writer = None
     if settings.audit_to_postgres:

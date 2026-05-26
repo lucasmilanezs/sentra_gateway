@@ -89,6 +89,11 @@ export const auditApi = {
     if (tenantId) q.set('tenant_id', tenantId);
     return request('GET', `/audit?${q}`);
   },
+  changes: (tenantId = null, limit = 100) => {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (tenantId) q.set('tenant_id', tenantId);
+    return request('GET', `/audit/changes?${q}`);
+  },
   metrics: (tenantId = null, hours = 24) => {
     const q = new URLSearchParams({ hours: String(hours) });
     if (tenantId) q.set('tenant_id', tenantId);
@@ -100,7 +105,7 @@ export const rawLogsApi = {
   list: (tenantId = null, limit = 100) => {
     const q = new URLSearchParams({ limit: String(limit) });
     if (tenantId) q.set('tenant_id', tenantId);
-    return request('GET', `/logs/raw?${q}`);
+    return request('GET', `/logs?${q}`);
   },
 };
 

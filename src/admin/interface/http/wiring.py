@@ -14,11 +14,13 @@ from src.admin.application.use_cases.manage_policy import ManagePolicy
 from src.admin.application.use_cases.manage_tenant import ManageTenant
 from src.admin.application.use_cases.manage_tenant_domain import ManageTenantDomain
 from src.admin.application.use_cases.query_audit import QueryAudit
+from src.admin.application.use_cases.query_gateway_logs import QueryGatewayLogs
 from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.infrastructure.config.settings import AdminSettings
 from src.admin.infrastructure.email.console_email_sender import ConsoleEmailSender
 from src.admin.infrastructure.email.smtp_email_sender import SmtpEmailSender
 from src.admin.infrastructure.pubsub.redis_publisher import RedisPublisher
+from src.admin.infrastructure.observability.redis_gateway_log_repository import RedisGatewayLogRepository
 
 # JSON adapters
 from src.admin.infrastructure.persistence.json.store import DocumentStore
@@ -67,6 +69,8 @@ class AdminWiring:
 
         self._redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
         self.publisher = RedisPublisher(client=self._redis_client)
+        self.raw_gateway_log_repository = RedisGatewayLogRepository(client=self._redis_client)
+        self.query_gateway_logs = QueryGatewayLogs(self.raw_gateway_log_repository)
 
         if settings.use_postgres:
             self._engine = create_async_engine(
@@ -149,6 +153,8 @@ class AdminWiring:
         w._session_factory = self._session_factory
         w._redis_client = self._redis_client
         w.publisher = self.publisher
+        w.raw_gateway_log_repository = self.raw_gateway_log_repository
+        w.query_gateway_logs = self.query_gateway_logs
         w.postgres_connected = True
 
         w.user_repository = PgUserRepository(session)
