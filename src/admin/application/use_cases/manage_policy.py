@@ -27,8 +27,9 @@ class ManagePolicy:
         TenantAccessControl.ensure_tenant_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
         return await self._policies.get_by_route_id(route_id)
 
-    async def upsert(self, *, caller_role, caller_tenant_id, route_id, requires_auth, rate_limit_per_minute, allowed_roles,
+    async def upsert(self, *, caller_role, caller_tenant_id, route_id, auth_mode="none", requires_auth=None, rate_limit_per_minute=None, allowed_roles=None,
                      jwt_validate_exp=True, jwt_issuer=None, jwt_audience=None, jwt_clock_skew_seconds=30,
+                     jwt_signing_algorithm=None, jwt_signing_key=None,
                      required_headers=None, forbidden_headers=None, required_params=None, forbidden_params=None,
                      caller_user_id=None):
         route = await self._routes.get_by_id(route_id)
@@ -37,12 +38,21 @@ class ManagePolicy:
         TenantAccessControl.ensure_tenant_access(caller_role=caller_role, caller_tenant_id=caller_tenant_id, resource_tenant_id=route.tenant_id)
         ensure_valid_rate_limit(rate_limit_per_minute)
         existing = await self._policies.get_by_route_id(route_id)
+        if auth_mode == Policy.AUTH_JWT_SIGNED and not jwt_signing_key and not (existing and existing.jwt_signing_key_configured):
+            raise ValidationError("Validação de assinatura JWT exige uma secret/chave pública configurada.")
         now = _utcnow()
         policy = Policy(
             id=existing.id if existing else str(uuid.uuid4()), route_id=route_id,
-            requires_auth=requires_auth, rate_limit_per_minute=rate_limit_per_minute,
-            allowed_roles=allowed_roles, jwt_validate_exp=jwt_validate_exp,
-            jwt_issuer=jwt_issuer, jwt_audience=jwt_audience, jwt_clock_skew_seconds=jwt_clock_skew_seconds,
+            requires_auth=bool(requires_auth) if requires_auth is not None else auth_mode != "none",
+            rate_limit_per_minute=rate_limit_per_minute,
+            allowed_roles=allowed_roles or [],
+            auth_mode=auth_mode,
+            jwt_validate_exp=jwt_validate_exp,
+            jwt_issuer=jwt_issuer,
+            jwt_audience=jwt_audience,
+            jwt_clock_skew_seconds=jwt_clock_skew_seconds,
+            jwt_signing_algorithm=jwt_signing_algorithm,
+            jwt_signing_key=jwt_signing_key,
             required_headers=required_headers or [], forbidden_headers=forbidden_headers or [],
             required_params=required_params or [], forbidden_params=forbidden_params or [],
             created_at=existing.created_at if existing else now, updated_at=now,
@@ -52,7 +62,7 @@ class ManagePolicy:
             tenant_id=route.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role,
             action="UPDATE" if existing else "CREATE", resource_type="policy", resource_id=policy.id,
             resource_summary=f"route policy for {route.path_pattern}",
-            detail={"route_id": route_id, "requires_auth": requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "allowed_roles": allowed_roles, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []},
+            detail={"route_id": route_id, "auth_mode": policy.auth_mode, "requires_auth": policy.requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []},
         )
         if self._publisher:
             await self._publisher.notify_config_updated()

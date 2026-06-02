@@ -405,56 +405,103 @@
 </div>
 
 <!-- Modal: Domain Policy -->
+<!-- Modal: DomainPolicy -->
 <div class="modal-overlay" id="modal-domain-policy" style="display:none">
-  <div class="modal-box">
+  <div class="modal-box modal-box-wide">
     <h2 class="modal-title">Política global — <span id="dp-domain-name" style="font-style:italic;font-weight:400"></span></h2>
     <input type="hidden" id="dp-domain-id" />
     <p style="font-size:0.78rem;color:var(--text-sub);font-style:italic;margin-top:-8px">
       Aplicada a todas as rotas deste tenant que não tenham política individual configurada.
     </p>
-    <div class="modal-field">
-      <label class="modal-check">
-        <input type="checkbox" id="dp-requires-auth" />
-        Requer autenticação JWT
-      </label>
+    <div class="policy-section-heading">
+      <h3>Controles de tráfego</h3>
+      <p>Limites, headers e parâmetros avaliados antes do encaminhamento ao backend.</p>
     </div>
-    <div class="modal-field">
-      <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
-      <input type="number" id="dp-rate-limit" min="1" placeholder="ex: 100" />
+    <div class="policy-grid">
+      <div class="modal-field">
+        <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
+        <input type="number" id="dp-rate-limit" min="1" placeholder="ex: 100" />
+      </div>
+      <div class="modal-field">
+        <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-required-headers" placeholder="x-client-id, authorization" />
+      </div>
+      <div class="modal-field">
+        <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-forbidden-headers" placeholder="x-debug-token" />
+      </div>
+      <div class="modal-field">
+        <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-required-params" placeholder="client_id" />
+      </div>
+      <div class="modal-field">
+        <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-forbidden-params" placeholder="debug" />
+      </div>
     </div>
-    <div class="modal-field">
-      <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
-      <input type="text" id="dp-roles" placeholder="admin, user" />
+
+    <div class="policy-section-heading policy-section-heading-token">
+      <h3>Validação de token</h3>
+      <p>Opcional. O backend protegido continua responsável por sessão, revogação e autorização fina.</p>
     </div>
-    <div class="modal-field">
-      <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="dp-required-headers" placeholder="x-client-id, authorization" />
+    <div class="policy-auth-note">
+      O SENTRA não gerencia sessão, revogação, roles ou autorização fina do contratante. Estes níveis apenas reduzem ruído e superfície de entrada antes do backend protegido.
     </div>
-    <div class="modal-field">
-      <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="dp-forbidden-headers" placeholder="x-debug-token" />
-    </div>
-    <div class="modal-field">
-      <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="dp-required-params" placeholder="client_id" />
-    </div>
-    <div class="modal-field">
-      <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="dp-forbidden-params" placeholder="debug" />
-    </div>
-    <div class="modal-field">
-      <label class="modal-check">
-        <input type="checkbox" id="dp-jwt-validate-exp" checked />
-        Validar expiração do JWT (exp)
-      </label>
-    </div>
-    <div class="modal-field">
-      <label>Issuer (iss) <span style="opacity:.5">— opcional</span></label>
-      <input type="text" id="dp-jwt-issuer" placeholder="https://auth.empresa.com" />
-    </div>
-    <div class="modal-field">
-      <label>Audience (aud) <span style="opacity:.5">— opcional</span></label>
-      <input type="text" id="dp-jwt-audience" placeholder="api-interna" />
+
+    <div class="policy-auth-panel" data-policy-prefix="dp">
+      <div class="modal-field">
+        <label>Modo de validação de token</label>
+        <select id="dp-auth-mode" class="policy-auth-mode">
+          <option value="none">Nenhuma validação no Gateway</option>
+          <option value="bearer">Exigir Bearer token</option>
+          <option value="jwt_structural">Pré-validar estrutura JWT</option>
+          <option value="jwt_claims">Pré-validar exp/issuer/audience declarados</option>
+          <option value="jwt_signed">Validar assinatura JWT localmente</option>
+        </select>
+        <p class="field-help" id="dp-auth-help"></p>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_claims">
+        <div class="modal-field">
+          <label class="modal-check">
+            <input type="checkbox" id="dp-jwt-validate-exp" checked />
+            Rejeitar JWT expirado <span style="opacity:.55">(claim exp)</span>
+          </label>
+          <p class="field-help">Sem assinatura válida, esta checagem é apenas um pré-filtro do valor declarado no token.</p>
+        </div>
+        <div class="modal-field">
+          <label>Clock skew permitido <span style="opacity:.5">— segundos</span></label>
+          <input type="number" id="dp-jwt-clock-skew" min="0" max="300" placeholder="30" />
+        </div>
+        <div class="modal-field">
+          <label>Issuer esperado <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="dp-jwt-issuer" placeholder="https://auth.empresa.local" />
+          <p class="field-help">Em modo não assinado, é apenas comparação com a claim declarada.</p>
+        </div>
+        <div class="modal-field">
+          <label>Audience esperada <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="dp-jwt-audience" placeholder="api-interna" />
+        </div>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_signed">
+        <div class="modal-field">
+          <label>Algoritmo de assinatura</label>
+          <select id="dp-jwt-signing-algorithm">
+            <option value="HS256">HS256 — secret HMAC compartilhada</option>
+            <option value="HS384">HS384 — secret HMAC compartilhada</option>
+            <option value="HS512">HS512 — secret HMAC compartilhada</option>
+            <option value="RS256">RS256 — chave pública RSA/PEM</option>
+            <option value="RS384">RS384 — chave pública RSA/PEM</option>
+            <option value="RS512">RS512 — chave pública RSA/PEM</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Material de validação <span style="opacity:.5">— write-only</span></label>
+          <textarea id="dp-jwt-signing-key" rows="4" placeholder="Cole a secret HMAC ou a chave pública PEM do emissor. O valor será armazenado de forma protegida e não será exibido novamente."></textarea>
+          <p class="field-help" id="dp-jwt-signing-key-status">Nenhum material de assinatura configurado.</p>
+        </div>
+      </div>
     </div>
     <p class="modal-error" id="dp-error" style="display:none"></p>
     <div class="modal-actions">
@@ -503,70 +550,104 @@
 
 <!-- Modal: Política por rota -->
 <div class="modal-overlay" id="modal-policy" style="display:none">
-  <div class="modal-box">
+  <div class="modal-box modal-box-wide">
     <h2 class="modal-title">Política — <span id="p-route-path" style="font-style:italic;font-weight:400"></span></h2>
     <input type="hidden" id="p-route-id" />
-    <div class="modal-field">
-      <label class="modal-check">
-        <input type="checkbox" id="p-requires-auth" />
-        Requer autenticação JWT
-      </label>
+    <div class="policy-section-heading">
+      <h3>Controles de tráfego</h3>
+      <p>Limites, headers e parâmetros avaliados antes do encaminhamento ao backend.</p>
     </div>
-    <div class="modal-field">
-      <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
-      <input type="number" id="p-rate-limit" min="1" placeholder="ex: 60" />
+    <div class="policy-grid">
+      <div class="modal-field">
+        <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
+        <input type="number" id="p-rate-limit" min="1" placeholder="ex: 60" />
+      </div>
+      <div class="modal-field">
+        <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-required-headers" placeholder="x-client-id, authorization" />
+      </div>
+      <div class="modal-field">
+        <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-forbidden-headers" placeholder="x-debug-token" />
+      </div>
+      <div class="modal-field">
+        <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-required-params" placeholder="client_id" />
+      </div>
+      <div class="modal-field">
+        <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-forbidden-params" placeholder="debug" />
+      </div>
     </div>
-    <div class="modal-field">
-      <label>Roles permitidos <span style="opacity:.5">— vírgula-separado, vazio = qualquer</span></label>
-      <input type="text" id="p-roles" placeholder="admin, user" />
+
+    <div class="policy-section-heading policy-section-heading-token">
+      <h3>Validação de token</h3>
+      <p>Opcional. O backend protegido continua responsável por sessão, revogação e autorização fina.</p>
     </div>
-    <div class="modal-field">
-      <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="p-required-headers" placeholder="x-client-id, authorization" />
+    <div class="policy-auth-note">
+      O SENTRA não gerencia sessão, revogação, roles ou autorização fina do contratante. Estes níveis apenas reduzem ruído e superfície de entrada antes do backend protegido.
     </div>
-    <div class="modal-field">
-      <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="p-forbidden-headers" placeholder="x-debug-token" />
-    </div>
-    <div class="modal-field">
-      <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="p-required-params" placeholder="client_id" />
-    </div>
-    <div class="modal-field">
-      <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
-      <input type="text" id="p-forbidden-params" placeholder="debug" />
-    </div>
-    <div class="modal-field">
-      <label class="modal-check">
-        <input type="checkbox" id="p-jwt-validate-exp" checked />
-        Validar expiração do JWT (exp)
-      </label>
-    </div>
-    <div class="modal-field">
-      <label>Issuer (iss) <span style="opacity:.5">— opcional</span></label>
-      <input type="text" id="p-jwt-issuer" placeholder="https://auth.empresa.com" />
-    </div>
-    <div class="modal-field">
-      <label>Audience (aud) <span style="opacity:.5">— opcional</span></label>
-      <input type="text" id="p-jwt-audience" placeholder="api-interna" />
+
+    <div class="policy-auth-panel" data-policy-prefix="p">
+      <div class="modal-field">
+        <label>Modo de validação de token</label>
+        <select id="p-auth-mode" class="policy-auth-mode">
+          <option value="none">Nenhuma validação no Gateway</option>
+          <option value="bearer">Exigir Bearer token</option>
+          <option value="jwt_structural">Pré-validar estrutura JWT</option>
+          <option value="jwt_claims">Pré-validar exp/issuer/audience declarados</option>
+          <option value="jwt_signed">Validar assinatura JWT localmente</option>
+        </select>
+        <p class="field-help" id="p-auth-help"></p>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_claims">
+        <div class="modal-field">
+          <label class="modal-check">
+            <input type="checkbox" id="p-jwt-validate-exp" checked />
+            Rejeitar JWT expirado <span style="opacity:.55">(claim exp)</span>
+          </label>
+          <p class="field-help">Sem assinatura válida, esta checagem é apenas um pré-filtro do valor declarado no token.</p>
+        </div>
+        <div class="modal-field">
+          <label>Clock skew permitido <span style="opacity:.5">— segundos</span></label>
+          <input type="number" id="p-jwt-clock-skew" min="0" max="300" placeholder="30" />
+        </div>
+        <div class="modal-field">
+          <label>Issuer esperado <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="p-jwt-issuer" placeholder="https://auth.empresa.local" />
+          <p class="field-help">Em modo não assinado, é apenas comparação com a claim declarada.</p>
+        </div>
+        <div class="modal-field">
+          <label>Audience esperada <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="p-jwt-audience" placeholder="api-interna" />
+        </div>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_signed">
+        <div class="modal-field">
+          <label>Algoritmo de assinatura</label>
+          <select id="p-jwt-signing-algorithm">
+            <option value="HS256">HS256 — secret HMAC compartilhada</option>
+            <option value="HS384">HS384 — secret HMAC compartilhada</option>
+            <option value="HS512">HS512 — secret HMAC compartilhada</option>
+            <option value="RS256">RS256 — chave pública RSA/PEM</option>
+            <option value="RS384">RS384 — chave pública RSA/PEM</option>
+            <option value="RS512">RS512 — chave pública RSA/PEM</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Material de validação <span style="opacity:.5">— write-only</span></label>
+          <textarea id="p-jwt-signing-key" rows="4" placeholder="Cole a secret HMAC ou a chave pública PEM do emissor. O valor será armazenado de forma protegida e não será exibido novamente."></textarea>
+          <p class="field-help" id="p-jwt-signing-key-status">Nenhum material de assinatura configurado.</p>
+        </div>
+      </div>
     </div>
     <p class="modal-error" id="p-error" style="display:none"></p>
     <div class="modal-actions">
       <button class="btn-danger-ghost" id="p-delete">Remover política</button>
       <button class="btn-ghost" id="p-cancel">Cancelar</button>
       <button class="btn-primary" id="p-save">Salvar</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Log bruto -->
-<div class="modal-overlay" id="modal-raw-log" style="display:none">
-  <div class="modal-box modal-box-wide">
-    <h2 class="modal-title">Detalhe do log</h2>
-    <div class="semantic-detail" id="raw-log-semantic"></div>
-    <pre class="json-detail" id="raw-log-detail"></pre>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="raw-log-close">Fechar</button>
     </div>
   </div>
 </div>

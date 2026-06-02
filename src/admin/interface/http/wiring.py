@@ -42,6 +42,7 @@ from src.admin.infrastructure.persistence.postgres.change_audit import ChangeAud
 
 from src.admin.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
 from src.admin.infrastructure.security.jwt_token_service import JwtTokenService
+from src.shared.security.secret_cipher import SecretCipher
 
 
 class AdminWiring:
@@ -55,6 +56,8 @@ class AdminWiring:
             algorithm=settings.jwt_algorithm,
             expire_minutes=settings.jwt_expire_minutes,
         )
+        self.policy_secret_cipher = SecretCipher.optional(settings.policy_secret_key)
+
 
         if settings.email_use_console or not settings.smtp_host:
             self.email_sender = ConsoleEmailSender()
@@ -148,6 +151,7 @@ class AdminWiring:
         w.use_postgres = True
         w.hasher = self.hasher
         w.token_service = self.token_service
+        w.policy_secret_cipher = self.policy_secret_cipher
         w.email_sender = self.email_sender
         w._engine = self._engine
         w._session_factory = self._session_factory
@@ -160,9 +164,9 @@ class AdminWiring:
         w.user_repository = PgUserRepository(session)
         w.tenant_repository = PgTenantRepository(session)
         w.tenant_domain_repository = PgTenantDomainRepository(session)
-        w.domain_policy_repository = PgDomainPolicyRepository(session)
+        w.domain_policy_repository = PgDomainPolicyRepository(session, secret_cipher=w.policy_secret_cipher)
         w.route_repository = PgRouteRepository(session)
-        w.policy_repository = PgPolicyRepository(session)
+        w.policy_repository = PgPolicyRepository(session, secret_cipher=w.policy_secret_cipher)
         w.reset_repository = JsonPasswordResetRepository(
             DocumentStore(self.settings.json_data_path)
         )

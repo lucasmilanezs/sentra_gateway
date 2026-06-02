@@ -636,7 +636,8 @@ html, body {
 }
 
 .modal-field input,
-.modal-field select {
+.modal-field select,
+.modal-field textarea {
   width: 100%;
   background: var(--surface-2);
   border: 1px solid var(--border-hi);
@@ -650,7 +651,8 @@ html, body {
 }
 
 .modal-field input:focus,
-.modal-field select:focus { border-color: var(--accent); }
+.modal-field select:focus,
+.modal-field textarea:focus { border-color: var(--accent); }
 
 .modal-field select {
   cursor: pointer;
@@ -967,3 +969,97 @@ html, body {
 
 .check-ok { color: var(--ok); margin-right: 4px; }
 .check-fail { color: var(--err); margin-right: 4px; }
+
+
+/* ── Policy configuration levels ─────────────────────────────────────── */
+.modal-box-wide {
+  width: min(760px, calc(100vw - 28px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.policy-section-heading {
+  margin-top: 18px;
+  margin-bottom: 10px;
+  padding-top: 4px;
+}
+
+.policy-section-heading:first-of-type {
+  margin-top: 12px;
+}
+
+.policy-section-heading h3 {
+  margin: 0 0 4px;
+  color: var(--text-light);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.policy-section-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.policy-section-heading-token {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.policy-auth-panel {
+  border: 1px solid var(--border-hi);
+  background: rgba(255,255,255,0.025);
+  border-radius: var(--r);
+  padding: 14px;
+  margin: 10px 0 0;
+}
+
+.policy-auth-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.policy-auth-note,
+.field-help {
+  margin-top: 6px;
+  font-size: 0.76rem;
+  line-height: 1.48;
+  color: var(--text-secondary);
+}
+
+.policy-auth-note {
+  padding: 10px 12px;
+  border: 1px solid rgba(245,158,11,0.18);
+  background: rgba(245,158,11,0.06);
+  border-radius: var(--r-sm);
+  margin: 8px 0 10px;
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.modal-field textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.45;
+  font-family: var(--sans);
+}
+
+.modal-field textarea::placeholder {
+  color: var(--text-dim);
+}
+
+@media (max-width: 720px) {
+  .policy-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-box-wide {
+    width: calc(100vw - 18px);
+  }
+}

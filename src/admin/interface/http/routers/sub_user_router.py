@@ -25,22 +25,56 @@ def _to_response(u) -> SubUserResponse:
     )
 
 
-@router.post("", response_model=SubUserResponse, status_code=status.HTTP_201_CREATED)
-async def create_sub_user(
+async def _create_sub_user_for_tenant(
+    *,
     body: SubUserCreate,
-    claims: Annotated[JwtClaims, Depends(require_admin())],
-    uc: Annotated[ManageSubUser, Depends(get_manage_sub_user)],
-):
+    tenant_id: str | None,
+    claims: JwtClaims,
+    uc: ManageSubUser,
+) -> SubUserResponse:
     user = await uc.create(
         caller_role=claims.role,
         caller_tenant_id=claims.tenant_id,
         email=body.email,
         password=body.password,
         permissions=body.permissions,
-        target_tenant_id=body.tenant_id,  # só usado por superuser
+        target_tenant_id=tenant_id,
         caller_user_id=claims.sub,
     )
     return _to_response(user)
+
+
+@router.post("", response_model=SubUserResponse, status_code=status.HTTP_201_CREATED)
+async def create_sub_user(
+    body: SubUserCreate,
+    claims: Annotated[JwtClaims, Depends(require_admin())],
+    uc: Annotated[ManageSubUser, Depends(get_manage_sub_user)],
+):
+    # Backward-compatible endpoint. For superuser, body.tenant_id is still
+    # required by the use case. Prefer POST /sub-users/{tenant_id} from the UI.
+    return await _create_sub_user_for_tenant(
+        body=body,
+        tenant_id=body.tenant_id,
+        claims=claims,
+        uc=uc,
+    )
+
+
+@router.post("/{tenant_id}", response_model=SubUserResponse, status_code=status.HTTP_201_CREATED)
+async def create_sub_user_in_tenant(
+    tenant_id: str,
+    body: SubUserCreate,
+    claims: Annotated[JwtClaims, Depends(require_admin())],
+    uc: Annotated[ManageSubUser, Depends(get_manage_sub_user)],
+):
+    # Canonical endpoint for the tenant-scoped member panel.
+    # The tenant scope comes from the URL, not from optional client payload.
+    return await _create_sub_user_for_tenant(
+        body=body,
+        tenant_id=tenant_id,
+        claims=claims,
+        uc=uc,
+    )
 
 
 @router.get("/{tenant_id}", response_model=list[SubUserResponse])

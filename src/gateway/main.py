@@ -31,17 +31,13 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = GatewaySettings()
 
-    snapshot = PostgresSnapshotRepository()
+    snapshot = PostgresSnapshotRepository(policy_secret_key=settings.policy_secret_key)
     await snapshot.load(settings.database_url)
 
     redis_client = aioredis.from_url(settings.redis_url, decode_responses=False)
 
-    jwt_secret = settings.jwt_secret or None
     policy_pipeline = ApplyPolicyPipeline(
-        policy_evaluator=PolicyEvaluator(
-            jwt_secret=jwt_secret,
-            jwt_algorithms=(settings.jwt_algorithm,),
-        ),
+        policy_evaluator=PolicyEvaluator(),
         rate_limit_checker=RateLimitChecker(
             port=RateLimiter(client=redis_client)
         ),

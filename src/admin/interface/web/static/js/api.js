@@ -139,7 +139,10 @@ export const rawLogsApi = {
 };
 
 export const subUsersApi = {
-  create:            (payload)             => request('POST',   '/sub-users', payload),
+  // Member creation is tenant-scoped. Keep the tenant in the URL so the
+  // backend does not need to infer scope from an optional payload field.
+  create:            (tenantId, payload)   => request('POST',   `/sub-users/${tenantId}`, payload),
+  createLegacy:      (payload)             => request('POST',   '/sub-users', payload),
   listByTenant:      (tenantId)            => request('GET',    `/sub-users/${tenantId}`),
   updatePermissions: (userId, permissions) => request('PATCH',  `/sub-users/${userId}/permissions`, { permissions }),
   delete:            (userId)              => request('DELETE', `/sub-users/${userId}`),

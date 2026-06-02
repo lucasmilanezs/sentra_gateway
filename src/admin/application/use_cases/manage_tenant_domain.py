@@ -157,13 +157,16 @@ class ManageTenantDomain:
         caller_role: str,
         caller_tenant_id: str | None,
         domain_id: str,
-        requires_auth: bool,
-        rate_limit_per_minute: int | None,
-        allowed_roles: list[str],
+        auth_mode: str = "none",
+        requires_auth: bool | None = None,
+        rate_limit_per_minute: int | None = None,
+        allowed_roles: list[str] | None = None,
         jwt_validate_exp: bool = True,
         jwt_issuer: str | None = None,
         jwt_audience: str | None = None,
         jwt_clock_skew_seconds: int = 30,
+        jwt_signing_algorithm: str | None = None,
+        jwt_signing_key: str | None = None,
         required_headers: list[str] | None = None,
         forbidden_headers: list[str] | None = None,
         required_params: list[str] | None = None,
@@ -182,18 +185,23 @@ class ManageTenantDomain:
         ensure_valid_rate_limit(rate_limit_per_minute)
 
         existing = await self._domain_policies.get_by_domain_id(domain_id)
+        if auth_mode == DomainPolicy.AUTH_JWT_SIGNED and not jwt_signing_key and not (existing and existing.jwt_signing_key_configured):
+            raise ValidationError("Validação de assinatura JWT exige uma secret/chave pública configurada.")
         now = _utcnow()
 
         policy = DomainPolicy(
             id=existing.id if existing else str(uuid.uuid4()),
             domain_id=domain_id,
-            requires_auth=requires_auth,
+            requires_auth=bool(requires_auth) if requires_auth is not None else auth_mode != "none",
             rate_limit_per_minute=rate_limit_per_minute,
-            allowed_roles=allowed_roles,
+            allowed_roles=allowed_roles or [],
+            auth_mode=auth_mode,
             jwt_validate_exp=jwt_validate_exp,
             jwt_issuer=jwt_issuer,
             jwt_audience=jwt_audience,
             jwt_clock_skew_seconds=jwt_clock_skew_seconds,
+            jwt_signing_algorithm=jwt_signing_algorithm,
+            jwt_signing_key=jwt_signing_key,
             required_headers=required_headers or [],
             forbidden_headers=forbidden_headers or [],
             required_params=required_params or [],
@@ -202,7 +210,7 @@ class ManageTenantDomain:
             updated_at=now,
         )
         await self._domain_policies.save(policy)
-        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE" if existing else "CREATE", resource_type="domain_policy", resource_id=policy.id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id, "requires_auth": requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "allowed_roles": allowed_roles, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []})
+        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE" if existing else "CREATE", resource_type="domain_policy", resource_id=policy.id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id, "auth_mode": policy.auth_mode, "requires_auth": policy.requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []})
 
         if self._publisher:
             await self._publisher.notify_config_updated()

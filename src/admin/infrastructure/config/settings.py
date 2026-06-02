@@ -29,6 +29,10 @@ class AdminSettings(BaseSettings):
     postgres_port: int = Field(default=5432, alias="POSTGRES_PORT")
     postgres_db: str = Field(default="sentra_db", alias="POSTGRES_DB")
 
+    # Local-only key used to encrypt/decrypt contractor-provided JWT signing material.
+    # Never commit its value; generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    policy_secret_key: str = Field(default="", alias="SENTRA_POLICY_SECRET_KEY")
+
     # Redis
     redis_host: str = Field(default="redis", alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")

@@ -278,7 +278,20 @@ function navigate(pageId) {
     if (me.role === 'superuser') {
       tenant = currentTenant();
 
-      if (!tenant) {
+      if (!tenant?.id) {
+        sessionStorage.removeItem('sentra_tenant');
+        window.location.href = '/tenant-select.html';
+        return;
+      }
+
+      // Hydrate the selected tenant again. This prevents stale/incomplete
+      // sessionStorage data from becoming the implicit scope for member CRUD.
+      try {
+        const full = await tenantsApi.get(tenant.id);
+        tenant = { id: full.id, name: full.name, alias: full.alias };
+        sessionStorage.setItem('sentra_tenant', JSON.stringify(tenant));
+      } catch {
+        sessionStorage.removeItem('sentra_tenant');
         window.location.href = '/tenant-select.html';
         return;
       }
@@ -470,7 +483,7 @@ async function loadDomains() {
     list.forEach((d, i) => {
       const p = policies[i];
       const pHtml = p
-        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}${_policyConstraintSummary(p)}</span>
+        ? `${_policySummary(p)}
            <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Editar</button>`
         : `<span class="policy-off">sem política</span>
            <button class="btn-icon" onclick="_openDomainPolicyModal('${d.id}','${esc(d.domain)}')">Configurar</button>`;
@@ -520,32 +533,13 @@ window._deleteDomain = async function(domainId, domain) {
 window._openDomainPolicyModal = async function(domainId, domainName) {
   document.getElementById('dp-domain-id').value = domainId;
   document.getElementById('dp-domain-name').textContent = domainName;
-  document.getElementById('dp-requires-auth').checked = false;
-  document.getElementById('dp-rate-limit').value = '';
-  document.getElementById('dp-roles').value = '';
-  document.getElementById('dp-jwt-validate-exp').checked = true;
-  document.getElementById('dp-jwt-issuer').value = '';
-  document.getElementById('dp-jwt-audience').value = '';
-  _setCsvInput('dp-required-headers', []);
-  _setCsvInput('dp-forbidden-headers', []);
-  _setCsvInput('dp-required-params', []);
-  _setCsvInput('dp-forbidden-params', []);
+  _setPolicyForm('dp', null);
   document.getElementById('dp-error').style.display = 'none';
+  _wirePolicyMode('dp');
   document.getElementById('modal-domain-policy').style.display = 'flex';
   try {
     const p = await domainsApi.getPolicy(tenant.id, domainId);
-    if (p) {
-      document.getElementById('dp-requires-auth').checked = p.requires_auth;
-      document.getElementById('dp-rate-limit').value = p.rate_limit_per_minute || '';
-      document.getElementById('dp-roles').value = (p.allowed_roles || []).join(', ');
-      document.getElementById('dp-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
-      document.getElementById('dp-jwt-issuer').value = p.jwt_issuer || '';
-      document.getElementById('dp-jwt-audience').value = p.jwt_audience || '';
-      _setCsvInput('dp-required-headers', p.required_headers || []);
-      _setCsvInput('dp-forbidden-headers', p.forbidden_headers || []);
-      _setCsvInput('dp-required-params', p.required_params || []);
-      _setCsvInput('dp-forbidden-params', p.forbidden_params || []);
-    }
+    if (p) _setPolicyForm('dp', p);
   } catch {}
 };
 
@@ -553,25 +547,11 @@ document.getElementById('dp-cancel').addEventListener('click', () => { document.
 document.getElementById('modal-domain-policy').addEventListener('click', e => { if (e.target.id === 'modal-domain-policy') document.getElementById('modal-domain-policy').style.display = 'none'; });
 
 document.getElementById('dp-save').addEventListener('click', async () => {
-  const domainId     = document.getElementById('dp-domain-id').value;
-  const requiresAuth = document.getElementById('dp-requires-auth').checked;
-  const rateRaw      = document.getElementById('dp-rate-limit').value.trim();
-  const rolesRaw     = document.getElementById('dp-roles').value.trim();
-  const errEl        = document.getElementById('dp-error');
+  const domainId = document.getElementById('dp-domain-id').value;
+  const errEl = document.getElementById('dp-error');
   errEl.style.display = 'none';
-  const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
-  const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   try {
-    await domainsApi.upsertPolicy(tenant.id, domainId, {
-      requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
-      jwt_validate_exp: document.getElementById('dp-jwt-validate-exp').checked,
-      jwt_issuer:   document.getElementById('dp-jwt-issuer').value.trim()   || null,
-      jwt_audience: document.getElementById('dp-jwt-audience').value.trim() || null,
-      required_headers: _csvInput('dp-required-headers'),
-      forbidden_headers: _csvInput('dp-forbidden-headers'),
-      required_params: _csvInput('dp-required-params'),
-      forbidden_params: _csvInput('dp-forbidden-params'),
-    });
+    await domainsApi.upsertPolicy(tenant.id, domainId, _policyPayload('dp'));
     document.getElementById('modal-domain-policy').style.display = 'none';
     loadDomains();
   } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar política.'; errEl.style.display = 'block'; }
@@ -613,7 +593,7 @@ async function loadRoutes() {
       }).join('');
 
       const policyHtml = p
-        ? `<span class="policy-on">JWT${p.rate_limit_per_minute ? ` · ${p.rate_limit_per_minute}/min` : ''}${p.allowed_roles?.length ? ` · ${p.allowed_roles.join(',')}` : ''}${_policyConstraintSummary(p)}</span>`
+        ? `${_policySummary(p)}`
         : `<span class="policy-off">sem política</span>`;
 
       const methodsJson = esc(JSON.stringify(methods));
@@ -707,31 +687,12 @@ window._openPolicyModal = async function(routeId, routePath) {
   document.getElementById('p-route-id').value = routeId;
   document.getElementById('p-route-path').textContent = routePath;
   document.getElementById('p-error').style.display = 'none';
-  document.getElementById('p-requires-auth').checked = false;
-  document.getElementById('p-rate-limit').value = '';
-  document.getElementById('p-roles').value = '';
-  document.getElementById('p-jwt-validate-exp').checked = true;
-  document.getElementById('p-jwt-issuer').value = '';
-  document.getElementById('p-jwt-audience').value = '';
-  _setCsvInput('p-required-headers', []);
-  _setCsvInput('p-forbidden-headers', []);
-  _setCsvInput('p-required-params', []);
-  _setCsvInput('p-forbidden-params', []);
+  _setPolicyForm('p', null);
+  _wirePolicyMode('p');
   document.getElementById('modal-policy').style.display = 'flex';
   try {
     const p = await policiesApi.get(routeId);
-    if (p) {
-      document.getElementById('p-requires-auth').checked = p.requires_auth;
-      document.getElementById('p-rate-limit').value = p.rate_limit_per_minute || '';
-      document.getElementById('p-roles').value = (p.allowed_roles || []).join(', ');
-      document.getElementById('p-jwt-validate-exp').checked = p.jwt_validate_exp ?? true;
-      document.getElementById('p-jwt-issuer').value = p.jwt_issuer || '';
-      document.getElementById('p-jwt-audience').value = p.jwt_audience || '';
-      _setCsvInput('p-required-headers', p.required_headers || []);
-      _setCsvInput('p-forbidden-headers', p.forbidden_headers || []);
-      _setCsvInput('p-required-params', p.required_params || []);
-      _setCsvInput('p-forbidden-params', p.forbidden_params || []);
-    }
+    if (p) _setPolicyForm('p', p);
   } catch {}
 };
 
@@ -739,25 +700,11 @@ document.getElementById('p-cancel').addEventListener('click', () => { document.g
 document.getElementById('modal-policy').addEventListener('click', e => { if (e.target.id === 'modal-policy') document.getElementById('modal-policy').style.display = 'none'; });
 
 document.getElementById('p-save').addEventListener('click', async () => {
-  const routeId      = document.getElementById('p-route-id').value;
-  const requiresAuth = document.getElementById('p-requires-auth').checked;
-  const rateRaw      = document.getElementById('p-rate-limit').value.trim();
-  const rolesRaw     = document.getElementById('p-roles').value.trim();
-  const errEl        = document.getElementById('p-error');
+  const routeId = document.getElementById('p-route-id').value;
+  const errEl = document.getElementById('p-error');
   errEl.style.display = 'none';
-  const rate_limit_per_minute = rateRaw ? parseInt(rateRaw, 10) : null;
-  const allowed_roles = rolesRaw ? rolesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
   try {
-    await policiesApi.upsert(routeId, {
-      requires_auth: requiresAuth, rate_limit_per_minute, allowed_roles,
-      jwt_validate_exp: document.getElementById('p-jwt-validate-exp').checked,
-      jwt_issuer:   document.getElementById('p-jwt-issuer').value.trim()   || null,
-      jwt_audience: document.getElementById('p-jwt-audience').value.trim() || null,
-      required_headers: _csvInput('p-required-headers'),
-      forbidden_headers: _csvInput('p-forbidden-headers'),
-      required_params: _csvInput('p-required-params'),
-      forbidden_params: _csvInput('p-forbidden-params'),
-    });
+    await policiesApi.upsert(routeId, _policyPayload('p'));
     document.getElementById('modal-policy').style.display = 'none';
     loadRoutes();
   } catch (err) { errEl.textContent = err.detail || 'Erro ao salvar.'; errEl.style.display = 'block'; }
@@ -880,7 +827,8 @@ document.getElementById('m-save').addEventListener('click', async () => {
       if (!email) { errEl.textContent = 'E-mail obrigatório.'; errEl.style.display = 'block'; return; }
       if (!pass)  { errEl.textContent = 'Senha obrigatória.'; errEl.style.display = 'block'; return; }
       if (!perms.length) { errEl.textContent = 'Selecione ao menos uma permissão.'; errEl.style.display = 'block'; return; }
-      await subUsersApi.create({ email, password: pass, permissions: perms, tenant_id: tenant?.id || null });
+      if (!tenant?.id) { errEl.textContent = 'Selecione um tenant antes de criar membros.'; errEl.style.display = 'block'; return; }
+      await subUsersApi.create(tenant.id, { email, password: pass, permissions: perms });
     }
     _closeMemberModal();
     loadMembers();
@@ -1071,6 +1019,111 @@ function _setCsvInput(id, values) {
   const el = document.getElementById(id);
   if (el) el.value = (values || []).join(', ');
 }
+
+const AUTH_MODE_LABELS = {
+  none: 'Sem token',
+  bearer: 'Bearer obrigatório',
+  jwt_structural: 'JWT estrutural',
+  jwt_claims: 'Exp/issuer/audience',
+  jwt_signed: 'Assinatura local',
+};
+
+const AUTH_MODE_HELP = {
+  none: 'O Gateway não exige token. O backend continua responsável por sua própria segurança.',
+  bearer: 'Exige Authorization: Bearer <token>. Não interpreta JWT nem valida sessão.',
+  jwt_structural: 'Exige Bearer e valida se o token tem estrutura JWT legível. Não valida assinatura.',
+  jwt_claims: 'Pré-valida exp/issuer/audience declarados. Sem assinatura, isso é apenas filtro estrutural, não autenticação forte.',
+  jwt_signed: 'Valida assinatura com secret HMAC ou chave pública fornecida pelo contratante. Não gerencia sessão, revogação ou autorização fina.',
+};
+
+const AUTH_MODE_ORDER = ['none', 'bearer', 'jwt_structural', 'jwt_claims', 'jwt_signed'];
+
+function _authModeLabel(mode) {
+  return AUTH_MODE_LABELS[mode || 'none'] || mode || 'Sem token';
+}
+
+function _authModeLevel(mode) {
+  const idx = AUTH_MODE_ORDER.indexOf(mode || 'none');
+  return idx >= 0 ? idx : 0;
+}
+
+function _policySummary(p) {
+  if (!p) return '<span class="policy-off">sem política</span>';
+  const parts = [_authModeLabel(p.auth_mode || (p.requires_auth ? 'jwt_claims' : 'none'))];
+  if (p.auth_mode === 'jwt_signed' || p.jwt_signing_key_configured) {
+    parts.push(p.jwt_signing_key_configured ? `assinatura ${p.jwt_signing_algorithm || ''}`.trim() : 'assinatura sem chave');
+  }
+  if (p.rate_limit_per_minute) parts.push(`${p.rate_limit_per_minute}/min`);
+  const constraints = _policyConstraintSummary(p);
+  return `<span class="policy-on">${parts.map(escHtml).join(' · ')}${constraints}</span>`;
+}
+
+function _setPolicyForm(prefix, p = null) {
+  const mode = p?.auth_mode || (p?.requires_auth ? 'jwt_claims' : 'none');
+  document.getElementById(`${prefix}-auth-mode`).value = mode;
+  document.getElementById(`${prefix}-rate-limit`).value = p?.rate_limit_per_minute || '';
+  document.getElementById(`${prefix}-jwt-validate-exp`).checked = p?.jwt_validate_exp ?? true;
+  document.getElementById(`${prefix}-jwt-clock-skew`).value = p?.jwt_clock_skew_seconds ?? 30;
+  document.getElementById(`${prefix}-jwt-issuer`).value = p?.jwt_issuer || '';
+  document.getElementById(`${prefix}-jwt-audience`).value = p?.jwt_audience || '';
+  document.getElementById(`${prefix}-jwt-signing-algorithm`).value = p?.jwt_signing_algorithm || 'HS256';
+  document.getElementById(`${prefix}-jwt-signing-key`).value = '';
+  const status = document.getElementById(`${prefix}-jwt-signing-key-status`);
+  if (status) {
+    status.textContent = p?.jwt_signing_key_configured
+      ? `Material de assinatura já configurado${p.jwt_signing_key_hint ? ` (final ${p.jwt_signing_key_hint})` : ''}. Preencha apenas para substituir.`
+      : 'Nenhum material de assinatura configurado.';
+  }
+  _setCsvInput(`${prefix}-required-headers`, p?.required_headers || []);
+  _setCsvInput(`${prefix}-forbidden-headers`, p?.forbidden_headers || []);
+  _setCsvInput(`${prefix}-required-params`, p?.required_params || []);
+  _setCsvInput(`${prefix}-forbidden-params`, p?.forbidden_params || []);
+  _refreshPolicyAuthUI(prefix);
+}
+
+function _refreshPolicyAuthUI(prefix) {
+  const mode = document.getElementById(`${prefix}-auth-mode`)?.value || 'none';
+  const level = _authModeLevel(mode);
+  const help = document.getElementById(`${prefix}-auth-help`);
+  if (help) help.textContent = AUTH_MODE_HELP[mode] || '';
+  document.querySelectorAll(`[data-policy-prefix="${prefix}"] .policy-auth-section`).forEach(section => {
+    const minMode = section.dataset.minMode || 'none';
+    section.style.display = level >= _authModeLevel(minMode) ? 'block' : 'none';
+  });
+}
+
+function _policyPayload(prefix) {
+  const auth_mode = document.getElementById(`${prefix}-auth-mode`).value;
+  const rateRaw = document.getElementById(`${prefix}-rate-limit`).value.trim();
+  const signingKey = document.getElementById(`${prefix}-jwt-signing-key`).value;
+  const payload = {
+    auth_mode,
+    requires_auth: auth_mode !== 'none',
+    rate_limit_per_minute: rateRaw ? parseInt(rateRaw, 10) : null,
+    allowed_roles: [],
+    jwt_validate_exp: document.getElementById(`${prefix}-jwt-validate-exp`).checked,
+    jwt_clock_skew_seconds: parseInt(document.getElementById(`${prefix}-jwt-clock-skew`).value || '30', 10),
+    jwt_issuer: document.getElementById(`${prefix}-jwt-issuer`).value.trim() || null,
+    jwt_audience: document.getElementById(`${prefix}-jwt-audience`).value.trim() || null,
+    jwt_signing_algorithm: document.getElementById(`${prefix}-jwt-signing-algorithm`).value || null,
+    required_headers: _csvInput(`${prefix}-required-headers`),
+    forbidden_headers: _csvInput(`${prefix}-forbidden-headers`),
+    required_params: _csvInput(`${prefix}-required-params`),
+    forbidden_params: _csvInput(`${prefix}-forbidden-params`),
+  };
+  if (signingKey.trim()) payload.jwt_signing_key = signingKey;
+  return payload;
+}
+
+function _wirePolicyMode(prefix) {
+  const el = document.getElementById(`${prefix}-auth-mode`);
+  if (el && !el.dataset.wired) {
+    el.addEventListener('change', () => _refreshPolicyAuthUI(prefix));
+    el.dataset.wired = 'true';
+  }
+}
+
+
 function _policyConstraintSummary(p) {
   const parts = [];
   if (p.required_headers?.length) parts.push(`reqH:${p.required_headers.length}`);

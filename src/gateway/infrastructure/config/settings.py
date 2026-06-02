@@ -25,6 +25,10 @@ class GatewaySettings(BaseSettings):
     def redis_url(self) -> str:
         return f"redis://{self.redis_host}:{self.redis_port}/0"
 
+    # Local-only key used to encrypt/decrypt contractor-provided JWT signing material.
+    # Never commit its value; generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    policy_secret_key: str = Field(default="", alias="SENTRA_POLICY_SECRET_KEY")
+
     # Observabilidade
     audit_to_postgres: bool = Field(default=True, alias="GATEWAY_AUDIT_TO_POSTGRES")
     raw_log_retention_days: int = Field(default=7, alias="GATEWAY_RAW_LOG_RETENTION_DAYS")
@@ -38,9 +42,6 @@ class GatewaySettings(BaseSettings):
     def raw_log_redact_header_names(self) -> tuple[str, ...]:
         return tuple(h.strip().lower() for h in self.raw_log_redact_headers.split(",") if h.strip())
 
-    # JWT — mesma secret do admin para validação criptográfica opcional
-    jwt_secret: str = Field(default="", alias="ADMIN_JWT_SECRET")
-    jwt_algorithm: str = Field(default="HS256", alias="ADMIN_JWT_ALGORITHM")
 
     @model_validator(mode="after")
     def _build_database_url(self) -> "GatewaySettings":
