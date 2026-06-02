@@ -1,18 +1,18 @@
 from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
 
-from src.admin.domain.services.access_control import TenantAccessControl
-from src.admin.domain.entities.domain_policy import DomainPolicy
+from src.admin.application.services.governance_audit_recorder import GovernanceAuditRecorder
+from src.admin.domain.entities.policy import Policy
 from src.admin.domain.entities.tenant_domain import TenantDomain
-from src.admin.domain.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
-from src.admin.domain.services.policy_validation import ensure_valid_rate_limit
+from src.admin.domain.exceptions import ConflictError, NotFoundError
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
+from src.admin.domain.ports.config_notifier import ConfigNotifier
 from src.admin.domain.ports.domain_policy_repository import DomainPolicyRepositoryPort
 from src.admin.domain.ports.tenant_domain_repository import TenantDomainRepositoryPort
 from src.admin.domain.ports.tenant_repository import TenantRepositoryPort
-from src.admin.domain.ports.config_notifier import ConfigNotifier
-from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
-from src.admin.domain.services.audit_event_factory import GovernanceAuditEventFactory
+from src.admin.domain.services.access_control import TenantAccessControl
 
 
 def _utcnow() -> datetime:
@@ -20,15 +20,7 @@ def _utcnow() -> datetime:
 
 
 class ManageTenantDomain:
-    """
-    Use case para gerenciamento de domains vinculados a um tenant.
-
-    Um tenant pode ter múltiplos domains/subdomains. O gateway usa o
-    Host header para resolver qual tenant está sendo acessado.
-
-    Cada domain pode ter uma DomainPolicy (política global fallback):
-    aplicada a rotas do tenant que não possuam Policy individual.
-    """
+    """Use case for tenant domains and their fallback policies."""
 
     def __init__(
         self,
@@ -42,9 +34,7 @@ class ManageTenantDomain:
         self._domain_policies = domain_policies
         self._tenants = tenants
         self._publisher = publisher
-        self._change_audit = change_audit
-
-    # ── Domains ────────────────────────────────────────────────────────
+        self._audit = GovernanceAuditRecorder(change_audit)
 
     async def list(
         self,
@@ -63,10 +53,10 @@ class ManageTenantDomain:
         return await self._domains.list_by_tenant(tenant_id)
 
     async def get(self, domain_id: str) -> TenantDomain:
-        d = await self._domains.get_by_id(domain_id)
-        if not d:
+        domain = await self._domains.get_by_id(domain_id)
+        if not domain:
             raise NotFoundError("domain não encontrado")
-        return d
+        return domain
 
     async def create(
         self,
@@ -85,30 +75,30 @@ class ManageTenantDomain:
         if not await self._tenants.get_by_id(tenant_id):
             raise NotFoundError("tenant não encontrado")
 
-        domain = domain.strip().lower()
-        if not domain:
-            raise ValidationError("domain não pode ser vazio")
-
-        # Garante unicidade global de domain
-        existing = await self._domains.get_by_domain(domain)
-        if existing:
-            raise ConflictError(f"domain '{domain}' já está em uso")
-
         now = _utcnow()
-        td = TenantDomain(
+        tenant_domain = TenantDomain.create(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
             domain=domain,
-            created_at=now,
-            updated_at=now,
+            now=now,
         )
-        await self._domains.save(td)
-        await self._record_change(tenant_id=tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="CREATE", resource_type="domain", resource_id=td.id, resource_summary=td.domain, detail={"domain": td.domain})
+        if await self._domains.get_by_domain(tenant_domain.domain):
+            raise ConflictError(f"domain '{tenant_domain.domain}' já está em uso")
 
+        await self._domains.save(tenant_domain)
+        await self._audit.record(
+            tenant_id=tenant_id,
+            actor_id=caller_user_id,
+            actor_role=caller_role,
+            action="CREATE",
+            resource_type="domain",
+            resource_id=tenant_domain.id,
+            resource_summary=tenant_domain.audit_summary(),
+            detail=tenant_domain.audit_detail(),
+        )
         if self._publisher:
             await self._publisher.notify_config_updated()
-
-        return td
+        return tenant_domain
 
     async def delete(
         self,
@@ -118,21 +108,27 @@ class ManageTenantDomain:
         domain_id: str,
         caller_user_id: str | None = None,
     ) -> None:
-        d = await self._domains.get_by_id(domain_id)
-        if not d:
+        domain = await self._domains.get_by_id(domain_id)
+        if not domain:
             raise NotFoundError("domain não encontrado")
         TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
-            resource_tenant_id=d.tenant_id,
+            resource_tenant_id=domain.tenant_id,
         )
         await self._domains.delete(domain_id)
-        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="domain", resource_id=d.id, resource_summary=d.domain, detail={"domain": d.domain})
-
+        await self._audit.record(
+            tenant_id=domain.tenant_id,
+            actor_id=caller_user_id,
+            actor_role=caller_role,
+            action="DELETE",
+            resource_type="domain",
+            resource_id=domain.id,
+            resource_summary=domain.audit_summary(),
+            detail=domain.audit_detail(),
+        )
         if self._publisher:
             await self._publisher.notify_config_updated()
-
-    # ── Domain Policy (política global por domain) ─────────────────────
 
     async def get_policy(
         self,
@@ -140,14 +136,14 @@ class ManageTenantDomain:
         caller_role: str,
         caller_tenant_id: str | None,
         domain_id: str,
-    ) -> DomainPolicy | None:
-        d = await self._domains.get_by_id(domain_id)
-        if not d:
+    ) -> Policy | None:
+        domain = await self._domains.get_by_id(domain_id)
+        if not domain:
             raise NotFoundError("domain não encontrado")
         TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
-            resource_tenant_id=d.tenant_id,
+            resource_tenant_id=domain.tenant_id,
         )
         return await self._domain_policies.get_by_domain_id(domain_id)
 
@@ -172,27 +168,20 @@ class ManageTenantDomain:
         required_params: list[str] | None = None,
         forbidden_params: list[str] | None = None,
         caller_user_id: str | None = None,
-    ) -> DomainPolicy:
-        d = await self._domains.get_by_id(domain_id)
-        if not d:
+    ) -> Policy:
+        domain = await self._domains.get_by_id(domain_id)
+        if not domain:
             raise NotFoundError("domain não encontrado")
         TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
-            resource_tenant_id=d.tenant_id,
+            resource_tenant_id=domain.tenant_id,
         )
 
-        ensure_valid_rate_limit(rate_limit_per_minute)
-
         existing = await self._domain_policies.get_by_domain_id(domain_id)
-        if auth_mode == DomainPolicy.AUTH_JWT_SIGNED and not jwt_signing_key and not (existing and existing.jwt_signing_key_configured):
-            raise ValidationError("Validação de assinatura JWT exige uma secret/chave pública configurada.")
         now = _utcnow()
-
-        policy = DomainPolicy(
-            id=existing.id if existing else str(uuid.uuid4()),
-            domain_id=domain_id,
-            requires_auth=bool(requires_auth) if requires_auth is not None else auth_mode != "none",
+        data = dict(
+            requires_auth=bool(requires_auth) if requires_auth is not None else auth_mode != Policy.AUTH_NONE,
             rate_limit_per_minute=rate_limit_per_minute,
             allowed_roles=allowed_roles or [],
             auth_mode=auth_mode,
@@ -206,15 +195,25 @@ class ManageTenantDomain:
             forbidden_headers=forbidden_headers or [],
             required_params=required_params or [],
             forbidden_params=forbidden_params or [],
-            created_at=existing.created_at if existing else now,
-            updated_at=now,
+        )
+        policy = (
+            existing.reconfigure(now=now, **data)
+            if existing
+            else Policy.create_for_domain(id=str(uuid.uuid4()), domain_id=domain_id, now=now, **data)
         )
         await self._domain_policies.save(policy)
-        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="UPDATE" if existing else "CREATE", resource_type="domain_policy", resource_id=policy.id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id, "auth_mode": policy.auth_mode, "requires_auth": policy.requires_auth, "rate_limit_per_minute": rate_limit_per_minute, "required_headers": required_headers or [], "forbidden_headers": forbidden_headers or [], "required_params": required_params or [], "forbidden_params": forbidden_params or []})
-
+        await self._audit.record(
+            tenant_id=domain.tenant_id,
+            actor_id=caller_user_id,
+            actor_role=caller_role,
+            action="UPDATE" if existing else "CREATE",
+            resource_type=policy.audit_resource_type(),
+            resource_id=policy.id,
+            resource_summary=f"domain policy for {domain.domain}",
+            detail=policy.audit_detail(),
+        )
         if self._publisher:
             await self._publisher.notify_config_updated()
-
         return policy
 
     async def delete_policy(
@@ -225,23 +224,26 @@ class ManageTenantDomain:
         domain_id: str,
         caller_user_id: str | None = None,
     ) -> None:
-        d = await self._domains.get_by_id(domain_id)
-        if not d:
+        domain = await self._domains.get_by_id(domain_id)
+        if not domain:
             raise NotFoundError("domain não encontrado")
         TenantAccessControl.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
-            resource_tenant_id=d.tenant_id,
+            resource_tenant_id=domain.tenant_id,
         )
         deleted = await self._domain_policies.delete_by_domain_id(domain_id)
         if not deleted:
             raise NotFoundError("política não encontrada para este domain")
-        await self._record_change(tenant_id=d.tenant_id, actor_id=caller_user_id or "unknown", actor_role=caller_role, action="DELETE", resource_type="domain_policy", resource_id=domain_id, resource_summary=f"domain policy for {d.domain}", detail={"domain_id": domain_id})
-
+        await self._audit.record(
+            tenant_id=domain.tenant_id,
+            actor_id=caller_user_id,
+            actor_role=caller_role,
+            action="DELETE",
+            resource_type="domain_policy",
+            resource_id=domain_id,
+            resource_summary=f"domain policy for {domain.domain}",
+            detail={"domain_id": domain_id},
+        )
         if self._publisher:
             await self._publisher.notify_config_updated()
-
-    async def _record_change(self, *, tenant_id, actor_id, actor_role, action, resource_type, resource_id, resource_summary, detail=None):
-        if not self._change_audit:
-            return
-        await self._change_audit.record(GovernanceAuditEventFactory.build(tenant_id=tenant_id, actor_id=actor_id, actor_role=actor_role or "unknown", action=action, resource_type=resource_type, resource_id=resource_id, resource_summary=resource_summary, detail=detail))

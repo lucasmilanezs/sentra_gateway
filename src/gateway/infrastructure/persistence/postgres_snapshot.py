@@ -32,10 +32,10 @@ def _csv(raw) -> Tuple[str, ...]:
     if not raw: return ()
     return tuple(r for r in str(raw).split(",") if r)
 
-def _policy_from_row(pid, rid, auth, rlimit, roles, auth_mode, jexp, jiss, jaud, jskew,
+def _policy_from_row(pid, route_id, auth, rlimit, roles, auth_mode, jexp, jiss, jaud, jskew,
                      signing_alg=None, signing_key_encrypted=None, signing_key_hint=None,
                      rh=None, fh=None, rp=None, fp=None,
-                     cipher: SecretCipher | None = None) -> Policy:
+                     cipher: SecretCipher | None = None, domain_id: str | None = None) -> Policy:
     signing_key = None
     signing_key_configured = bool(signing_key_encrypted)
     if signing_key_encrypted and cipher:
@@ -45,7 +45,7 @@ def _policy_from_row(pid, rid, auth, rlimit, roles, auth_mode, jexp, jiss, jaud,
             logger.exception("Could not decrypt JWT signing material for policy %s.", pid)
 
     return Policy(
-        id=pid, route_id=rid, requires_auth=bool(auth),
+        id=pid, route_id=route_id, domain_id=domain_id, requires_auth=bool(auth),
         rate_limit_per_minute=rlimit, allowed_roles=_csv(roles),
         auth_mode=auth_mode,
         jwt_validate_exp=bool(jexp) if jexp is not None else True,
@@ -91,7 +91,7 @@ class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyReposi
                     "required_headers, forbidden_headers, required_params, forbidden_params "
                     "FROM admin_policies"))).fetchall()
                 dp_rows = (await conn.execute(text(
-                    "SELECT dp.id, td.domain, dp.requires_auth, dp.rate_limit_per_minute, dp.allowed_roles, "
+                    "SELECT dp.id, dp.domain_id, td.domain, dp.requires_auth, dp.rate_limit_per_minute, dp.allowed_roles, "
                     "dp.auth_mode, dp.jwt_validate_exp, dp.jwt_issuer, dp.jwt_audience, dp.jwt_clock_skew_seconds, "
                     "dp.jwt_signing_algorithm, dp.jwt_signing_key_encrypted, dp.jwt_signing_key_hint, "
                     "dp.required_headers, dp.forbidden_headers, dp.required_params, dp.forbidden_params "
@@ -114,7 +114,8 @@ class PostgresSnapshotRepository(RouteRepository, DomainRepository, PolicyReposi
             policies[row[1]] = _policy_from_row(*row, cipher=self._secret_cipher)
         dp = {}
         for row in dp_rows:
-            dp[row[1].lower()] = _policy_from_row(row[0], "", *row[2:], cipher=self._secret_cipher)
+            host = row[2].lower()
+            dp[host] = _policy_from_row(row[0], None, *row[3:], cipher=self._secret_cipher, domain_id=row[1])
 
         self._tenant_by_domain = tbd
         self._routes = routes

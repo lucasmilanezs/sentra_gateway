@@ -22,8 +22,7 @@ class RequiredHeadersPolicy:
         return bool(policy.required_headers)
 
     def evaluate(self, policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        headers_lower = {key.lower() for key in request.headers}
-        missing = [header for header in policy.required_headers if header.lower() not in headers_lower]
+        missing = [header for header in policy.required_headers if not request.headers.contains(header)]
         if missing:
             return PolicyEvaluationDetail(
                 check="required_headers",
@@ -42,8 +41,7 @@ class ForbiddenHeadersPolicy:
         return bool(policy.forbidden_headers)
 
     def evaluate(self, policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        headers_lower = {key.lower() for key in request.headers}
-        blocked = [header for header in policy.forbidden_headers if header.lower() in headers_lower]
+        blocked = [header for header in policy.forbidden_headers if request.headers.contains(header)]
         if blocked:
             return PolicyEvaluationDetail(
                 check="forbidden_headers",
@@ -62,7 +60,7 @@ class RequiredParamsPolicy:
         return bool(policy.required_params)
 
     def evaluate(self, policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        missing = [param for param in policy.required_params if param not in request.query_params]
+        missing = [param for param in policy.required_params if not request.query_params.contains(param)]
         if missing:
             return PolicyEvaluationDetail(
                 check="required_params",
@@ -81,7 +79,7 @@ class ForbiddenParamsPolicy:
         return bool(policy.forbidden_params)
 
     def evaluate(self, policy: Policy, request: Request) -> PolicyEvaluationDetail:
-        blocked = [param for param in policy.forbidden_params if param in request.query_params]
+        blocked = [param for param in policy.forbidden_params if request.query_params.contains(param)]
         if blocked:
             return PolicyEvaluationDetail(
                 check="forbidden_params",

@@ -1,4 +1,4 @@
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.admin.domain.entities.policy import Policy
@@ -16,6 +16,8 @@ def _from_csv(raw):
 
 
 def _apply_signing_key(row: PolicyORM, policy: Policy, cipher: SecretCipher | None) -> None:
+    if not policy.is_route_policy():
+        raise ValueError("PolicyRepository only persists route policies.")
     if policy.auth_mode != Policy.AUTH_JWT_SIGNED:
         row.jwt_signing_algorithm = None
         row.jwt_signing_key_encrypted = None
@@ -33,6 +35,7 @@ def _orm_to_entity(row):
     return Policy(
         id=row.id,
         route_id=row.route_id,
+        domain_id=None,
         requires_auth=row.requires_auth,
         rate_limit_per_minute=row.rate_limit_per_minute,
         allowed_roles=_from_csv(row.allowed_roles),
@@ -53,27 +56,29 @@ def _orm_to_entity(row):
     )
 
 
-def _entity_to_orm(p, cipher: SecretCipher | None):
+def _entity_to_orm(policy: Policy, cipher: SecretCipher | None):
+    if not policy.is_route_policy():
+        raise ValueError("PolicyRepository only persists route policies.")
     row = PolicyORM(
-        id=p.id,
-        route_id=p.route_id,
-        requires_auth=p.requires_auth,
-        rate_limit_per_minute=p.rate_limit_per_minute,
-        allowed_roles=_csv(p.allowed_roles),
-        auth_mode=p.auth_mode,
-        jwt_validate_exp=p.jwt_validate_exp,
-        jwt_issuer=p.jwt_issuer,
-        jwt_audience=p.jwt_audience,
-        jwt_clock_skew_seconds=p.jwt_clock_skew_seconds,
-        jwt_signing_algorithm=p.jwt_signing_algorithm,
-        required_headers=_csv(p.required_headers),
-        forbidden_headers=_csv(p.forbidden_headers),
-        required_params=_csv(p.required_params),
-        forbidden_params=_csv(p.forbidden_params),
-        created_at=p.created_at,
-        updated_at=p.updated_at,
+        id=policy.id,
+        route_id=policy.route_id,
+        requires_auth=policy.requires_auth,
+        rate_limit_per_minute=policy.rate_limit_per_minute,
+        allowed_roles=_csv(policy.allowed_roles),
+        auth_mode=policy.auth_mode,
+        jwt_validate_exp=policy.jwt_validate_exp,
+        jwt_issuer=policy.jwt_issuer,
+        jwt_audience=policy.jwt_audience,
+        jwt_clock_skew_seconds=policy.jwt_clock_skew_seconds,
+        jwt_signing_algorithm=policy.jwt_signing_algorithm,
+        required_headers=_csv(policy.required_headers),
+        forbidden_headers=_csv(policy.forbidden_headers),
+        required_params=_csv(policy.required_params),
+        forbidden_params=_csv(policy.forbidden_params),
+        created_at=policy.created_at,
+        updated_at=policy.updated_at,
     )
-    _apply_signing_key(row, p, cipher)
+    _apply_signing_key(row, policy, cipher)
     return row
 
 
@@ -93,6 +98,8 @@ class PolicyRepository(PolicyRepositoryPort):
         return _orm_to_entity(row) if row else None
 
     async def save(self, policy):
+        if not policy.is_route_policy():
+            raise ValueError("PolicyRepository only persists route policies.")
         existing = await self._session.get(PolicyORM, policy.id)
         if existing:
             for attr in (
@@ -107,7 +114,7 @@ class PolicyRepository(PolicyRepositoryPort):
                 "updated_at",
             ):
                 setattr(existing, attr, getattr(policy, attr))
-            for csv_attr in ("allowed_roles","required_headers","forbidden_headers","required_params","forbidden_params"):
+            for csv_attr in ("allowed_roles", "required_headers", "forbidden_headers", "required_params", "forbidden_params"):
                 setattr(existing, csv_attr, _csv(getattr(policy, csv_attr)))
             _apply_signing_key(existing, policy, self._secret_cipher)
         else:

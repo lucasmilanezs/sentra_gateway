@@ -9,6 +9,7 @@ from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.application.use_cases.query_audit import QueryAudit
 from src.admin.application.use_cases.query_gateway_logs import QueryGatewayLogs
 from src.admin.domain.exceptions import AuthError
+from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
 from src.admin.interface.http.wiring import AdminWiring
@@ -76,11 +77,13 @@ def require_permission(permission: str):
     async def _guard(
         claims: Annotated[JwtClaims, Depends(get_current_claims)],
     ) -> JwtClaims:
-        if not claims.has_permission(permission):
+        try:
+            TenantAccessControl.ensure_has_permission(claims, permission)
+        except AuthError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"permissão '{permission}' necessária",
-            )
+                detail=str(e),
+            ) from e
         return claims
 
     return _guard
@@ -94,11 +97,13 @@ def require_admin():
     async def _guard(
         claims: Annotated[JwtClaims, Depends(get_current_claims)],
     ) -> JwtClaims:
-        if not claims.is_admin_like():
+        try:
+            TenantAccessControl.ensure_admin_like_claims(claims)
+        except AuthError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="acesso restrito a administradores",
-            )
+                detail=str(e),
+            ) from e
         return claims
 
     return _guard
@@ -109,11 +114,13 @@ def require_superuser():
     async def _guard(
         claims: Annotated[JwtClaims, Depends(get_current_claims)],
     ) -> JwtClaims:
-        if not claims.is_superuser():
+        try:
+            TenantAccessControl.ensure_superuser_claims(claims)
+        except AuthError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="acesso restrito ao superuser",
-            )
+                detail=str(e),
+            ) from e
         return claims
 
     return _guard

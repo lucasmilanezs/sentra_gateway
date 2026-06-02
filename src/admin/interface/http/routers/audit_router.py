@@ -59,8 +59,12 @@ async def list_change_audit(
         return ChangeEventFilteredResponse(items=[], total=0)
     scope = claims.resolve_tenant_scope(tenant_id)
     items, total = await change_audit.list_for_tenant(
-        tenant_id=scope, limit=limit, offset=offset, resource_type=resource_type,
-        action=action, actor_role=actor_role, search=search, date_from=date_from, date_to=date_to,
+        tenant_id=scope, limit=limit, offset=offset,
+        resource_type=resource_type.strip() if resource_type else None,
+        action=action.strip() if action else None,
+        actor_role=actor_role.strip() if actor_role else None,
+        search=search.strip() if search else None,
+        date_from=date_from, date_to=date_to,
     )
     return ChangeEventFilteredResponse(items=[ChangeEventResponse.model_validate(r) for r in items], total=total)
 

@@ -3,6 +3,8 @@ from fastapi import Request as FastAPIRequest
 from src.gateway.domain.models.request import Request
 from src.gateway.domain.models.param import Param
 from src.gateway.domain.value_objects.http_method import HttpMethod
+from src.shared.http.headers import Headers
+from src.shared.http.params import Params
 
 _HOP_BY_HOP = frozenset([
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -28,8 +30,8 @@ class RequestParser:
         return Request(
             method=method,
             path=path,
-            headers=headers,
-            query_params=query_params,
+            headers=Headers(headers),
+            query_params=Params(query_params),
             params=params,
             host=host,
         )

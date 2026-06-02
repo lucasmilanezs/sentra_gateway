@@ -43,9 +43,9 @@ class ChangeAuditRepository(ChangeAuditRepositoryPort):
             .outerjoin(UserORM, AdminChangeAuditORM.actor_id == UserORM.id))
         filters = []
         if tenant_id: filters.append(AdminChangeAuditORM.tenant_id == tenant_id)
-        if resource_type: filters.append(AdminChangeAuditORM.resource_type == resource_type)
-        if action: filters.append(AdminChangeAuditORM.action == action)
-        if actor_role: filters.append(AdminChangeAuditORM.actor_role == actor_role)
+        if resource_type: filters.append(func.lower(AdminChangeAuditORM.resource_type) == resource_type.strip().lower())
+        if action: filters.append(func.lower(AdminChangeAuditORM.action) == action.strip().lower())
+        if actor_role: filters.append(func.lower(AdminChangeAuditORM.actor_role) == actor_role.strip().lower())
         if date_from: filters.append(AdminChangeAuditORM.created_at >= date_from)
         if date_to: filters.append(AdminChangeAuditORM.created_at <= date_to)
         if search:

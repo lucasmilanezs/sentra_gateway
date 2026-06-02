@@ -941,7 +941,10 @@ function _checkListHtml(title, checks) {
 }
 
 function _openRawLogModal(record) {
+  const modal = document.getElementById('modal-raw-log');
   const semantic = document.getElementById('raw-log-semantic');
+  const detail = document.getElementById('raw-log-detail');
+  if (!modal || !semantic || !detail) return;
   const routeLabel = record.route_label || record.path || 'rota não resolvida';
   const layerErrors = record.layer_errors || {};
   const layerHtml = Object.keys(layerErrors).length
@@ -960,15 +963,20 @@ function _openRawLogModal(record) {
     ${_checkListHtml('Headers e matches', record.header_checks)}
     ${_checkListHtml('Params e matches', record.param_checks)}
     ${layerHtml}`;
-  document.getElementById('raw-log-detail').textContent = JSON.stringify(record.payload || record, null, 2);
-  document.getElementById('modal-raw-log').style.display = 'flex';
+  detail.textContent = JSON.stringify(record.payload || record, null, 2);
+  modal.style.display = 'flex';
 }
 
 document.getElementById('logs-group-by')?.addEventListener('change', _renderRawLogs);
 document.getElementById('logs-sort-by')?.addEventListener('change', _renderRawLogs);
 document.getElementById('logs-refresh')?.addEventListener('click', loadRawLogs);
-document.getElementById('raw-log-close')?.addEventListener('click', () => { document.getElementById('modal-raw-log').style.display = 'none'; });
-document.getElementById('modal-raw-log')?.addEventListener('click', e => { if (e.target.id === 'modal-raw-log') document.getElementById('modal-raw-log').style.display = 'none'; });
+document.getElementById('raw-log-close')?.addEventListener('click', () => {
+  const modal = document.getElementById('modal-raw-log');
+  if (modal) modal.style.display = 'none';
+});
+document.getElementById('modal-raw-log')?.addEventListener('click', e => {
+  if (e.target.id === 'modal-raw-log') e.currentTarget.style.display = 'none';
+});
 
 // ── MÉTRICAS ──────────────────────────────────────────────────────────────
 async function loadMetrics() {

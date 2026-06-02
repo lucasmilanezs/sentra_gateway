@@ -1,15 +1,15 @@
 from abc import ABC, abstractmethod
 
-from src.admin.domain.entities.domain_policy import DomainPolicy
+from src.admin.domain.entities.policy import Policy
 
 
 class DomainPolicyRepositoryPort(ABC):
     @abstractmethod
-    async def get_by_domain_id(self, domain_id: str) -> DomainPolicy | None:
+    async def get_by_domain_id(self, domain_id: str) -> Policy | None:
         ...
 
     @abstractmethod
-    async def save(self, policy: DomainPolicy) -> None:
+    async def save(self, policy: Policy) -> None:
         ...
 
     @abstractmethod
