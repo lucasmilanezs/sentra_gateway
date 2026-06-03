@@ -85,9 +85,17 @@ async def metrics_by_route(
     claims: Annotated[JwtClaims, Depends(require_permission("metrics"))],
     uc: Annotated[QueryAudit, Depends(get_query_audit)],
     tenant_id: str | None = Query(default=None),
-    seconds: int = Query(default=3600, ge=10, le=60 * 60 * 24 * 14),
-    bucket_seconds: int = Query(default=60, ge=1, le=60 * 60 * 24),
+    seconds: int = Query(default=3600, ge=10, le=60 * 60 * 24 * 366),
+    bucket_seconds: int = Query(default=60, ge=1, le=60 * 60 * 24 * 31),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
 ):
     scope = claims.resolve_tenant_scope(tenant_id)
-    data = await uc.metrics_by_route(tenant_id=scope, seconds=seconds, bucket_seconds=bucket_seconds)
+    data = await uc.metrics_by_route(
+        tenant_id=scope,
+        seconds=seconds,
+        bucket_seconds=bucket_seconds,
+        date_from=date_from,
+        date_to=date_to,
+    )
     return RouteMetricsResponse(**data)

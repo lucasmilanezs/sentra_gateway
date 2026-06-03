@@ -1219,6 +1219,7 @@ const CHART_UNIT_SECONDS = {
   minute: 60,
   hour: 60 * 60,
   day: 24 * 60 * 60,
+  week: 7 * 24 * 60 * 60,
   month: 30 * 24 * 60 * 60,
   year: 365 * 24 * 60 * 60,
 };
@@ -1226,10 +1227,14 @@ const CHART_UNIT_LABELS = {
   second: 'segundos',
   minute: 'minutos',
   hour: 'horas',
-  day: 'dias',
-  month: 'meses',
-  year: 'anos',
+  day: 'dia',
+  week: 'semana',
+  month: 'mês',
+  year: 'ano',
 };
+const CHART_CONFIGURABLE_UNITS = new Set(['second', 'minute', 'hour']);
+const CHART_FIXED_UNIT_HINT = 'janela configurável apenas disponível para segundo, minuto e hora';
+const MONTH_LABELS_PT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 let _metricsChartUnit = 'minute';
 let _metricsChartAmount = 10;
 let _metricsWindowSeconds = _metricsChartAmount * CHART_UNIT_SECONDS[_metricsChartUnit];
@@ -1240,12 +1245,14 @@ let _metricsChartHitLines = [];
 let _metricsChartHoveredRouteId = null;
 let _lastChartMetrics = null;
 let _lastRouteSummaryMetrics = null;
+let _lastChartConfig = null;
 
 function _metricsWindowLabel(seconds) {
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}min`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
-  if (seconds < 2592000) return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 604800) return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 2592000) return `${Math.round(seconds / 604800)}sem`;
   if (seconds < 31536000) return `${Math.round(seconds / 2592000)}m`;
   return `${Math.round(seconds / 31536000)}a`;
 }
@@ -1257,23 +1264,119 @@ function _bucketForWindow(seconds) {
   return candidates.find(v => v >= raw) || candidates[candidates.length - 1];
 }
 
-function _graphWindowSeconds() {
+function _iso(dt) {
+  return dt.toISOString();
+}
+
+function _setChartAmountControl(unit) {
+  const amountInput = document.getElementById('mt-chart-amount');
+  if (!amountInput) return;
+  const configurable = CHART_CONFIGURABLE_UNITS.has(unit);
+  amountInput.disabled = !configurable;
+  amountInput.classList.toggle('disabled', !configurable);
+  amountInput.title = configurable ? '' : CHART_FIXED_UNIT_HINT;
+  amountInput.closest('label')?.classList.toggle('disabled', !configurable);
+  if (unit === 'hour') {
+    amountInput.max = '48';
+    if (Number(amountInput.value || 1) > 48) amountInput.value = '48';
+  } else {
+    amountInput.removeAttribute('max');
+  }
+}
+
+function _graphWindowConfig() {
   const unit = document.getElementById('mt-chart-unit')?.value || _metricsChartUnit;
-  const amount = Math.max(1, Math.min(999, Number(document.getElementById('mt-chart-amount')?.value || _metricsChartAmount)));
+  const amountInput = document.getElementById('mt-chart-amount');
+  const now = new Date();
+  let amount = Math.max(1, Number(amountInput?.value || _metricsChartAmount) || 1);
+  _setChartAmountControl(unit);
+
+  let start;
+  let end;
+  let bucketSeconds;
+  let caption;
+
+  if (unit === 'day') {
+    end = now;
+    start = new Date(end.getTime() - CHART_UNIT_SECONDS.day * 1000);
+    amount = 1;
+    bucketSeconds = 3600;
+    caption = 'gráfico: últimas 24 horas · bucket 1h';
+  } else if (unit === 'week') {
+    end = now;
+    start = new Date(end.getTime() - CHART_UNIT_SECONDS.week * 1000);
+    amount = 1;
+    bucketSeconds = 86400;
+    caption = 'gráfico: últimos 7 dias · bucket 1d';
+  } else if (unit === 'month') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    amount = 1;
+    bucketSeconds = 86400;
+    caption = `gráfico: mês atual (${MONTH_LABELS_PT[now.getMonth()]}) · bucket 1d`;
+  } else if (unit === 'year') {
+    start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    end = new Date(now.getFullYear() + 1, 0, 1, 0, 0, 0, 0);
+    amount = 1;
+    bucketSeconds = 2592000;
+    caption = `gráfico: ano atual (${now.getFullYear()}) · bucket mensal`;
+  } else {
+    if (unit === 'hour') amount = Math.min(48, amount);
+    const seconds = amount * (CHART_UNIT_SECONDS[unit] || 60);
+    end = now;
+    start = new Date(end.getTime() - seconds * 1000);
+    bucketSeconds = _bucketForWindow(seconds);
+    caption = `gráfico: últimos ${amount} ${CHART_UNIT_LABELS[unit] || 'minutos'} · bucket ${_metricsWindowLabel(bucketSeconds)}`;
+  }
+
+  const windowSeconds = Math.max(10, Math.ceil((end.getTime() - start.getTime()) / 1000));
   _metricsChartUnit = unit;
   _metricsChartAmount = amount;
-  _metricsWindowSeconds = amount * (CHART_UNIT_SECONDS[unit] || 60);
-  _metricsBucketSeconds = _bucketForWindow(_metricsWindowSeconds);
-  return _metricsWindowSeconds;
+  _metricsWindowSeconds = windowSeconds;
+  _metricsBucketSeconds = bucketSeconds;
+  _lastChartConfig = { unit, amount, start, end, windowSeconds, bucketSeconds, caption };
+  return _lastChartConfig;
 }
 
 function _formatMilestone(ts, unit) {
   const d = new Date(ts);
-  if (unit === 'second' || unit === 'minute') return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: unit === 'second' ? '2-digit' : undefined });
-  if (unit === 'hour') return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit' });
-  if (unit === 'day') return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-  if (unit === 'month') return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-  return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+  if (unit === 'second') return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (unit === 'minute') return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (unit === 'hour' || unit === 'day') return `${String(d.getHours()).padStart(2, '0')}:00`;
+  if (unit === 'week' || unit === 'month') return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  if (unit === 'year') return MONTH_LABELS_PT[d.getMonth()];
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function _chartMilestones(minX, maxX, unit) {
+  const result = [];
+  const push = (t) => {
+    if (t >= minX - 1 && t <= maxX + 1) result.push(t);
+  };
+  if (unit === 'week') {
+    const start = new Date(minX);
+    start.setHours(0, 0, 0, 0);
+    for (let t = start.getTime(); t <= maxX; t += 2 * 86400000) push(t);
+    if (!result.length || result[result.length - 1] < maxX - 86400000) push(maxX);
+    return result;
+  }
+  if (unit === 'month') {
+    const start = new Date(minX);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(maxX);
+    const lastDay = new Date(end.getFullYear(), end.getMonth(), 0).getDate();
+    const days = [1, 7, 14, 21, lastDay];
+    days.forEach(day => push(new Date(start.getFullYear(), start.getMonth(), day, 0, 0, 0, 0).getTime()));
+    return Array.from(new Set(result)).sort((a, b) => a - b);
+  }
+  if (unit === 'year') {
+    const year = new Date(minX).getFullYear();
+    for (let month = 0; month < 12; month++) push(new Date(year, month, 1, 0, 0, 0, 0).getTime());
+    return result;
+  }
+  const milestones = 5;
+  for (let i = 0; i <= milestones; i++) result.push(minX + ((maxX - minX) / milestones) * i);
+  return result;
 }
 
 function _rgba(hex, alpha) {
@@ -1347,8 +1450,8 @@ function _buildChartSeries(chartData) {
     ? allRoutes.filter(r => r.route_id === _metricsSelectedRouteId)
     : allRoutes;
   const bucketMs = (chartData.bucket_seconds || _metricsBucketSeconds || 60) * 1000;
-  const end = new Date(chartData.generated_at || Date.now()).getTime();
-  const start = end - (chartData.window_seconds || _metricsWindowSeconds) * 1000;
+  const end = chartData.window_end ? new Date(chartData.window_end).getTime() : new Date(chartData.generated_at || Date.now()).getTime();
+  const start = chartData.window_start ? new Date(chartData.window_start).getTime() : end - (chartData.window_seconds || _metricsWindowSeconds) * 1000;
   const buckets = [];
   for (let t = Math.floor(start / bucketMs) * bucketMs; t <= end; t += bucketMs) buckets.push(t);
   const values = new Map();
@@ -1384,8 +1487,10 @@ function _drawMetricsChart(chartData) {
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const maxY = Math.max(1, ...series.flatMap(s => s.points.map(p => p.y)));
-  const minX = Math.min(...series.flatMap(s => s.points.map(p => p.x)), Date.now() - 1000);
-  const maxX = Math.max(...series.flatMap(s => s.points.map(p => p.x)), Date.now());
+  const cfgStart = chartData.window_start ? new Date(chartData.window_start).getTime() : null;
+  const cfgEnd = chartData.window_end ? new Date(chartData.window_end).getTime() : null;
+  const minX = cfgStart || Math.min(...series.flatMap(s => s.points.map(p => p.x)), Date.now() - 1000);
+  const maxX = cfgEnd || Math.max(...series.flatMap(s => s.points.map(p => p.x)), Date.now());
   const xOf = x => pad.left + ((x - minX) / Math.max(1, maxX - minX)) * plotW;
   const yOf = y => pad.top + plotH - (y / maxY) * plotH;
 
@@ -1405,16 +1510,15 @@ function _drawMetricsChart(chartData) {
     ctx.fillText(String(Math.round(maxY - (maxY / 4) * i)), 10, y + 4);
   }
 
-  const milestones = 5;
+  const milestones = _chartMilestones(minX, maxX, unit);
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.055)';
-  for (let i = 0; i <= milestones; i++) {
-    const x = pad.left + (plotW / milestones) * i;
-    const t = minX + ((maxX - minX) / milestones) * i;
+  milestones.forEach((t, idx) => {
+    const x = xOf(t);
     ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke();
     ctx.fillStyle = 'rgba(180,200,240,0.50)';
-    ctx.textAlign = i === 0 ? 'left' : i === milestones ? 'right' : 'center';
-    ctx.fillText(_formatMilestone(t, unit), x, height - 14);
-  }
+    ctx.textAlign = idx === 0 ? 'left' : idx === milestones.length - 1 ? 'right' : 'center';
+    ctx.fillText(String(_formatMilestone(t, unit)), x, height - 14);
+  });
   ctx.textAlign = 'left';
 
   series.forEach(s => {
@@ -1517,18 +1621,18 @@ function _renderMetricsSummary(data) {
 
 function _renderMetricsChartOnly(data) {
   const caption = document.getElementById('mt-chart-caption');
-  if (caption) caption.textContent = `gráfico: últimos ${_metricsWindowLabel(data.window_seconds || _metricsWindowSeconds)} · bucket ${_metricsWindowLabel(data.bucket_seconds || _metricsBucketSeconds)}`;
+  if (caption) caption.textContent = _lastChartConfig?.caption || `gráfico: últimos ${_metricsWindowLabel(data.window_seconds || _metricsWindowSeconds)} · bucket ${_metricsWindowLabel(data.bucket_seconds || _metricsBucketSeconds)}`;
   _drawMetricsChart(data);
   _wireMetricsChartInteractions();
 }
 
 async function loadMetrics() {
   try {
-    _graphWindowSeconds();
+    const chartConfig = _graphWindowConfig();
     const tenantId = tenant?.id || null;
     const [summaryData, chartData] = await Promise.all([
       auditApi.routeMetrics(tenantId, METRICS_SUMMARY_SECONDS, 86400),
-      auditApi.routeMetrics(tenantId, _metricsWindowSeconds, _metricsBucketSeconds),
+      auditApi.routeMetrics(tenantId, chartConfig.windowSeconds, chartConfig.bucketSeconds, { dateFrom: _iso(chartConfig.start), dateTo: _iso(chartConfig.end) }),
     ]);
     _renderMetricsSummary(summaryData);
     _renderMetricsChartOnly(chartData);
@@ -1539,8 +1643,8 @@ async function loadMetrics() {
 }
 
 function _reloadMetricsChartOnly() {
-  _graphWindowSeconds();
-  auditApi.routeMetrics(tenant?.id || null, _metricsWindowSeconds, _metricsBucketSeconds)
+  const chartConfig = _graphWindowConfig();
+  auditApi.routeMetrics(tenant?.id || null, chartConfig.windowSeconds, chartConfig.bucketSeconds, { dateFrom: _iso(chartConfig.start), dateTo: _iso(chartConfig.end) })
     .then(_renderMetricsChartOnly)
     .catch(err => {
       const caption = document.getElementById('mt-chart-caption');

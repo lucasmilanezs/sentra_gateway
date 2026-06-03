@@ -119,13 +119,24 @@ class AuditRepository(AuditRepositoryPort):
             "window_hours": hours,
         }
 
-    async def metrics_by_route(self, *, tenant_id=None, seconds=3600, bucket_seconds=60):
+    async def metrics_by_route(self, *, tenant_id=None, seconds=3600, bucket_seconds=60, date_from=None, date_to=None):
         seconds = max(10, min(int(seconds or 3600), 60 * 60 * 24 * 366 * 5))
         bucket_seconds = max(1, min(int(bucket_seconds or 60), seconds))
-        since = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+        now = datetime.now(timezone.utc)
+        since = date_from or (now - timedelta(seconds=seconds))
+        until = date_to or now
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=timezone.utc)
+        if until <= since:
+            until = since + timedelta(seconds=seconds)
+        seconds = max(10, int((until - since).total_seconds()))
+        bucket_seconds = max(1, min(int(bucket_seconds or 60), seconds))
+
         tf_route = "WHERE r.tenant_id = :tenant_id" if tenant_id else ""
         tf_audit = "AND r.tenant_id = :tenant_id" if tenant_id else ""
-        params = {"since": since, "bucket": bucket_seconds}
+        params = {"since": since, "until": until, "bucket": bucket_seconds}
         if tenant_id:
             params["tenant_id"] = tenant_id
 
@@ -146,7 +157,10 @@ class AuditRepository(AuditRepositoryPort):
                 PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ar.latency_ms) AS p95_latency,
                 MAX(ar.created_at) AS last_seen_at
             FROM admin_routes r
-            LEFT JOIN admin_audit_requests ar ON ar.route_id = r.id AND ar.created_at >= :since
+            LEFT JOIN admin_audit_requests ar
+              ON ar.route_id = r.id
+             AND ar.created_at >= :since
+             AND ar.created_at < :until
             {tf_route}
             GROUP BY r.id, r.path_pattern, r.methods, r.display_color
             ORDER BY total_requests DESC, r.path_pattern ASC
@@ -159,7 +173,9 @@ class AuditRepository(AuditRepositoryPort):
                 COUNT(*) AS cnt
             FROM admin_audit_requests ar
             JOIN admin_routes r ON r.id = ar.route_id
-            WHERE ar.created_at >= :since {tf_audit}
+            WHERE ar.created_at >= :since
+              AND ar.created_at < :until
+              {tf_audit}
             GROUP BY ar.route_id, bucket_start
             ORDER BY bucket_start ASC
         """), params)).all()
@@ -187,11 +203,12 @@ class AuditRepository(AuditRepositoryPort):
         return {
             "window_seconds": seconds,
             "bucket_seconds": bucket_seconds,
-            "generated_at": datetime.now(timezone.utc),
+            "generated_at": now,
+            "window_start": since,
+            "window_end": until,
             "routes": routes,
             "series": [
                 {"route_id": r.route_id, "bucket_start": r.bucket_start, "count": int(r.cnt or 0)}
                 for r in series_rows
             ],
         }
-

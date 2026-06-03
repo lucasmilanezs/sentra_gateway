@@ -92,6 +92,8 @@ class RouteMetricsResponse(BaseModel):
     window_seconds: int
     bucket_seconds: int
     generated_at: datetime
+    window_start: datetime | None = None
+    window_end: datetime | None = None
     routes: list[RouteMetricSummary]
     series: list[RouteMetricPoint]
 
