@@ -152,6 +152,35 @@ async def listen_for_config_updates(
             reason_code, human_reason = classify_connection_error(exc)
             remaining = max(max_retries - attempt, 0)
             if status_registry:
+                # Pub/Sub is usually the first component to notice a Redis outage.
+                # Propagate that information to the shared Redis connectivity flag
+                # so request-path adapters can short-circuit immediately instead of
+                # paying Redis DNS/socket timeouts until /health runs again.
+                status_registry.mark_error(
+                    "redis_ping",
+                    exc,
+                    detail=human_reason,
+                    reason_code=reason_code,
+                    human_reason=human_reason,
+                    phase="detected_by_pubsub",
+                    redis_url=safe_url,
+                    redis_host=endpoint.host,
+                    redis_port=endpoint.port,
+                    retry_in_seconds=backoff_seconds,
+                )
+                for component, detail in {
+                    "redis_rate_limit": "Rate limit degradado porque o Pub/Sub detectou indisponibilidade geral do Redis. O gateway opera em fail-open sem tocar no Redis no caminho crítico.",
+                    "redis_raw_logs": "Logs operacionais degradados porque o Pub/Sub detectou indisponibilidade geral do Redis. A auditoria persistente não é afetada.",
+                }.items():
+                    state = status_registry.get(component)
+                    if state.status not in {"inactive", "error"}:
+                        status_registry.mark_degraded(
+                            component,
+                            detail,
+                            reason_code=reason_code,
+                            human_reason=human_reason,
+                            phase="redis_connectivity_unavailable",
+                        )
                 status_registry.mark_error(
                     status_name,
                     exc,

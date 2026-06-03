@@ -68,15 +68,14 @@ def classify_connection_error(exc: BaseException) -> tuple[str, str]:
     return "connection_error", "falha de conexão com Redis"
 
 
+def _blocking_tcp_probe(host: str, port: int, timeout: float) -> None:
+    # Use a blocking socket in a worker thread instead of asyncio.open_connection.
+    # uvloop/asyncio DNS failures may otherwise leave cancelled resolver futures that
+    # are later reported as "Future exception was never retrieved". The health
+    # path needs to be cheap, deterministic and fully contained.
+    with socket.create_connection((host, port), timeout=timeout):
+        return
+
+
 async def tcp_probe(host: str, port: int, *, timeout: float = 1.0) -> None:
-    reader = None
-    writer = None
-    try:
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=timeout)
-    finally:
-        if writer is not None:
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception:
-                pass
+    await asyncio.to_thread(_blocking_tcp_probe, host, port, max(0.1, float(timeout)))

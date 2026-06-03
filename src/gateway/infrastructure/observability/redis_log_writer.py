@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Iterable
 
 import redis.asyncio as aioredis
@@ -35,6 +35,7 @@ class RedisLogWriter(LogPort):
         status_registry: DependencyStatusRegistry | None = None,
         status_name: str = "redis_raw_logs",
         max_failures: int | None = None,
+        retry_cooldown_seconds: float = 10.0,
     ) -> None:
         self._client = client
         self._ttl_seconds = max(1, retention_days) * 24 * 60 * 60
@@ -44,8 +45,12 @@ class RedisLogWriter(LogPort):
         self._status_registry = status_registry
         self._status_name = status_name
         self._max_failures = max(1, int(max_failures or 5))
+        self._retry_cooldown_seconds = max(1.0, float(retry_cooldown_seconds))
 
     async def write(self, event: LogEvent) -> None:
+        if self._should_short_circuit():
+            return
+
         tenant_id = event.tenant_id or "unknown"
         day = event.timestamp.astimezone(timezone.utc).date().isoformat()
         stream_key = f"{self._stream_prefix}:{tenant_id}:gateway:raw_logs:{day}"
@@ -77,12 +82,13 @@ class RedisLogWriter(LogPort):
                     reason_code=reason_code,
                     human_reason=human_reason,
                     phase="redis_stream_write_failed",
+                    retry_in_seconds=self._retry_cooldown_seconds,
                     stream_key=stream_key,
                 )
                 if self._status_registry.get(self._status_name).attempts >= self._max_failures:
                     self._status_registry.mark_inactive(
                         self._status_name,
-                        "Logs operacionais em Redis inativos após falhas repetidas de escrita. O gateway continua encaminhando requisições.",
+                        "Logs operacionais em Redis inativos após falhas repetidas de escrita. O gateway continua encaminhando requisições sem tocar no Redis para logs no caminho crítico.",
                         reason_code="retry_budget_exhausted",
                         phase="inactive",
                         stream_key=stream_key,
@@ -92,7 +98,26 @@ class RedisLogWriter(LogPort):
                 reason_code,
                 type(exc).__name__,
             )
-            raise
+            return
+
+    def _should_short_circuit(self) -> bool:
+        if self._status_registry is None:
+            return False
+        now = datetime.now(timezone.utc)
+
+        # The shared Redis connectivity flag is updated by /health. If Redis is
+        # already known to be down, raw operational logging must not add latency to
+        # the proxy path by attempting a Redis write on every request.
+        redis_state = self._status_registry.get("redis_ping")
+        if redis_state.status in {"error", "inactive"}:
+            return True
+
+        state = self._status_registry.get(self._status_name)
+        if state.status == "inactive":
+            return True
+        if state.next_retry_at is not None and state.next_retry_at > now:
+            return True
+        return False
 
     def _serialize(self, event: LogEvent) -> dict:
         return {

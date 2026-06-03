@@ -4,10 +4,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-import redis.asyncio as aioredis
 from sqlalchemy import text
 
-from src.shared.runtime.redis_diagnostics import classify_connection_error
+from src.shared.runtime.redis_diagnostics import classify_connection_error, parse_redis_endpoint, tcp_probe
 
 
 def _now() -> str:
@@ -81,12 +80,18 @@ async def check_postgres(session_factory) -> dict[str, Any]:
         return _component("error", f"PostgreSQL do Admin não respondeu ao SELECT 1: {exc}", error_type=type(exc).__name__)
 
 
-async def check_redis(client: aioredis.Redis | None) -> dict[str, Any]:
-    if client is None:
-        return _component("not_configured", "Cliente Redis do Admin não está configurado.")
+async def check_redis(settings) -> dict[str, Any]:
+    if settings is None:
+        return _component("not_configured", "Configurações Redis do Admin não estão disponíveis.")
     try:
-        await client.ping()
-        return _component("ok", "Redis do Admin respondeu ao PING")
+        endpoint = parse_redis_endpoint(settings.redis_url)
+        await tcp_probe(endpoint.host, endpoint.port, timeout=float(getattr(settings, "redis_connect_timeout_seconds", 1.0)))
+        return _component(
+            "ok",
+            "Redis do Admin acessível via conexão TCP.",
+            redis_host=endpoint.host,
+            redis_port=endpoint.port,
+        )
     except Exception as exc:
         reason_code, human_reason = classify_connection_error(exc)
         return _component(
@@ -156,7 +161,7 @@ async def fetch_gateway_health(base_url: str, *, timeout: float) -> dict[str, An
 
 async def build_admin_health(admin, *, include_components: bool = False) -> dict[str, Any]:
     postgres = await check_postgres(getattr(admin, "_session_factory", None))
-    redis = await check_redis(getattr(admin, "_redis_client", None))
+    redis = await check_redis(getattr(admin, "settings", None))
     if postgres["status"] != "ok":
         status = "error"
         detail = "Admin indisponível: PostgreSQL administrativo não está saudável."
