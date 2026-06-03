@@ -8,13 +8,13 @@ from fastapi import FastAPI
 
 from src.gateway.application.use_cases.apply_policy_pipeline import ApplyPolicyPipeline
 from src.gateway.application.use_cases.forward_request import ForwardRequest
-from src.gateway.domain.services.audit_event_builder import AuditEventBuilder
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
 from src.gateway.domain.services.policy_evaluator import PolicyEvaluator
 from src.gateway.domain.services.rate_limit_checker import RateLimitChecker
 from src.gateway.infrastructure.config.settings import GatewaySettings
-from src.gateway.infrastructure.observability.postgres_audit_writer import PostgresAuditWriter
+from src.gateway.domain.services.audit_event_builder import AuditEventBuilder
 from src.gateway.infrastructure.observability.redis_log_writer import RedisLogWriter
+from src.gateway.infrastructure.observability.postgres_audit_writer import PostgresAuditWriter
 from src.gateway.infrastructure.persistence.postgres_snapshot import PostgresSnapshotRepository
 from src.gateway.infrastructure.proxy.httpx_upstream_proxy import HttpxUpstreamProxy
 from src.gateway.infrastructure.pubsub.redis_subscriber import listen_for_config_updates
@@ -39,9 +39,18 @@ def _redis_client(
         decode_responses=decode_responses,
         socket_connect_timeout=connect_timeout_seconds,
         socket_timeout=operation_timeout_seconds,
-        health_check_interval=None,
+        health_check_interval=30,
         retry_on_timeout=False,
     )
+
+
+async def _ping_redis(client: aioredis.Redis, registry: DependencyStatusRegistry, name: str) -> None:
+    try:
+        await client.ping()
+        registry.mark_ok(name, "Redis ping succeeded")
+    except Exception as exc:
+        registry.mark_error(name, exc, detail="Redis unavailable at startup; component will operate in degraded mode")
+        logger.warning("Redis dependency %s is unavailable at startup [%s]: %s", name, type(exc).__name__, exc)
 
 
 @asynccontextmanager
@@ -56,30 +65,32 @@ async def lifespan(app: FastAPI):
         await snapshot.load(settings.database_url)
         dependency_status.mark_ok(
             "snapshot",
-            "snapshot inicial carregada com sucesso",
+            "snapshot loaded",
             routes_loaded=snapshot.route_count(),
             tenants_loaded=snapshot.tenant_count(),
             policies_loaded=snapshot.policy_count(),
             loaded_at=snapshot.loaded_at.isoformat() if snapshot.loaded_at else None,
             last_successful_load_at=snapshot.loaded_at.isoformat() if snapshot.loaded_at else None,
         )
-        dependency_status.mark_ok("postgres", "PostgreSQL acessível durante carga inicial da snapshot")
     except Exception as exc:
-        dependency_status.mark_error("snapshot", exc, detail="falha ao carregar snapshot durante startup do gateway")
-        dependency_status.mark_error("postgres", exc, detail="PostgreSQL indisponível durante startup do gateway")
+        dependency_status.mark_error("snapshot", exc, detail="failed to load snapshot during gateway startup")
         logger.exception("Failed to load gateway snapshot during startup.")
         raise
 
     redis_rate_limit_client = _redis_client(
         settings.redis_url,
+        decode_responses=False,
         connect_timeout_seconds=settings.redis_connect_timeout_seconds,
         operation_timeout_seconds=settings.redis_operation_timeout_seconds,
     )
     redis_log_client = _redis_client(
         settings.redis_url,
+        decode_responses=False,
         connect_timeout_seconds=settings.redis_connect_timeout_seconds,
         operation_timeout_seconds=settings.redis_operation_timeout_seconds,
     )
+    await _ping_redis(redis_rate_limit_client, dependency_status, "redis_rate_limit")
+    await _ping_redis(redis_log_client, dependency_status, "redis_raw_logs")
 
     policy_pipeline = ApplyPolicyPipeline(
         policy_evaluator=PolicyEvaluator(),
@@ -88,6 +99,7 @@ async def lifespan(app: FastAPI):
                 client=redis_rate_limit_client,
                 fail_open=settings.redis_fail_open,
                 status_registry=dependency_status,
+                max_failures=settings.redis_runtime_max_failures,
             )
         ),
     )
@@ -98,14 +110,15 @@ async def lifespan(app: FastAPI):
         max_entries_per_tenant_per_day=settings.raw_log_max_entries_per_tenant_per_day,
         redact_headers=settings.raw_log_redact_header_names,
         status_registry=dependency_status,
+        max_failures=settings.redis_runtime_max_failures,
     )
 
     audit_writer = None
     if settings.audit_to_postgres:
         audit_writer = PostgresAuditWriter(settings.database_url)
-        dependency_status.mark_ok("postgres_audit", "auditoria PostgreSQL configurada")
+        dependency_status.mark_ok("postgres_audit", "writer configured; no write observed yet")
     else:
-        dependency_status.mark_ok("postgres_audit", "auditoria PostgreSQL desabilitada por configuração", enabled=False)
+        dependency_status.mark_ok("postgres_audit", "disabled by configuration", enabled=False)
 
     http_client = httpx.AsyncClient()
 
@@ -113,14 +126,13 @@ async def lifespan(app: FastAPI):
         await snapshot.reload(settings.database_url)
         dependency_status.mark_ok(
             "snapshot",
-            "snapshot recarregada com sucesso",
+            "snapshot reloaded",
             routes_loaded=snapshot.route_count(),
             tenants_loaded=snapshot.tenant_count(),
             policies_loaded=snapshot.policy_count(),
             loaded_at=snapshot.loaded_at.isoformat() if snapshot.loaded_at else None,
             last_successful_load_at=snapshot.loaded_at.isoformat() if snapshot.loaded_at else None,
         )
-        dependency_status.mark_ok("postgres", "PostgreSQL acessível durante reload da snapshot")
 
     forward_request = ForwardRequest(
         route_repository=snapshot,
@@ -141,17 +153,38 @@ async def lifespan(app: FastAPI):
     app.state.redis_rate_limit_client = redis_rate_limit_client
     app.state.redis_log_client = redis_log_client
 
-    subscriber_task = asyncio.create_task(
-        listen_for_config_updates(
-            redis_url=settings.redis_url,
-            on_update=reload_snapshot,
-            status_registry=dependency_status,
-            max_retries=settings.redis_subscriber_max_retries,
-            idle_ping_seconds=settings.redis_pubsub_idle_ping_seconds,
-            connect_timeout_seconds=settings.redis_connect_timeout_seconds,
-            operation_timeout_seconds=settings.redis_operation_timeout_seconds,
+    def _new_subscriber_task(reason: str) -> asyncio.Task:
+        logger.info("Starting Redis Pub/Sub subscriber (%s).", reason)
+        dependency_status.mark_degraded(
+            "redis_pubsub",
+            f"iniciando subscriber Redis Pub/Sub ({reason})",
+            reason_code="subscriber_starting",
+            phase="starting",
         )
-    )
+        return asyncio.create_task(
+            listen_for_config_updates(
+                redis_url=settings.redis_url,
+                on_update=reload_snapshot,
+                status_registry=dependency_status,
+                max_retries=settings.redis_subscriber_max_retries,
+                connect_timeout_seconds=settings.redis_connect_timeout_seconds,
+                operation_timeout_seconds=settings.redis_operation_timeout_seconds,
+                idle_ping_seconds=settings.redis_pubsub_idle_ping_seconds,
+            )
+        )
+
+    async def restart_redis_subscriber_if_needed(reason: str = "redis health recovered") -> bool:
+        current = getattr(app.state, "subscriber_task", None)
+        current_status = dependency_status.status_of("redis_pubsub")
+        if current is not None and not current.done():
+            return False
+        if current_status not in {"inactive", "error", "unknown", "degraded"}:
+            return False
+        app.state.subscriber_task = _new_subscriber_task(reason)
+        return True
+
+    app.state.restart_redis_subscriber_if_needed = restart_redis_subscriber_if_needed
+    subscriber_task = _new_subscriber_task("startup")
     app.state.subscriber_task = subscriber_task
 
     logger.info(
@@ -166,11 +199,13 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        subscriber_task.cancel()
-        try:
-            await subscriber_task
-        except asyncio.CancelledError:
-            pass
+        subscriber_task = getattr(app.state, "subscriber_task", None)
+        if subscriber_task is not None:
+            subscriber_task.cancel()
+            try:
+                await subscriber_task
+            except asyncio.CancelledError:
+                pass
 
         await http_client.aclose()
         await redis_rate_limit_client.aclose()

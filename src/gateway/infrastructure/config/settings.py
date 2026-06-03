@@ -24,7 +24,13 @@ class GatewaySettings(BaseSettings):
     redis_connect_timeout_seconds: float = Field(default=1.0, alias="GATEWAY_REDIS_CONNECT_TIMEOUT_SECONDS")
     redis_operation_timeout_seconds: float = Field(default=1.5, alias="GATEWAY_REDIS_OPERATION_TIMEOUT_SECONDS")
     redis_subscriber_max_retries: int = Field(default=5, alias="GATEWAY_REDIS_SUBSCRIBER_MAX_RETRIES")
+    redis_runtime_max_failures: int = Field(default=5, alias="GATEWAY_REDIS_RUNTIME_MAX_FAILURES")
+    redis_health_probe_max_failures: int = Field(default=3, alias="GATEWAY_REDIS_HEALTH_PROBE_MAX_FAILURES")
     redis_pubsub_idle_ping_seconds: float = Field(default=20.0, alias="GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS")
+
+    # Optional read-only authorization for detailed health payloads exposed by the gateway.
+    admin_jwt_secret: str = Field(default="change-me-in-production-use-long-random-secret", alias="ADMIN_JWT_SECRET")
+    admin_jwt_algorithm: str = Field(default="HS256", alias="ADMIN_JWT_ALGORITHM")
 
     @property
     def redis_url(self) -> str:

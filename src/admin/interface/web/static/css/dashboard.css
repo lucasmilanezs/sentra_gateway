@@ -1106,3 +1106,28 @@ html, body {
   font-family: var(--mono);
   font-style: normal;
 }
+
+.health-plane-block {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.28);
+  margin-top: 12px;
+}
+
+.health-plane-block h3 {
+  margin: 0 0 12px 0;
+  font-size: .82rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.overview-health-subgrid {
+  margin-top: 0 !important;
+}
+
+.overview-restricted {
+  grid-column: 1 / -1;
+}

@@ -79,28 +79,25 @@ export const policiesApi = {
   delete: (routeId)          => request('DELETE', `/routes/${routeId}/policy`),
 };
 
-function gatewayBaseUrl() {
-  const host = window.location.hostname || 'localhost';
-  const protocol = window.location.protocol || 'http:';
-  return `${protocol}//${host}:8000`;
-}
-
-async function fetchJson(url) {
-  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw { status: response.status, detail: data.detail || `Erro HTTP ${response.status}` };
-  }
-  return data;
-}
-
 export const healthApi = {
-  admin:      () => request('GET', '/health'),
-  adminLive:  () => request('GET', '/health/live'),
-  adminReady: () => request('GET', '/health/ready'),
-  gateway:    () => fetchJson(`${gatewayBaseUrl()}/health`),
-  gatewayLive:() => fetchJson(`${gatewayBaseUrl()}/health/live`),
-  gatewayUrl: gatewayBaseUrl,
+  check:      () => request('GET', '/health'),
+  live:       () => request('GET', '/health/live'),
+  ready:      () => request('GET', '/health/ready'),
+  gateway: async () => {
+    const token = getToken();
+    const response = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw { status: response.status, detail: data.detail || 'Erro ao consultar health do gateway' };
+    }
+    return data;
+  },
 };
 
 function appendQuery(q, values = {}) {

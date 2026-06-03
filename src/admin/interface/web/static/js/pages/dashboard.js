@@ -39,8 +39,6 @@ let _auditView = 'gateway';
 let _lastGatewayAuditRows = [];
 let _lastGovernanceAuditRows = [];
 let _lastRawLogRows = [];
-const OVERVIEW_HEALTH_POLL_MS = 1000;
-let _overviewPollTimer = null;
 
 function _tenantLabel() {
   return tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : 'Todos os tenants';
@@ -263,20 +261,12 @@ function navigate(pageId) {
   if (btn)  btn.classList.add('active');
   if (page) page.classList.add('active');
 
-  if (pageId === 'audit') {
-    _stopOverviewPoll();
-    setAuditView(_auditView || 'gateway');
-    return;
-  }
+  if (pageId === 'audit') { setAuditView(_auditView || 'gateway'); }
+  else                    { _stopAuditPoll();  }
 
-  _stopAuditPoll();
-  if (pageId === 'overview') {
-    _startOverviewPoll();
-    return;
-  }
-
+  if (pageId === 'overview') { _startOverviewPoll(); return; }
   _stopOverviewPoll();
-  PAGE_LOADERS[pageId]?.();
+  if (pageId !== 'audit') PAGE_LOADERS[pageId]?.();
 }
 
 // ── Inicialização — tudo depende de me() ─────────────────────────────────
@@ -373,12 +363,14 @@ function navigate(pageId) {
 })();
 
 // ── OVERVIEW ─────────────────────────────────────────────────────────────
+const OVERVIEW_POLL_MS = 1000;
+let _overviewPollTimer = null;
+
 function _statusIcon(status) {
   if (status === 'ok') return '✓';
   if (status === 'degraded') return '!';
   if (status === 'error') return '✗';
   if (status === 'inactive') return '⏸';
-  if (status === 'not_loaded') return '?';
   return '?';
 }
 
@@ -388,7 +380,6 @@ function _statusText(status) {
   if (status === 'error') return 'erro';
   if (status === 'inactive') return 'inativo';
   if (status === 'not_loaded') return 'não carregado';
-  if (status === 'not_configured') return 'não configurado';
   return status || 'desconhecido';
 }
 
@@ -423,11 +414,10 @@ function _setOverviewCard(id, status, sub = '') {
 function _healthDetail(label, component) {
   const status = component?.status || 'unknown';
   const detail = component?.detail || component?.human_reason || component?.last_error || component?.last_error_type || _statusText(status);
-  const reason = component?.reason_code ? `Motivo: ${component.reason_code}` : '';
+  const reason = component?.reason_code ? ` · ${component.reason_code}` : '';
   const lastOk = component?.last_ok_at ? `Último OK: ${new Date(component.last_ok_at).toLocaleString('pt-BR')}` : '';
   const disabled = component?.disabled_at ? `Inativo desde: ${new Date(component.disabled_at).toLocaleString('pt-BR')}` : '';
-  const loadedAt = component?.loaded_at ? `Snapshot: ${new Date(component.loaded_at).toLocaleString('pt-BR')}` : '';
-  const meta = [reason, lastOk, disabled, loadedAt].filter(Boolean).join(' · ');
+  const meta = [reason && reason.trim(), lastOk, disabled].filter(Boolean).join(' · ');
   const cls = _statusClass(status);
   return `<div class="${cls}">
     <span>${escHtml(label)}</span>
@@ -437,124 +427,136 @@ function _healthDetail(label, component) {
   </div>`;
 }
 
-function _component(checks, name, fallbackDetail = 'estado ainda não observado') {
-  return checks?.[name] || { status: 'unknown', detail: fallbackDetail };
+function _worstStatus(statuses, { redisIsDegraded = false } = {}) {
+  const clean = statuses.filter(Boolean);
+  if (clean.includes('error')) return redisIsDegraded ? 'degraded' : 'error';
+  if (clean.some(s => ['degraded', 'inactive', 'unknown', 'not_loaded', 'not_configured'].includes(s))) return 'degraded';
+  return clean.length ? 'ok' : 'unknown';
 }
 
-function _mergeRedisStatus(adminRedis, gatewayRedis) {
-  const statuses = [adminRedis?.status, gatewayRedis?.status].filter(Boolean);
-  if (statuses.includes('error')) return 'error';
-  if (statuses.includes('inactive') || statuses.includes('degraded') || statuses.includes('unknown')) return 'degraded';
-  return statuses.length ? 'ok' : 'unknown';
-}
-
-function _systemStatus(adminHealth, gatewayHealth) {
-  const adminStatus = adminHealth?.status || 'unknown';
-  const gatewayStatus = gatewayHealth?.status || 'unknown';
-  if (adminStatus === 'error') return 'error';
-  if (gatewayStatus === 'error') return 'error';
-  if ([adminStatus, gatewayStatus].some(s => ['degraded', 'inactive', 'unknown'].includes(s))) return 'degraded';
-  return 'ok';
-}
-
-function _renderSplitHealth(adminHealth, gatewayHealth) {
+function _normalizeComponents(adminHealth, gatewayHealth) {
   const adminChecks = adminHealth?.checks || {};
   const gatewayChecks = gatewayHealth?.checks || {};
-
-  const adminStatus = adminHealth?.status || 'unknown';
-  const gatewayStatus = gatewayHealth?.status || 'unknown';
-  const postgresStatus = _component(adminChecks, 'postgres').status === 'ok' && _component(gatewayChecks, 'postgres').status === 'ok' ? 'ok' : 'error';
-  const redisStatus = _mergeRedisStatus(_component(adminChecks, 'redis'), _component(gatewayChecks, 'redis'));
-  const snapshot = _component(gatewayChecks, 'snapshot', 'gateway não retornou estado de snapshot');
-  const systemStatus = _systemStatus(adminHealth, gatewayHealth);
-
-  _setOverviewCard('ov-status', systemStatus, systemStatus === 'ok' ? 'admin e gateway saudáveis' : 'verifique componentes abaixo');
-  _setOverviewCard('ov-admin', adminStatus, adminHealth?.detail || `admin ${_statusText(adminStatus)}`);
-  _setOverviewCard('ov-gateway', gatewayStatus, gatewayHealth?.detail || `gateway ${_statusText(gatewayStatus)}`);
-  _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'admin/gateway conectados' : 'falha em uma conexão');
-  _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'admin/gateway conectados' : 'Redis indisponível ou degradado');
-  _setOverviewCard('ov-snapshot', snapshot.status, snapshot.status === 'ok'
-    ? `atualizada há ${snapshot.age_seconds ?? '—'}s`
-    : snapshot.detail || _statusText(snapshot.status));
-
-  if (snapshot.routes_loaded != null) document.getElementById('ov-routes').textContent = snapshot.routes_loaded;
-  if (snapshot.tenants_loaded != null) document.getElementById('ov-domains').textContent = snapshot.tenants_loaded;
-
-  const summary = document.getElementById('ov-health-summary');
-  if (summary) {
-    const snapshotWhen = snapshot.loaded_at ? new Date(snapshot.loaded_at).toLocaleString('pt-BR') : 'sem snapshot carregada';
-    summary.innerHTML = `Health separado por serviço. Admin: <strong>${escHtml(_statusText(adminStatus))}</strong>. ` +
-      `Gateway: <strong>${escHtml(_statusText(gatewayStatus))}</strong>. ` +
-      `Última snapshot do gateway: <code>${escHtml(snapshotWhen)}</code>.`;
-  }
-
-  const grid = document.getElementById('ov-health-grid');
-  if (grid) {
-    grid.innerHTML = [
-      _healthDetail('Admin API', adminHealth),
-      _healthDetail('Admin PostgreSQL', _component(adminChecks, 'postgres')),
-      _healthDetail('Admin Redis', _component(adminChecks, 'redis')),
-      _healthDetail('Gateway API', gatewayHealth),
-      _healthDetail('Gateway PostgreSQL', _component(gatewayChecks, 'postgres')),
-      _healthDetail('Gateway Redis', _component(gatewayChecks, 'redis')),
-      _healthDetail('Gateway Pub/Sub', _component(gatewayChecks, 'redis_pubsub')),
-      _healthDetail('Gateway Rate limit', _component(gatewayChecks, 'redis_rate_limit')),
-      _healthDetail('Gateway Logs operacionais', _component(gatewayChecks, 'redis_raw_logs')),
-      _healthDetail('Gateway Audit Postgres', _component(gatewayChecks, 'postgres_audit')),
-      _healthDetail('Gateway Snapshot', snapshot),
-    ].join('');
-  }
+  return {
+    admin_api: adminHealth || { status: 'error', detail: 'Admin não respondeu ao healthcheck.' },
+    gateway_api: gatewayHealth || { status: 'error', detail: 'Gateway não respondeu ao healthcheck.' },
+    admin_postgres: adminChecks.postgres || { status: 'unknown', detail: 'Admin não retornou estado do PostgreSQL.' },
+    admin_redis: adminChecks.redis || { status: 'unknown', detail: 'Admin não retornou estado do Redis.' },
+    gateway_snapshot: gatewayChecks.snapshot || { status: 'unknown', detail: 'Gateway não retornou estado da snapshot.' },
+    gateway_postgres: gatewayChecks.postgres || { status: 'unknown', detail: 'Gateway não retornou estado do PostgreSQL.' },
+    gateway_redis_ping: gatewayChecks.redis_ping || { status: 'unknown', detail: 'Gateway não retornou estado do Redis.' },
+    gateway_pubsub: gatewayChecks.redis_pubsub || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
+    gateway_rate_limit: gatewayChecks.redis_rate_limit || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
+    gateway_raw_logs: gatewayChecks.redis_raw_logs || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
+    gateway_postgres_audit: gatewayChecks.postgres_audit || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
+    gateway_snapshot_reload: gatewayChecks.snapshot_reload || { status: 'unknown', detail: 'Nenhuma falha de reload reportada.' },
+  };
 }
 
-function _renderOverviewError(adminResult, gatewayResult) {
-  const adminFailed = adminResult.status === 'rejected';
-  const gatewayFailed = gatewayResult.status === 'rejected';
-  if (adminFailed) _setOverviewCard('ov-admin', 'error', adminResult.reason?.detail || 'admin health indisponível');
-  if (gatewayFailed) _setOverviewCard('ov-gateway', 'error', gatewayResult.reason?.detail || 'gateway health indisponível');
-  _setOverviewCard('ov-status', 'error', 'falha ao consultar um ou mais healthchecks');
-  const grid = document.getElementById('ov-health-grid');
-  if (grid) {
-    const items = [];
-    if (adminFailed) items.push(_healthDetail('Admin API', { status: 'error', detail: adminResult.reason?.detail || String(adminResult.reason) }));
-    if (gatewayFailed) items.push(_healthDetail('Gateway API', { status: 'error', detail: gatewayResult.reason?.detail || String(gatewayResult.reason) }));
-    grid.innerHTML = items.join('');
+function _renderOverview(adminHealth, gatewayHealth) {
+  const c = _normalizeComponents(adminHealth, gatewayHealth);
+  const superuser = isSuperUser();
+
+  const adminStatus = c.admin_api.status || 'unknown';
+  const gatewayStatus = c.gateway_api.status || 'unknown';
+  const postgresStatus = _worstStatus([c.admin_postgres.status, c.gateway_postgres.status]);
+  const redisStatus = _worstStatus([c.admin_redis.status, c.gateway_redis_ping.status], { redisIsDegraded: false });
+  const snapshotStatus = c.gateway_snapshot.status || 'unknown';
+  const systemStatus = _worstStatus([adminStatus, gatewayStatus, postgresStatus, snapshotStatus, redisStatus], { redisIsDegraded: true });
+
+  const snapshotAge = c.gateway_snapshot.age_seconds ?? '—';
+  const snapshotDetail = snapshotStatus === 'ok'
+    ? `última carga há ${snapshotAge}s`
+    : (c.gateway_snapshot.detail || _statusText(snapshotStatus));
+
+  _setOverviewCard('ov-status', systemStatus, systemStatus === 'ok'
+    ? 'sistema operacional'
+    : (superuser ? 'verifique os componentes abaixo' : 'contate o super-user para mais detalhes'));
+  _setOverviewCard('ov-admin', adminStatus, c.admin_api.detail || `admin ${_statusText(adminStatus)}`);
+  _setOverviewCard('ov-gateway', gatewayStatus, c.gateway_api.detail || `gateway ${_statusText(gatewayStatus)}`);
+  _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'admin/gateway conectado' : 'falha em um plano');
+  _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'admin/gateway conectado' : 'redis indisponível ou degradado');
+  _setOverviewCard('ov-snapshot', snapshotStatus, snapshotDetail);
+
+  const healthSummary = document.getElementById('ov-health-summary');
+  if (healthSummary) {
+    const loadedAt = c.gateway_snapshot.loaded_at
+      ? new Date(c.gateway_snapshot.loaded_at).toLocaleString('pt-BR')
+      : null;
+    healthSummary.innerHTML = superuser
+      ? `Admin: <strong>${escHtml(_statusText(adminStatus))}</strong>. Gateway: <strong>${escHtml(_statusText(gatewayStatus))}</strong>. ` +
+        `Snapshot: <strong>${escHtml(_statusText(snapshotStatus))}</strong>${loadedAt ? ` desde <code>${escHtml(loadedAt)}</code>` : ''}.`
+      : (systemStatus === 'ok'
+          ? 'Resumo operacional disponível. Detalhes internos são restritos ao super-user.'
+          : 'Estado degradado detectado. Contate o super-user para mais detalhes.');
   }
+
+  const grid = document.getElementById('ov-health-grid');
+  if (!grid) return;
+
+  if (!superuser) {
+    grid.innerHTML = `<div class="health-unknown overview-restricted">
+      <span>Detalhes restritos</span>
+      <strong>contate o super-user</strong>
+      <small>Componentes internos podem expor timestamps e estado operacional de outros tenants.</small>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = `
+    <div class="health-plane-block">
+      <h3>Plano Admin</h3>
+      <div class="semantic-grid overview-health-subgrid">
+        ${_healthDetail('Admin API', c.admin_api)}
+        ${_healthDetail('PostgreSQL Admin', c.admin_postgres)}
+        ${_healthDetail('Redis Admin', c.admin_redis)}
+      </div>
+    </div>
+    <div class="health-plane-block">
+      <h3>Plano Gateway</h3>
+      <div class="semantic-grid overview-health-subgrid">
+        ${_healthDetail('Gateway API', c.gateway_api)}
+        ${_healthDetail('Snapshot Gateway', c.gateway_snapshot)}
+        ${_healthDetail('PostgreSQL Gateway', c.gateway_postgres)}
+        ${_healthDetail('Redis Gateway Ping', c.gateway_redis_ping)}
+        ${_healthDetail('Redis Pub/Sub', c.gateway_pubsub)}
+        ${_healthDetail('Rate limit', c.gateway_rate_limit)}
+        ${_healthDetail('Logs operacionais', c.gateway_raw_logs)}
+        ${_healthDetail('Audit Postgres', c.gateway_postgres_audit)}
+        ${_healthDetail('Snapshot Reload', c.gateway_snapshot_reload)}
+      </div>
+    </div>`;
 }
 
 async function loadOverview() {
-  const [adminResult, gatewayResult] = await Promise.allSettled([
-    healthApi.admin(),
-    healthApi.gateway(),
-  ]);
-
-  if (adminResult.status === 'fulfilled' && gatewayResult.status === 'fulfilled') {
-    _renderSplitHealth(adminResult.value, gatewayResult.value);
-  } else {
-    _renderOverviewError(adminResult, gatewayResult);
-  }
-
-  if (tenant) {
-    try {
-      const [routes, domains] = await Promise.all([
-        routesApi.list(tenant.id),
-        domainsApi.list(tenant.id),
-      ]);
-      document.getElementById('ov-routes').textContent  = routes.length;
-      document.getElementById('ov-domains').textContent = domains.length;
-    } catch {}
+  try {
+    const [adminHealth, gatewayHealth] = await Promise.all([
+      healthApi.check(),
+      healthApi.gateway(),
+    ]);
+    _renderOverview(adminHealth, gatewayHealth);
+  } catch (err) {
+    _setOverviewCard('ov-status', 'error', err.detail || 'erro ao carregar healthchecks');
+    const summary = document.getElementById('ov-health-summary');
+    if (summary) summary.textContent = err.detail || 'Erro ao carregar healthchecks.';
   }
 }
 
 function _startOverviewPoll() {
-  if (_overviewPollTimer) return;
+  _stopOverviewPoll();
   loadOverview();
-  _overviewPollTimer = setInterval(loadOverview, OVERVIEW_HEALTH_POLL_MS);
+  _overviewPollTimer = setInterval(() => {
+    if (document.getElementById('page-overview')?.classList.contains('active')) {
+      loadOverview();
+    }
+  }, OVERVIEW_POLL_MS);
 }
 
 function _stopOverviewPoll() {
-  if (!_overviewPollTimer) return;
-  clearInterval(_overviewPollTimer);
-  _overviewPollTimer = null;
+  if (_overviewPollTimer) {
+    clearInterval(_overviewPollTimer);
+    _overviewPollTimer = null;
+  }
 }
 
 // ── TENANTS (superuser) ───────────────────────────────────────────────────

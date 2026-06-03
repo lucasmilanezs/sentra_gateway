@@ -22,11 +22,13 @@ class RateLimiter(RateLimitPort):
         fail_open: bool = True,
         status_registry: DependencyStatusRegistry | None = None,
         status_name: str = "redis_rate_limit",
+        max_failures: int | None = None,
     ) -> None:
         self._client = client
         self._fail_open = fail_open
         self._status_registry = status_registry
         self._status_name = status_name
+        self._max_failures = max_failures if max_failures and max_failures > 0 else None
 
     async def is_allowed(
         self,
@@ -62,18 +64,36 @@ class RateLimiter(RateLimitPort):
         except Exception as exc:
             reason_code, human_reason = classify_connection_error(exc)
             if self._status_registry:
-                self._status_registry.mark_error(
-                    self._status_name,
-                    exc,
-                    detail=(
-                        f"{human_reason}; rate limit operando em fail-open"
-                        if self._fail_open else human_reason
-                    ),
-                    reason_code=reason_code,
-                    human_reason=human_reason,
-                    fail_open=self._fail_open,
-                    key_prefix="rate",
-                )
+                current_attempts = self._status_registry.get(self._status_name).attempts + 1
+                if self._max_failures is not None and current_attempts >= self._max_failures:
+                    self._status_registry.mark_inactive(
+                        self._status_name,
+                        (
+                            f"{human_reason}; rate limit desativado temporariamente após "
+                            f"{current_attempts} falha(s). Requests seguem em fail-open."
+                            if self._fail_open
+                            else f"{human_reason}; rate limit indisponível após {current_attempts} falha(s)."
+                        ),
+                        reason_code="runtime_failure_budget_exhausted",
+                        human_reason=human_reason,
+                        fail_open=self._fail_open,
+                        key_prefix="rate",
+                        max_failures=self._max_failures,
+                    )
+                else:
+                    self._status_registry.mark_error(
+                        self._status_name,
+                        exc,
+                        detail=(
+                            f"{human_reason}; rate limit operando em fail-open"
+                            if self._fail_open else human_reason
+                        ),
+                        reason_code=reason_code,
+                        human_reason=human_reason,
+                        fail_open=self._fail_open,
+                        key_prefix="rate",
+                        max_failures=self._max_failures,
+                    )
             if self._fail_open:
                 logger.warning(
                     "Redis rate limiter unavailable [%s/%s]; allowing request by fail-open policy.",
