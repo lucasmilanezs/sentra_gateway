@@ -36,6 +36,9 @@ class AdminSettings(BaseSettings):
     # Redis
     redis_host: str = Field(default="redis", alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
+    redis_connect_timeout_seconds: float = Field(default=1.0, alias="ADMIN_REDIS_CONNECT_TIMEOUT_SECONDS")
+    redis_operation_timeout_seconds: float = Field(default=1.5, alias="ADMIN_REDIS_OPERATION_TIMEOUT_SECONDS")
+
 
     # Email
     smtp_host: str | None = Field(default=None, alias="ADMIN_SMTP_HOST")

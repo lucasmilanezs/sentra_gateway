@@ -70,7 +70,14 @@ class AdminWiring:
                 mail_from=settings.smtp_from or "noreply@sentra.local",
             )
 
-        self._redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+        self._redis_client = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_operation_timeout_seconds,
+            health_check_interval=None,
+            retry_on_timeout=False,
+        )
         self.publisher = RedisConfigNotifier(client=self._redis_client)
         self.raw_gateway_log_repository = RedisGatewayLogRepository(client=self._redis_client)
         self.query_gateway_logs = QueryGatewayLogs(self.raw_gateway_log_repository)

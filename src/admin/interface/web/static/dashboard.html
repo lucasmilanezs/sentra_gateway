@@ -112,13 +112,34 @@
       <div class="page-header"><h1 class="page-title">Overview</h1></div>
       <div class="metrics-grid">
         <div class="metric-card">
-          <div class="metric-label">Status</div>
+          <div class="metric-label">Sistema</div>
           <div class="metric-value" id="ov-status">—</div>
+          <div class="metric-sub" id="ov-status-sub">health geral</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Admin</div>
+          <div class="metric-value" id="ov-admin">—</div>
+          <div class="metric-sub" id="ov-admin-sub">painel de controle</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Gateway</div>
+          <div class="metric-value" id="ov-gateway">—</div>
+          <div class="metric-sub" id="ov-gateway-sub">plano de dados</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">PostgreSQL</div>
           <div class="metric-value" id="ov-postgres">—</div>
           <div class="metric-sub" id="ov-postgres-sub"></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Redis</div>
+          <div class="metric-value" id="ov-redis">—</div>
+          <div class="metric-sub" id="ov-redis-sub">admin/gateway</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Snapshot Gateway</div>
+          <div class="metric-value" id="ov-snapshot">—</div>
+          <div class="metric-sub" id="ov-snapshot-sub">config em memória</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Rotas ativas</div>
@@ -128,6 +149,11 @@
           <div class="metric-label">Domains</div>
           <div class="metric-value" id="ov-domains">—</div>
         </div>
+      </div>
+      <div class="card" id="ov-health-details" style="margin-top:16px">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:10px">Saúde dos componentes</div>
+        <div class="domain-hint" id="ov-health-summary">Carregando estado dos serviços…</div>
+        <div id="ov-health-grid" class="semantic-grid" style="margin-top:14px"></div>
       </div>
     </section>
 
@@ -695,14 +721,14 @@
   </div>
 </div>
 
-<!-- Modal: Log operacional -->
+<!-- Modal: Log operacional bruto -->
 <div class="modal-overlay" id="modal-raw-log" style="display:none">
-  <div class="modal-box modal-box-wide">
+  <div class="modal-box" style="max-width:920px;width:92vw">
     <h2 class="modal-title">Detalhes do log operacional</h2>
-    <div class="semantic-detail" id="raw-log-semantic"></div>
-    <pre class="json-detail" id="raw-log-detail">{}</pre>
+    <div id="raw-log-semantic" style="margin-bottom:14px"></div>
+    <pre id="raw-log-detail" style="max-height:420px;overflow:auto;background:#111827;color:#e5e7eb;border-radius:10px;padding:14px;font-size:.78rem;white-space:pre-wrap"></pre>
     <div class="modal-actions">
-      <button class="btn-ghost" id="raw-log-close">Fechar</button>
+      <button class="btn-primary" id="raw-log-close">Fechar</button>
     </div>
   </div>
 </div>

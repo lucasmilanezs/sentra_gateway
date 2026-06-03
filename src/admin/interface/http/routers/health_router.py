@@ -1,29 +1,52 @@
-import redis.asyncio as aioredis
+from __future__ import annotations
+
+from typing import Any
+
 from fastapi import APIRouter, Request
-from sqlalchemy import text
+
+from src.admin.infrastructure.health.system_health import build_admin_health
 
 router = APIRouter(tags=["health"])
 
+
+def _admin_from_request(request: Request):
+    return getattr(request.app.state, "admin", None)
+
+
+async def _admin_health_response(request: Request) -> dict[str, Any]:
+    admin = _admin_from_request(request)
+    if admin is None:
+        return {
+            "service": "admin",
+            "status": "error",
+            "ready": False,
+            "detail": "admin wiring não está configurado",
+            "postgres_connected": False,
+            "redis_connected": False,
+            "checks": {"admin": {"status": "error", "detail": "admin wiring não está configurado"}},
+        }
+    return await build_admin_health(admin)
+
+
+@router.get("/health/live")
+@router.get("/api/v1/health/live", include_in_schema=False)
+async def health_live() -> dict[str, Any]:
+    return {"service": "admin", "status": "ok", "detail": "processo HTTP do admin está vivo"}
+
+
+@router.get("/health/ready")
+@router.get("/api/v1/health/ready", include_in_schema=False)
+async def health_ready(request: Request) -> dict[str, Any]:
+    return await _admin_health_response(request)
+
+
+@router.get("/health/dependencies")
+@router.get("/api/v1/health/dependencies", include_in_schema=False)
+async def health_dependencies(request: Request) -> dict[str, Any]:
+    return await _admin_health_response(request)
+
+
 @router.get("/health")
-async def health(request: Request) -> dict:
-    admin = getattr(request.app.state, "admin", None)
-    checks = {}
-    if admin and hasattr(admin, "_session_factory") and admin._session_factory:
-        try:
-            async with admin._session_factory() as s:
-                await s.execute(text("SELECT 1"))
-            checks["postgres"] = {"status": "ok"}
-        except Exception as e:
-            checks["postgres"] = {"status": "error", "detail": str(e)}
-    else:
-        checks["postgres"] = {"status": "not_configured"}
-    if admin and hasattr(admin, "_redis_client"):
-        try:
-            await admin._redis_client.ping()
-            checks["redis"] = {"status": "ok"}
-        except Exception as e:
-            checks["redis"] = {"status": "error", "detail": str(e)}
-    else:
-        checks["redis"] = {"status": "not_configured"}
-    overall = "ok" if all(v.get("status") == "ok" for v in checks.values()) else "degraded"
-    return {"status": overall, "postgres_connected": checks.get("postgres", {}).get("status") == "ok", "checks": checks}
+@router.get("/api/v1/health", include_in_schema=False)
+async def health(request: Request) -> dict[str, Any]:
+    return await _admin_health_response(request)

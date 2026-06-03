@@ -19,6 +19,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 5s
 
   redis:
     image: redis:7-alpine
@@ -27,10 +28,11 @@ services:
     ports:
       - "${REDIS_PORT_HOST:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -h 127.0.0.1 -p 6379 ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 5s
 
   # ── Aplicação ─────────────────────────────────────────────────────────────
 
@@ -84,6 +86,8 @@ services:
       GATEWAY_RAW_LOG_RETENTION_DAYS: ${GATEWAY_RAW_LOG_RETENTION_DAYS:-7}
       GATEWAY_RAW_LOG_MAX_ENTRIES_PER_TENANT_PER_DAY: ${GATEWAY_RAW_LOG_MAX_ENTRIES_PER_TENANT_PER_DAY:-1000}
       GATEWAY_RAW_LOG_REDACT_HEADERS: ${GATEWAY_RAW_LOG_REDACT_HEADERS:-authorization,cookie,set-cookie,x-api-key}
+      GATEWAY_REDIS_FAIL_OPEN: ${GATEWAY_REDIS_FAIL_OPEN:-true}
+      GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS: ${GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS:-20}
       SENTRA_POLICY_SECRET_KEY: ${SENTRA_POLICY_SECRET_KEY:-}
     ports:
       - "8000:8000"

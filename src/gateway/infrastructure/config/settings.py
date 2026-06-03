@@ -20,6 +20,11 @@ class GatewaySettings(BaseSettings):
     #Redis
     redis_host: str = Field(default="redis", alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
+    redis_fail_open: bool = Field(default=True, alias="GATEWAY_REDIS_FAIL_OPEN")
+    redis_connect_timeout_seconds: float = Field(default=1.0, alias="GATEWAY_REDIS_CONNECT_TIMEOUT_SECONDS")
+    redis_operation_timeout_seconds: float = Field(default=1.5, alias="GATEWAY_REDIS_OPERATION_TIMEOUT_SECONDS")
+    redis_subscriber_max_retries: int = Field(default=5, alias="GATEWAY_REDIS_SUBSCRIBER_MAX_RETRIES")
+    redis_pubsub_idle_ping_seconds: float = Field(default=20.0, alias="GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS")
 
     @property
     def redis_url(self) -> str:

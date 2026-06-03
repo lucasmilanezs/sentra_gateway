@@ -23,4 +23,4 @@ class RedisConfigNotifier(ConfigNotifier):
             logger.info("Notificação de atualização de configuração publicada.")
         except Exception as exc:
             # Best-effort: a notification failure must not rollback the admin write.
-            logger.warning("Falha ao publicar notificação Redis: %s", exc)
+            logger.warning("Falha ao publicar notificação Redis [%s].", type(exc).__name__, exc_info=True)

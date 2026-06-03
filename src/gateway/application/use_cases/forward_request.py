@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from typing import Optional
 
@@ -20,6 +21,8 @@ from src.gateway.domain.ports.route_repository import RouteRepository
 from src.gateway.domain.ports.upstream_proxy_port import UpstreamProxyPort
 from src.gateway.domain.services.audit_event_builder import AuditEventBuilder
 from src.gateway.domain.services.log_event_builder import LogEventBuilder
+
+logger = logging.getLogger(__name__)
 
 # Backward-compat re-exports so nothing outside breaks
 __all__ = [
@@ -187,8 +190,12 @@ class ForwardRequest(GatewayRequestPort):
     async def _safe_audit_write(self, event: AuditEvent) -> None:
         try:
             await self._audit.write(event)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist gateway audit event [%s]: %s",
+                type(exc).__name__,
+                exc,
+            )
 
     def _schedule_log(
         self, *, request: Request, upstream_url: str, status_code: int, latency_ms: float,
@@ -212,8 +219,12 @@ class ForwardRequest(GatewayRequestPort):
     async def _safe_log_write(self, event) -> None:
         try:
             await self._log.write(event)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist gateway operational log [%s]: %s",
+                type(exc).__name__,
+                exc,
+            )
 
     @staticmethod
     def _elapsed(start: float) -> float:

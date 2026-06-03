@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import timezone
 from typing import Iterable
 
 import redis.asyncio as aioredis
 
 from src.gateway.domain.models.log_event import LogEvent
 from src.gateway.domain.ports.log_port import LogPort
+from src.shared.runtime.dependency_status import DependencyStatusRegistry
+from src.shared.runtime.redis_diagnostics import classify_connection_error
+
+logger = logging.getLogger(__name__)
 
 
 class RedisLogWriter(LogPort):
     """
     Redis Streams adapter for dense gateway operational logs.
 
-    These records are intentionally short-lived observability data, not a formal
-    audit source of truth. Curated request audit events remain in PostgreSQL.
+    These records are short-lived observability data, not formal audit data.
+    If Redis becomes unavailable, this adapter marks the component as degraded
+    and lets the caller decide how to handle the failed write.
     """
 
     def __init__(
@@ -26,12 +32,16 @@ class RedisLogWriter(LogPort):
         max_entries_per_tenant_per_day: int = 1000,
         redact_headers: Iterable[str] = (),
         stream_prefix: str = "sentra:tenant",
+        status_registry: DependencyStatusRegistry | None = None,
+        status_name: str = "redis_raw_logs",
     ) -> None:
         self._client = client
         self._ttl_seconds = max(1, retention_days) * 24 * 60 * 60
         self._max_entries = max(1, max_entries_per_tenant_per_day)
         self._redact_headers = {h.lower() for h in redact_headers}
         self._stream_prefix = stream_prefix.strip(":")
+        self._status_registry = status_registry
+        self._status_name = status_name
 
     async def write(self, event: LogEvent) -> None:
         tenant_id = event.tenant_id or "unknown"
@@ -39,13 +49,37 @@ class RedisLogWriter(LogPort):
         stream_key = f"{self._stream_prefix}:{tenant_id}:gateway:raw_logs:{day}"
         record = self._serialize(event)
 
-        await self._client.xadd(
-            stream_key,
-            {"event": json.dumps(record, ensure_ascii=False)},
-            maxlen=self._max_entries,
-            approximate=True,
-        )
-        await self._client.expire(stream_key, self._ttl_seconds)
+        try:
+            await self._client.xadd(
+                stream_key,
+                {"event": json.dumps(record, ensure_ascii=False)},
+                maxlen=self._max_entries,
+                approximate=True,
+            )
+            await self._client.expire(stream_key, self._ttl_seconds)
+            if self._status_registry:
+                self._status_registry.mark_ok(
+                    self._status_name,
+                    "log operacional gravado no Redis",
+                    stream_key=stream_key,
+                )
+        except Exception as exc:
+            reason_code, human_reason = classify_connection_error(exc)
+            if self._status_registry:
+                self._status_registry.mark_error(
+                    self._status_name,
+                    exc,
+                    detail=f"{human_reason}; escrita de logs operacionais interrompida",
+                    reason_code=reason_code,
+                    human_reason=human_reason,
+                    stream_key=stream_key,
+                )
+            logger.warning(
+                "Failed to write gateway raw log to Redis [%s/%s]; operational logging is degraded.",
+                reason_code,
+                type(exc).__name__,
+            )
+            raise
 
     def _serialize(self, event: LogEvent) -> dict:
         return {

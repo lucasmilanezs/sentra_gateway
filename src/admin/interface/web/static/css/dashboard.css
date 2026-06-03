@@ -1063,3 +1063,46 @@ html, body {
     width: calc(100vw - 18px);
   }
 }
+
+/* ── Health status colors ─────────────────────────────────────────────── */
+.health-ok { color: var(--ok) !important; }
+.health-error { color: var(--err) !important; }
+.health-degraded { color: var(--warn) !important; }
+.health-unknown { color: var(--text-secondary) !important; }
+
+.semantic-grid > div.health-ok { border-color: var(--ok-border); background: var(--ok-bg); }
+.semantic-grid > div.health-error { border-color: var(--err-border); background: var(--err-bg); }
+.semantic-grid > div.health-degraded { border-color: rgba(245,158,11,0.25); background: var(--warn-bg); }
+
+.metric-value.health-ok,
+.metric-sub.health-ok,
+.semantic-grid strong.health-ok { color: var(--ok) !important; }
+.metric-value.health-error,
+.metric-sub.health-error,
+.semantic-grid strong.health-error { color: var(--err) !important; }
+.metric-value.health-degraded,
+.metric-sub.health-degraded,
+.semantic-grid strong.health-degraded { color: var(--warn) !important; }
+
+.health-inactive { color: var(--warn) !important; }
+.semantic-grid > div.health-inactive { border-color: rgba(245,158,11,0.25); background: var(--warn-bg); }
+.metric-value.health-inactive,
+.metric-sub.health-inactive,
+.semantic-grid strong.health-inactive { color: var(--warn) !important; }
+.semantic-grid small {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  font-family: var(--sans);
+}
+.semantic-grid em {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.64rem;
+  line-height: 1.35;
+  font-family: var(--mono);
+  font-style: normal;
+}

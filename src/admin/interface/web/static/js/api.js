@@ -79,8 +79,28 @@ export const policiesApi = {
   delete: (routeId)          => request('DELETE', `/routes/${routeId}/policy`),
 };
 
+function gatewayBaseUrl() {
+  const host = window.location.hostname || 'localhost';
+  const protocol = window.location.protocol || 'http:';
+  return `${protocol}//${host}:8000`;
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw { status: response.status, detail: data.detail || `Erro HTTP ${response.status}` };
+  }
+  return data;
+}
+
 export const healthApi = {
-  check: () => request('GET', '/health'),
+  admin:      () => request('GET', '/health'),
+  adminLive:  () => request('GET', '/health/live'),
+  adminReady: () => request('GET', '/health/ready'),
+  gateway:    () => fetchJson(`${gatewayBaseUrl()}/health`),
+  gatewayLive:() => fetchJson(`${gatewayBaseUrl()}/health/live`),
+  gatewayUrl: gatewayBaseUrl,
 };
 
 function appendQuery(q, values = {}) {

@@ -39,6 +39,8 @@ let _auditView = 'gateway';
 let _lastGatewayAuditRows = [];
 let _lastGovernanceAuditRows = [];
 let _lastRawLogRows = [];
+const OVERVIEW_HEALTH_POLL_MS = 1000;
+let _overviewPollTimer = null;
 
 function _tenantLabel() {
   return tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : 'Todos os tenants';
@@ -261,10 +263,20 @@ function navigate(pageId) {
   if (btn)  btn.classList.add('active');
   if (page) page.classList.add('active');
 
-  if (pageId === 'audit') { setAuditView(_auditView || 'gateway'); }
-  else                    { _stopAuditPoll();  }
+  if (pageId === 'audit') {
+    _stopOverviewPoll();
+    setAuditView(_auditView || 'gateway');
+    return;
+  }
 
-  if (pageId !== 'audit') PAGE_LOADERS[pageId]?.();
+  _stopAuditPoll();
+  if (pageId === 'overview') {
+    _startOverviewPoll();
+    return;
+  }
+
+  _stopOverviewPoll();
+  PAGE_LOADERS[pageId]?.();
 }
 
 // ── Inicialização — tudo depende de me() ─────────────────────────────────
@@ -361,13 +373,165 @@ function navigate(pageId) {
 })();
 
 // ── OVERVIEW ─────────────────────────────────────────────────────────────
+function _statusIcon(status) {
+  if (status === 'ok') return '✓';
+  if (status === 'degraded') return '!';
+  if (status === 'error') return '✗';
+  if (status === 'inactive') return '⏸';
+  if (status === 'not_loaded') return '?';
+  return '?';
+}
+
+function _statusText(status) {
+  if (status === 'ok') return 'saudável';
+  if (status === 'degraded') return 'degradado';
+  if (status === 'error') return 'erro';
+  if (status === 'inactive') return 'inativo';
+  if (status === 'not_loaded') return 'não carregado';
+  if (status === 'not_configured') return 'não configurado';
+  return status || 'desconhecido';
+}
+
+function _statusClass(status) {
+  if (status === 'ok') return 'health-ok';
+  if (status === 'error') return 'health-error';
+  if (status === 'degraded') return 'health-degraded';
+  if (status === 'inactive') return 'health-inactive';
+  return 'health-unknown';
+}
+
+function _applyHealthClass(el, status) {
+  if (!el) return;
+  el.classList.remove('health-ok', 'health-error', 'health-degraded', 'health-inactive', 'health-unknown');
+  el.classList.add(_statusClass(status));
+}
+
+function _setOverviewCard(id, status, sub = '') {
+  const value = document.getElementById(id);
+  const subEl = document.getElementById(`${id}-sub`);
+  if (value) {
+    value.textContent = _statusIcon(status);
+    value.title = _statusText(status);
+    _applyHealthClass(value, status);
+  }
+  if (subEl) {
+    subEl.textContent = sub || _statusText(status);
+    _applyHealthClass(subEl, status);
+  }
+}
+
+function _healthDetail(label, component) {
+  const status = component?.status || 'unknown';
+  const detail = component?.detail || component?.human_reason || component?.last_error || component?.last_error_type || _statusText(status);
+  const reason = component?.reason_code ? `Motivo: ${component.reason_code}` : '';
+  const lastOk = component?.last_ok_at ? `Último OK: ${new Date(component.last_ok_at).toLocaleString('pt-BR')}` : '';
+  const disabled = component?.disabled_at ? `Inativo desde: ${new Date(component.disabled_at).toLocaleString('pt-BR')}` : '';
+  const loadedAt = component?.loaded_at ? `Snapshot: ${new Date(component.loaded_at).toLocaleString('pt-BR')}` : '';
+  const meta = [reason, lastOk, disabled, loadedAt].filter(Boolean).join(' · ');
+  const cls = _statusClass(status);
+  return `<div class="${cls}">
+    <span>${escHtml(label)}</span>
+    <strong class="${cls}" title="${escHtml(detail)}">${_statusIcon(status)} ${escHtml(_statusText(status))}</strong>
+    <small title="${escHtml(detail)}">${escHtml(detail)}</small>
+    ${meta ? `<em>${escHtml(meta)}</em>` : ''}
+  </div>`;
+}
+
+function _component(checks, name, fallbackDetail = 'estado ainda não observado') {
+  return checks?.[name] || { status: 'unknown', detail: fallbackDetail };
+}
+
+function _mergeRedisStatus(adminRedis, gatewayRedis) {
+  const statuses = [adminRedis?.status, gatewayRedis?.status].filter(Boolean);
+  if (statuses.includes('error')) return 'error';
+  if (statuses.includes('inactive') || statuses.includes('degraded') || statuses.includes('unknown')) return 'degraded';
+  return statuses.length ? 'ok' : 'unknown';
+}
+
+function _systemStatus(adminHealth, gatewayHealth) {
+  const adminStatus = adminHealth?.status || 'unknown';
+  const gatewayStatus = gatewayHealth?.status || 'unknown';
+  if (adminStatus === 'error') return 'error';
+  if (gatewayStatus === 'error') return 'error';
+  if ([adminStatus, gatewayStatus].some(s => ['degraded', 'inactive', 'unknown'].includes(s))) return 'degraded';
+  return 'ok';
+}
+
+function _renderSplitHealth(adminHealth, gatewayHealth) {
+  const adminChecks = adminHealth?.checks || {};
+  const gatewayChecks = gatewayHealth?.checks || {};
+
+  const adminStatus = adminHealth?.status || 'unknown';
+  const gatewayStatus = gatewayHealth?.status || 'unknown';
+  const postgresStatus = _component(adminChecks, 'postgres').status === 'ok' && _component(gatewayChecks, 'postgres').status === 'ok' ? 'ok' : 'error';
+  const redisStatus = _mergeRedisStatus(_component(adminChecks, 'redis'), _component(gatewayChecks, 'redis'));
+  const snapshot = _component(gatewayChecks, 'snapshot', 'gateway não retornou estado de snapshot');
+  const systemStatus = _systemStatus(adminHealth, gatewayHealth);
+
+  _setOverviewCard('ov-status', systemStatus, systemStatus === 'ok' ? 'admin e gateway saudáveis' : 'verifique componentes abaixo');
+  _setOverviewCard('ov-admin', adminStatus, adminHealth?.detail || `admin ${_statusText(adminStatus)}`);
+  _setOverviewCard('ov-gateway', gatewayStatus, gatewayHealth?.detail || `gateway ${_statusText(gatewayStatus)}`);
+  _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'admin/gateway conectados' : 'falha em uma conexão');
+  _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'admin/gateway conectados' : 'Redis indisponível ou degradado');
+  _setOverviewCard('ov-snapshot', snapshot.status, snapshot.status === 'ok'
+    ? `atualizada há ${snapshot.age_seconds ?? '—'}s`
+    : snapshot.detail || _statusText(snapshot.status));
+
+  if (snapshot.routes_loaded != null) document.getElementById('ov-routes').textContent = snapshot.routes_loaded;
+  if (snapshot.tenants_loaded != null) document.getElementById('ov-domains').textContent = snapshot.tenants_loaded;
+
+  const summary = document.getElementById('ov-health-summary');
+  if (summary) {
+    const snapshotWhen = snapshot.loaded_at ? new Date(snapshot.loaded_at).toLocaleString('pt-BR') : 'sem snapshot carregada';
+    summary.innerHTML = `Health separado por serviço. Admin: <strong>${escHtml(_statusText(adminStatus))}</strong>. ` +
+      `Gateway: <strong>${escHtml(_statusText(gatewayStatus))}</strong>. ` +
+      `Última snapshot do gateway: <code>${escHtml(snapshotWhen)}</code>.`;
+  }
+
+  const grid = document.getElementById('ov-health-grid');
+  if (grid) {
+    grid.innerHTML = [
+      _healthDetail('Admin API', adminHealth),
+      _healthDetail('Admin PostgreSQL', _component(adminChecks, 'postgres')),
+      _healthDetail('Admin Redis', _component(adminChecks, 'redis')),
+      _healthDetail('Gateway API', gatewayHealth),
+      _healthDetail('Gateway PostgreSQL', _component(gatewayChecks, 'postgres')),
+      _healthDetail('Gateway Redis', _component(gatewayChecks, 'redis')),
+      _healthDetail('Gateway Pub/Sub', _component(gatewayChecks, 'redis_pubsub')),
+      _healthDetail('Gateway Rate limit', _component(gatewayChecks, 'redis_rate_limit')),
+      _healthDetail('Gateway Logs operacionais', _component(gatewayChecks, 'redis_raw_logs')),
+      _healthDetail('Gateway Audit Postgres', _component(gatewayChecks, 'postgres_audit')),
+      _healthDetail('Gateway Snapshot', snapshot),
+    ].join('');
+  }
+}
+
+function _renderOverviewError(adminResult, gatewayResult) {
+  const adminFailed = adminResult.status === 'rejected';
+  const gatewayFailed = gatewayResult.status === 'rejected';
+  if (adminFailed) _setOverviewCard('ov-admin', 'error', adminResult.reason?.detail || 'admin health indisponível');
+  if (gatewayFailed) _setOverviewCard('ov-gateway', 'error', gatewayResult.reason?.detail || 'gateway health indisponível');
+  _setOverviewCard('ov-status', 'error', 'falha ao consultar um ou mais healthchecks');
+  const grid = document.getElementById('ov-health-grid');
+  if (grid) {
+    const items = [];
+    if (adminFailed) items.push(_healthDetail('Admin API', { status: 'error', detail: adminResult.reason?.detail || String(adminResult.reason) }));
+    if (gatewayFailed) items.push(_healthDetail('Gateway API', { status: 'error', detail: gatewayResult.reason?.detail || String(gatewayResult.reason) }));
+    grid.innerHTML = items.join('');
+  }
+}
+
 async function loadOverview() {
-  try {
-    const h = await healthApi.check();
-    document.getElementById('ov-status').textContent    = h.status === 'ok' ? '✓' : '✗';
-    document.getElementById('ov-postgres').textContent  = h.postgres_connected ? '✓' : '✗';
-    document.getElementById('ov-postgres-sub').textContent = h.postgres_connected ? 'conectado' : 'offline';
-  } catch { document.getElementById('ov-status').textContent = 'erro'; }
+  const [adminResult, gatewayResult] = await Promise.allSettled([
+    healthApi.admin(),
+    healthApi.gateway(),
+  ]);
+
+  if (adminResult.status === 'fulfilled' && gatewayResult.status === 'fulfilled') {
+    _renderSplitHealth(adminResult.value, gatewayResult.value);
+  } else {
+    _renderOverviewError(adminResult, gatewayResult);
+  }
 
   if (tenant) {
     try {
@@ -379,6 +543,18 @@ async function loadOverview() {
       document.getElementById('ov-domains').textContent = domains.length;
     } catch {}
   }
+}
+
+function _startOverviewPoll() {
+  if (_overviewPollTimer) return;
+  loadOverview();
+  _overviewPollTimer = setInterval(loadOverview, OVERVIEW_HEALTH_POLL_MS);
+}
+
+function _stopOverviewPoll() {
+  if (!_overviewPollTimer) return;
+  clearInterval(_overviewPollTimer);
+  _overviewPollTimer = null;
 }
 
 // ── TENANTS (superuser) ───────────────────────────────────────────────────
@@ -941,10 +1117,7 @@ function _checkListHtml(title, checks) {
 }
 
 function _openRawLogModal(record) {
-  const modal = document.getElementById('modal-raw-log');
   const semantic = document.getElementById('raw-log-semantic');
-  const detail = document.getElementById('raw-log-detail');
-  if (!modal || !semantic || !detail) return;
   const routeLabel = record.route_label || record.path || 'rota não resolvida';
   const layerErrors = record.layer_errors || {};
   const layerHtml = Object.keys(layerErrors).length
@@ -963,20 +1136,15 @@ function _openRawLogModal(record) {
     ${_checkListHtml('Headers e matches', record.header_checks)}
     ${_checkListHtml('Params e matches', record.param_checks)}
     ${layerHtml}`;
-  detail.textContent = JSON.stringify(record.payload || record, null, 2);
-  modal.style.display = 'flex';
+  document.getElementById('raw-log-detail').textContent = JSON.stringify(record.payload || record, null, 2);
+  document.getElementById('modal-raw-log').style.display = 'flex';
 }
 
 document.getElementById('logs-group-by')?.addEventListener('change', _renderRawLogs);
 document.getElementById('logs-sort-by')?.addEventListener('change', _renderRawLogs);
 document.getElementById('logs-refresh')?.addEventListener('click', loadRawLogs);
-document.getElementById('raw-log-close')?.addEventListener('click', () => {
-  const modal = document.getElementById('modal-raw-log');
-  if (modal) modal.style.display = 'none';
-});
-document.getElementById('modal-raw-log')?.addEventListener('click', e => {
-  if (e.target.id === 'modal-raw-log') e.currentTarget.style.display = 'none';
-});
+document.getElementById('raw-log-close')?.addEventListener('click', () => { document.getElementById('modal-raw-log').style.display = 'none'; });
+document.getElementById('modal-raw-log')?.addEventListener('click', e => { if (e.target.id === 'modal-raw-log') document.getElementById('modal-raw-log').style.display = 'none'; });
 
 // ── MÉTRICAS ──────────────────────────────────────────────────────────────
 async function loadMetrics() {
