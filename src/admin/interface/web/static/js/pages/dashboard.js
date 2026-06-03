@@ -411,19 +411,64 @@ function _setOverviewCard(id, status, sub = '') {
   }
 }
 
+function _translateHealthDetail(text) {
+  if (!text) return '';
+  const raw = String(text);
+  const direct = {
+    'Redis ping succeeded': 'Redis respondeu ao PING.',
+    'snapshot loaded': 'Snapshot carregada com sucesso.',
+    'snapshot reloaded': 'Snapshot recarregada com sucesso.',
+    'writer configured; no write observed yet': 'Escritor configurado; aguardando o primeiro evento para confirmar escrita.',
+    'disabled by configuration': 'Desativado por configuração.',
+    'processo HTTP do admin está vivo': 'Processo HTTP do Admin está vivo.',
+    'processo HTTP do gateway está vivo': 'Processo HTTP do Gateway está vivo.',
+  };
+  return direct[raw] || raw;
+}
+
+function _componentDetail(label, component) {
+  const status = component?.status || 'unknown';
+  const detail = component?.human_detail || component?.detail || component?.human_reason || component?.last_error || component?.last_error_type;
+  if (detail) return _translateHealthDetail(detail);
+  if (status === 'ok') return `${label} está saudável.`;
+  if (status === 'degraded') return `${label} está operando em modo degradado.`;
+  if (status === 'inactive') return `${label} foi marcado como inativo após falhas repetidas.`;
+  if (status === 'error') return `${label} encontrou uma falha operacional.`;
+  return `${label} ainda não reportou estado suficiente.`;
+}
+
+function _isRetrying(component) {
+  const phase = String(component?.phase || '').toLowerCase();
+  const reason = String(component?.reason_code || '').toLowerCase();
+  return Boolean(
+    component?.next_retry_at ||
+    phase.includes('retry') ||
+    phase.includes('connect') ||
+    phase.includes('starting') ||
+    phase.includes('restarting') ||
+    reason.includes('connecting') ||
+    reason.includes('restart_requested')
+  ) && component?.status !== 'inactive' && component?.status !== 'ok';
+}
+
 function _healthDetail(label, component) {
   const status = component?.status || 'unknown';
-  const detail = component?.detail || component?.human_reason || component?.last_error || component?.last_error_type || _statusText(status);
-  const reason = component?.reason_code ? ` · ${component.reason_code}` : '';
+  const detail = _componentDetail(label, component);
+  const reason = component?.reason_code ? `Código: ${component.reason_code}` : '';
+  const phase = component?.phase ? `Fase: ${component.phase}` : '';
   const lastOk = component?.last_ok_at ? `Último OK: ${new Date(component.last_ok_at).toLocaleString('pt-BR')}` : '';
+  const lastFailure = component?.last_failure_at ? `Última falha: ${new Date(component.last_failure_at).toLocaleString('pt-BR')}` : '';
   const disabled = component?.disabled_at ? `Inativo desde: ${new Date(component.disabled_at).toLocaleString('pt-BR')}` : '';
-  const meta = [reason && reason.trim(), lastOk, disabled].filter(Boolean).join(' · ');
+  const retryAt = component?.next_retry_at ? `Nova tentativa: ${new Date(component.next_retry_at).toLocaleString('pt-BR')}` : '';
+  const meta = [reason, phase, lastOk, lastFailure, disabled, retryAt].filter(Boolean).join(' · ');
   const cls = _statusClass(status);
-  return `<div class="${cls}">
+  const retrying = _isRetrying(component);
+  return `<div class="${cls}${retrying ? ' health-retrying' : ''}">
     <span>${escHtml(label)}</span>
     <strong class="${cls}" title="${escHtml(detail)}">${_statusIcon(status)} ${escHtml(_statusText(status))}</strong>
     <small title="${escHtml(detail)}">${escHtml(detail)}</small>
     ${meta ? `<em>${escHtml(meta)}</em>` : ''}
+    ${retrying ? '<div class="health-retry-wave" aria-label="tentando reconectar"><i>.</i><i>.</i><i>.</i></div>' : ''}
   </div>`;
 }
 
@@ -445,11 +490,11 @@ function _normalizeComponents(adminHealth, gatewayHealth) {
     gateway_snapshot: gatewayChecks.snapshot || { status: 'unknown', detail: 'Gateway não retornou estado da snapshot.' },
     gateway_postgres: gatewayChecks.postgres || { status: 'unknown', detail: 'Gateway não retornou estado do PostgreSQL.' },
     gateway_redis_ping: gatewayChecks.redis_ping || { status: 'unknown', detail: 'Gateway não retornou estado do Redis.' },
-    gateway_pubsub: gatewayChecks.redis_pubsub || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
-    gateway_rate_limit: gatewayChecks.redis_rate_limit || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
-    gateway_raw_logs: gatewayChecks.redis_raw_logs || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
-    gateway_postgres_audit: gatewayChecks.postgres_audit || { status: 'unknown', detail: 'Disponível apenas para super-user.' },
-    gateway_snapshot_reload: gatewayChecks.snapshot_reload || { status: 'unknown', detail: 'Nenhuma falha de reload reportada.' },
+    gateway_pubsub: gatewayChecks.redis_pubsub || { status: 'unknown', detail: 'Detalhes disponíveis apenas para super-user.' },
+    gateway_rate_limit: gatewayChecks.redis_rate_limit || { status: 'unknown', detail: 'Detalhes disponíveis apenas para super-user.' },
+    gateway_raw_logs: gatewayChecks.redis_raw_logs || { status: 'unknown', detail: 'Detalhes disponíveis apenas para super-user.' },
+    gateway_postgres_audit: gatewayChecks.postgres_audit || { status: 'unknown', detail: 'Detalhes disponíveis apenas para super-user.' },
+    gateway_snapshot_reload: gatewayChecks.snapshot_reload || { status: 'unknown', detail: 'Nenhuma falha de recarga reportada.' },
   };
 }
 
@@ -472,10 +517,10 @@ function _renderOverview(adminHealth, gatewayHealth) {
   _setOverviewCard('ov-status', systemStatus, systemStatus === 'ok'
     ? 'sistema operacional'
     : (superuser ? 'verifique os componentes abaixo' : 'contate o super-user para mais detalhes'));
-  _setOverviewCard('ov-admin', adminStatus, c.admin_api.detail || `admin ${_statusText(adminStatus)}`);
-  _setOverviewCard('ov-gateway', gatewayStatus, c.gateway_api.detail || `gateway ${_statusText(gatewayStatus)}`);
-  _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'admin/gateway conectado' : 'falha em um plano');
-  _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'admin/gateway conectado' : 'redis indisponível ou degradado');
+  _setOverviewCard('ov-admin', adminStatus, _componentDetail('Admin', c.admin_api));
+  _setOverviewCard('ov-gateway', gatewayStatus, _componentDetail('Gateway', c.gateway_api));
+  _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'PostgreSQL conectado nos dois planos' : 'falha de PostgreSQL em um dos planos');
+  _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'Redis conectado nos dois planos' : 'Redis indisponível ou degradado');
   _setOverviewCard('ov-snapshot', snapshotStatus, snapshotDetail);
 
   const healthSummary = document.getElementById('ov-health-summary');
@@ -507,23 +552,23 @@ function _renderOverview(adminHealth, gatewayHealth) {
     <div class="health-plane-block">
       <h3>Plano Admin</h3>
       <div class="semantic-grid overview-health-subgrid">
-        ${_healthDetail('Admin API', c.admin_api)}
-        ${_healthDetail('PostgreSQL Admin', c.admin_postgres)}
-        ${_healthDetail('Redis Admin', c.admin_redis)}
+        ${_healthDetail('API do Admin', c.admin_api)}
+        ${_healthDetail('PostgreSQL do Admin', c.admin_postgres)}
+        ${_healthDetail('Redis do Admin', c.admin_redis)}
       </div>
     </div>
     <div class="health-plane-block">
       <h3>Plano Gateway</h3>
       <div class="semantic-grid overview-health-subgrid">
-        ${_healthDetail('Gateway API', c.gateway_api)}
-        ${_healthDetail('Snapshot Gateway', c.gateway_snapshot)}
-        ${_healthDetail('PostgreSQL Gateway', c.gateway_postgres)}
-        ${_healthDetail('Redis Gateway Ping', c.gateway_redis_ping)}
-        ${_healthDetail('Redis Pub/Sub', c.gateway_pubsub)}
-        ${_healthDetail('Rate limit', c.gateway_rate_limit)}
+        ${_healthDetail('API do Gateway', c.gateway_api)}
+        ${_healthDetail('Snapshot do Gateway', c.gateway_snapshot)}
+        ${_healthDetail('PostgreSQL do Gateway', c.gateway_postgres)}
+        ${_healthDetail('Redis do Gateway', c.gateway_redis_ping)}
+        ${_healthDetail('Mensageria Redis Pub/Sub', c.gateway_pubsub)}
+        ${_healthDetail('Limitação de requisições', c.gateway_rate_limit)}
         ${_healthDetail('Logs operacionais', c.gateway_raw_logs)}
-        ${_healthDetail('Audit Postgres', c.gateway_postgres_audit)}
-        ${_healthDetail('Snapshot Reload', c.gateway_snapshot_reload)}
+        ${_healthDetail('Auditoria PostgreSQL', c.gateway_postgres_audit)}
+        ${_healthDetail('Recarga da snapshot', c.gateway_snapshot_reload)}
       </div>
     </div>`;
 }

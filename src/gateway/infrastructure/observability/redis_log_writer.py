@@ -43,7 +43,7 @@ class RedisLogWriter(LogPort):
         self._stream_prefix = stream_prefix.strip(":")
         self._status_registry = status_registry
         self._status_name = status_name
-        self._max_failures = max_failures if max_failures and max_failures > 0 else None
+        self._max_failures = max(1, int(max_failures or 5))
 
     async def write(self, event: LogEvent) -> None:
         tenant_id = event.tenant_id or "unknown"
@@ -62,34 +62,30 @@ class RedisLogWriter(LogPort):
             if self._status_registry:
                 self._status_registry.mark_ok(
                     self._status_name,
-                    "log operacional gravado no Redis",
+                    "Logs operacionais saudáveis: último evento bruto gravado no Redis com sucesso.",
+                    reason_code="raw_log_write_ok",
+                    phase="operational",
                     stream_key=stream_key,
                 )
         except Exception as exc:
             reason_code, human_reason = classify_connection_error(exc)
             if self._status_registry:
-                current_attempts = self._status_registry.get(self._status_name).attempts + 1
-                if self._max_failures is not None and current_attempts >= self._max_failures:
+                self._status_registry.mark_error(
+                    self._status_name,
+                    exc,
+                    detail=f"{human_reason}. A escrita de logs operacionais foi interrompida; auditoria persistente não é afetada.",
+                    reason_code=reason_code,
+                    human_reason=human_reason,
+                    phase="redis_stream_write_failed",
+                    stream_key=stream_key,
+                )
+                if self._status_registry.get(self._status_name).attempts >= self._max_failures:
                     self._status_registry.mark_inactive(
                         self._status_name,
-                        (
-                            f"{human_reason}; escrita de logs operacionais desativada "
-                            f"após {current_attempts} falha(s)."
-                        ),
-                        reason_code="runtime_failure_budget_exhausted",
-                        human_reason=human_reason,
+                        "Logs operacionais em Redis inativos após falhas repetidas de escrita. O gateway continua encaminhando requisições.",
+                        reason_code="retry_budget_exhausted",
+                        phase="inactive",
                         stream_key=stream_key,
-                        max_failures=self._max_failures,
-                    )
-                else:
-                    self._status_registry.mark_error(
-                        self._status_name,
-                        exc,
-                        detail=f"{human_reason}; escrita de logs operacionais interrompida",
-                        reason_code=reason_code,
-                        human_reason=human_reason,
-                        stream_key=stream_key,
-                        max_failures=self._max_failures,
                     )
             logger.warning(
                 "Failed to write gateway raw log to Redis [%s/%s]; operational logging is degraded.",

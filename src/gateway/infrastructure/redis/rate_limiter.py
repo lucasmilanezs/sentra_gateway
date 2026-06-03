@@ -28,7 +28,7 @@ class RateLimiter(RateLimitPort):
         self._fail_open = fail_open
         self._status_registry = status_registry
         self._status_name = status_name
-        self._max_failures = max_failures if max_failures and max_failures > 0 else None
+        self._max_failures = max(1, int(max_failures or 5))
 
     async def is_allowed(
         self,
@@ -54,7 +54,9 @@ class RateLimiter(RateLimitPort):
             if self._status_registry:
                 self._status_registry.mark_ok(
                     self._status_name,
-                    "rate limit aplicado com Redis",
+                    "Rate limit operacional: Redis aceitou a escrita do contador desta requisição.",
+                    reason_code="rate_limit_write_ok",
+                    phase="operational",
                     fail_open=self._fail_open,
                     key_prefix="rate",
                 )
@@ -64,35 +66,29 @@ class RateLimiter(RateLimitPort):
         except Exception as exc:
             reason_code, human_reason = classify_connection_error(exc)
             if self._status_registry:
-                current_attempts = self._status_registry.get(self._status_name).attempts + 1
-                if self._max_failures is not None and current_attempts >= self._max_failures:
+                detail = (
+                    f"{human_reason}. A limitação de requisições foi liberada em fail-open para não interromper o proxy."
+                    if self._fail_open
+                    else f"{human_reason}. A limitação de requisições não pôde ser aplicada."
+                )
+                self._status_registry.mark_error(
+                    self._status_name,
+                    exc,
+                    detail=detail,
+                    reason_code=reason_code,
+                    human_reason=human_reason,
+                    phase="redis_write_failed",
+                    fail_open=self._fail_open,
+                    key_prefix="rate",
+                )
+                if self._status_registry.get(self._status_name).attempts >= self._max_failures:
                     self._status_registry.mark_inactive(
                         self._status_name,
-                        (
-                            f"{human_reason}; rate limit desativado temporariamente após "
-                            f"{current_attempts} falha(s). Requests seguem em fail-open."
-                            if self._fail_open
-                            else f"{human_reason}; rate limit indisponível após {current_attempts} falha(s)."
-                        ),
-                        reason_code="runtime_failure_budget_exhausted",
-                        human_reason=human_reason,
+                        "Rate limit inativo após falhas repetidas no Redis. O gateway continua operando em fail-open.",
+                        reason_code="retry_budget_exhausted",
+                        phase="inactive",
                         fail_open=self._fail_open,
                         key_prefix="rate",
-                        max_failures=self._max_failures,
-                    )
-                else:
-                    self._status_registry.mark_error(
-                        self._status_name,
-                        exc,
-                        detail=(
-                            f"{human_reason}; rate limit operando em fail-open"
-                            if self._fail_open else human_reason
-                        ),
-                        reason_code=reason_code,
-                        human_reason=human_reason,
-                        fail_open=self._fail_open,
-                        key_prefix="rate",
-                        max_failures=self._max_failures,
                     )
             if self._fail_open:
                 logger.warning(

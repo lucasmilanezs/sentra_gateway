@@ -41,15 +41,15 @@ def _snapshot_check(request: Request) -> dict[str, Any]:
     if not snapshot:
         return {
             "status": "not_loaded",
-            "detail": "snapshot repository not configured",
-            "human_detail": "snapshot de configuração não foi inicializada",
+            "detail": "Snapshot de configuração não foi inicializada.",
+            "human_detail": "Snapshot de configuração não foi inicializada.",
         }
     loaded_at = getattr(snapshot, "loaded_at", None)
     age = round((datetime.now(timezone.utc) - loaded_at).total_seconds(), 1) if loaded_at else None
     status = "ok" if loaded_at else "not_loaded"
     return {
         "status": status,
-        "detail": "última snapshot carregada com sucesso" if loaded_at else "snapshot ainda não carregada",
+        "detail": "Última snapshot carregada com sucesso." if loaded_at else "Snapshot ainda não carregada.",
         "routes_loaded": snapshot.route_count(),
         "tenants_loaded": snapshot.tenant_count(),
         "policies_loaded": snapshot.policy_count(),
@@ -124,7 +124,7 @@ async def _postgres_ping(database_url: str) -> dict[str, Any]:
             await conn.execute(text("SELECT 1"))
         return {"status": "ok", "detail": "PostgreSQL respondeu ao SELECT 1"}
     except Exception as exc:
-        return {"status": "error", "detail": str(exc), "error_type": type(exc).__name__}
+        return {"status": "error", "detail": f"PostgreSQL não respondeu ao SELECT 1: {exc}", "error_type": type(exc).__name__}
     finally:
         await engine.dispose()
 
@@ -148,8 +148,8 @@ async def _dependency_checks(request: Request) -> dict[str, Any]:
         checks["postgres"] = postgres
         checks["redis_ping"] = redis
     else:
-        checks["postgres"] = {"status": "not_configured", "detail": "settings not configured"}
-        checks["redis_ping"] = {"status": "not_configured", "detail": "settings not configured"}
+        checks["postgres"] = {"status": "not_configured", "detail": "Configurações do Gateway não foram inicializadas."}
+        checks["redis_ping"] = {"status": "not_configured", "detail": "Configurações do Gateway não foram inicializadas."}
 
     runtime = registry.as_dict() if registry else {}
     for name, payload in runtime.items():
@@ -189,7 +189,7 @@ def _overall(checks: dict[str, Any], *, critical: tuple[str, ...], detailed: boo
 
 
 async def live_response() -> dict[str, Any]:
-    return {"service": "gateway", "status": "ok", "detail": "processo HTTP do gateway está vivo", "checked_at": _now()}
+    return {"service": "gateway", "status": "ok", "detail": "Processo HTTP do Gateway está vivo.", "checked_at": _now()}
 
 
 async def ready_response(request: Request) -> dict[str, Any]:
@@ -202,7 +202,7 @@ async def ready_response(request: Request) -> dict[str, Any]:
         "service": "gateway",
         "status": status,
         "ready": snapshot_ok and checks.get("postgres", {}).get("status") == "ok",
-        "detail": "gateway pronto; dependências auxiliares podem estar degradadas" if snapshot_ok else "gateway sem snapshot válida",
+        "detail": "Gateway pronto; dependências auxiliares podem estar degradadas." if snapshot_ok else "Gateway sem snapshot válida carregada.",
         "checked_at": _now(),
         "scope": "superuser" if detailed else "summary",
         "checks": visible_checks,

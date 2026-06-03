@@ -1131,3 +1131,52 @@ html, body {
 .overview-restricted {
   grid-column: 1 / -1;
 }
+
+/* ── Overview health layout and retry indicator ───────────────────────── */
+#ov-health-grid.semantic-grid {
+  display: block;
+}
+
+#ov-health-grid .health-plane-block {
+  width: 100%;
+}
+
+#ov-health-grid .health-plane-block + .health-plane-block {
+  margin-top: 16px;
+}
+
+.overview-health-subgrid > div {
+  position: relative;
+  min-height: 128px;
+  padding-bottom: 28px;
+}
+
+.health-retry-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  color: var(--warn);
+  pointer-events: none;
+}
+
+.health-retry-wave i {
+  font-style: normal;
+  display: inline-block;
+  animation: health-retry-wave 1.15s ease-in-out infinite;
+  opacity: .55;
+}
+
+.health-retry-wave i:nth-child(2) { animation-delay: .14s; }
+.health-retry-wave i:nth-child(3) { animation-delay: .28s; }
+
+@keyframes health-retry-wave {
+  0%, 70%, 100% { transform: translateY(0); opacity: .45; }
+  35% { transform: translateY(-5px); opacity: 1; }
+}

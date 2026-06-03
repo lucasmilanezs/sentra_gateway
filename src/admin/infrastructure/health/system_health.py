@@ -72,18 +72,18 @@ def _gateway_api_detail(status: str, checks: dict[str, Any]) -> str:
 
 async def check_postgres(session_factory) -> dict[str, Any]:
     if not session_factory:
-        return _component("not_configured", "Postgres session factory não está configurada")
+        return _component("not_configured", "Factory de sessão PostgreSQL do Admin não está configurada.")
     try:
         async with session_factory() as session:
             await session.execute(text("SELECT 1"))
-        return _component("ok", "PostgreSQL respondeu ao SELECT 1")
+        return _component("ok", "PostgreSQL do Admin respondeu ao SELECT 1.")
     except Exception as exc:
-        return _component("error", str(exc), error_type=type(exc).__name__)
+        return _component("error", f"PostgreSQL do Admin não respondeu ao SELECT 1: {exc}", error_type=type(exc).__name__)
 
 
 async def check_redis(client: aioredis.Redis | None) -> dict[str, Any]:
     if client is None:
-        return _component("not_configured", "Redis client não está configurado")
+        return _component("not_configured", "Cliente Redis do Admin não está configurado.")
     try:
         await client.ping()
         return _component("ok", "Redis do Admin respondeu ao PING")

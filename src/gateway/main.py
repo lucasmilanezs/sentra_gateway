@@ -47,9 +47,9 @@ def _redis_client(
 async def _ping_redis(client: aioredis.Redis, registry: DependencyStatusRegistry, name: str) -> None:
     try:
         await client.ping()
-        registry.mark_ok(name, "Redis ping succeeded")
+        registry.mark_ok(name, "Redis respondeu ao PING de inicialização.", reason_code="startup_ping_ok", phase="startup")
     except Exception as exc:
-        registry.mark_error(name, exc, detail="Redis unavailable at startup; component will operate in degraded mode")
+        registry.mark_error(name, exc, detail="Redis indisponível na inicialização; o componente iniciará em modo degradado e será atualizado quando for usado.", phase="startup")
         logger.warning("Redis dependency %s is unavailable at startup [%s]: %s", name, type(exc).__name__, exc)
 
 
@@ -115,10 +115,24 @@ async def lifespan(app: FastAPI):
 
     audit_writer = None
     if settings.audit_to_postgres:
-        audit_writer = PostgresAuditWriter(settings.database_url)
-        dependency_status.mark_ok("postgres_audit", "writer configured; no write observed yet")
+        audit_writer = PostgresAuditWriter(
+            settings.database_url,
+            status_registry=dependency_status,
+        )
+        dependency_status.mark_ok(
+            "postgres_audit",
+            "Auditoria persistente configurada; aguardando o primeiro evento para confirmar escrita no PostgreSQL.",
+            reason_code="audit_writer_configured",
+            phase="idle",
+        )
     else:
-        dependency_status.mark_ok("postgres_audit", "disabled by configuration", enabled=False)
+        dependency_status.mark_ok(
+            "postgres_audit",
+            "Auditoria persistente desativada por configuração.",
+            reason_code="audit_disabled",
+            phase="disabled",
+            enabled=False,
+        )
 
     http_client = httpx.AsyncClient()
 
