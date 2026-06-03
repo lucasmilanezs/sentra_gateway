@@ -15,3 +15,6 @@ class AuditRepositoryPort(ABC):
 
     @abstractmethod
     async def metrics_summary(self, *, tenant_id: str | None = None, hours: int = 24) -> dict: ...
+
+    @abstractmethod
+    async def metrics_by_route(self, *, tenant_id: str | None = None, seconds: int = 3600, bucket_seconds: int = 60) -> dict: ...

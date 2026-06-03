@@ -74,6 +74,7 @@ class AdminRouteORM(Base):
     path_pattern: Mapped[str] = mapped_column(String(512), nullable=False)
     methods: Mapped[str] = mapped_column(Text, nullable=False)
     backend_url: Mapped[str] = mapped_column(Text, nullable=False)
+    display_color: Mapped[str] = mapped_column(String(7), nullable=False, server_default="#2dd4bf")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     tenant: Mapped[TenantORM] = relationship(back_populates="routes")

@@ -7,7 +7,7 @@ from src.admin.domain.value_objects.jwt_claims import JwtClaims
 from src.admin.interface.http.dependencies import get_change_audit, get_query_audit, require_permission
 from src.admin.interface.schema.audit_schema import (
     AuditFilteredResponse, AuditRequestResponse,
-    ChangeEventFilteredResponse, ChangeEventResponse, MetricsSummaryResponse,
+    ChangeEventFilteredResponse, ChangeEventResponse, MetricsSummaryResponse, RouteMetricsResponse,
 )
 
 router = APIRouter()
@@ -78,3 +78,16 @@ async def metrics_summary(
     scope = claims.resolve_tenant_scope(tenant_id)
     data = await uc.metrics_summary(tenant_id=scope, hours=hours)
     return MetricsSummaryResponse(**data)
+
+
+@router.get("/metrics/routes", response_model=RouteMetricsResponse)
+async def metrics_by_route(
+    claims: Annotated[JwtClaims, Depends(require_permission("metrics"))],
+    uc: Annotated[QueryAudit, Depends(get_query_audit)],
+    tenant_id: str | None = Query(default=None),
+    seconds: int = Query(default=3600, ge=10, le=60 * 60 * 24 * 14),
+    bucket_seconds: int = Query(default=60, ge=1, le=60 * 60 * 24),
+):
+    scope = claims.resolve_tenant_scope(tenant_id)
+    data = await uc.metrics_by_route(tenant_id=scope, seconds=seconds, bucket_seconds=bucket_seconds)
+    return RouteMetricsResponse(**data)

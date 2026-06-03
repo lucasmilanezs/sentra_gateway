@@ -9,6 +9,8 @@ from src.admin.domain.exceptions import ValidationError
 from src.admin.domain.value_objects.http_method import HttpMethod
 
 _PATH_RE = re.compile(r"^/[a-z0-9][a-z0-9/_\-{}]*$")
+_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+DEFAULT_DISPLAY_COLOR = "#2dd4bf"
 
 
 @dataclass
@@ -20,6 +22,7 @@ class AdminRoute:
     path_pattern: str
     methods: list[HttpMethod]
     backend_url: str
+    display_color: str
     created_at: datetime
     updated_at: datetime
 
@@ -27,6 +30,7 @@ class AdminRoute:
         self.path_pattern = self.normalize_path_pattern(self.path_pattern)
         self.methods = self.normalize_methods(self.methods)
         self.backend_url = self.normalize_backend_url(self.backend_url)
+        self.display_color = self.normalize_display_color(self.display_color)
 
     @classmethod
     def create(
@@ -38,6 +42,7 @@ class AdminRoute:
         methods: list[str] | list[HttpMethod],
         backend_url: str,
         now: datetime,
+        display_color: str | None = None,
     ) -> "AdminRoute":
         return cls(
             id=id,
@@ -45,6 +50,7 @@ class AdminRoute:
             path_pattern=path_pattern,
             methods=methods,
             backend_url=backend_url,
+            display_color=display_color or DEFAULT_DISPLAY_COLOR,
             created_at=now,
             updated_at=now,
         )
@@ -56,6 +62,7 @@ class AdminRoute:
             path_pattern=data.get("path_pattern", self.path_pattern),
             methods=data.get("methods", self.methods),
             backend_url=data.get("backend_url", self.backend_url),
+            display_color=data.get("display_color", self.display_color),
             created_at=self.created_at,
             updated_at=now,
         )
@@ -67,6 +74,7 @@ class AdminRoute:
         detail = {
             "methods": [m.value for m in self.methods],
             "backend_url": self.backend_url,
+            "display_color": self.display_color,
         }
         if changed_fields is not None:
             detail["changed_fields"] = sorted(changed_fields)
@@ -111,3 +119,12 @@ class AdminRoute:
         if not result:
             raise ValidationError("pelo menos um método HTTP deve ser informado")
         return result
+
+    @staticmethod
+    def normalize_display_color(display_color: str | None) -> str:
+        value = (display_color or DEFAULT_DISPLAY_COLOR).strip()
+        if not value:
+            return DEFAULT_DISPLAY_COLOR
+        if not _COLOR_RE.match(value):
+            raise ValidationError("display_color deve estar no formato hexadecimal #RRGGBB")
+        return value.lower()

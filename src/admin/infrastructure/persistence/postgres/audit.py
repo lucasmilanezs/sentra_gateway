@@ -118,3 +118,80 @@ class AuditRepository(AuditRepositoryPort):
             "top_routes": [{"route_id": r.route_id, "route_label": r.route_label, "count": int(r.cnt)} for r in top_routes],
             "window_hours": hours,
         }
+
+    async def metrics_by_route(self, *, tenant_id=None, seconds=3600, bucket_seconds=60):
+        seconds = max(10, min(int(seconds or 3600), 60 * 60 * 24 * 366 * 5))
+        bucket_seconds = max(1, min(int(bucket_seconds or 60), seconds))
+        since = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+        tf_route = "WHERE r.tenant_id = :tenant_id" if tenant_id else ""
+        tf_audit = "AND r.tenant_id = :tenant_id" if tenant_id else ""
+        params = {"since": since, "bucket": bucket_seconds}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+
+        route_rows = (await self._session.execute(text(f"""
+            SELECT
+                r.id AS route_id,
+                r.path_pattern AS route_label,
+                r.methods AS methods,
+                COALESCE(r.display_color, '#2dd4bf') AS display_color,
+                COUNT(ar.id) AS total_requests,
+                SUM(CASE WHEN ar.outcome='SUCCESS' THEN 1 ELSE 0 END) AS success_count,
+                SUM(CASE WHEN ar.outcome='POLICY_DENIED' THEN 1 ELSE 0 END) AS denied_count,
+                SUM(CASE WHEN ar.id IS NOT NULL AND (ar.status_code >= 500 OR ar.outcome NOT IN ('SUCCESS','POLICY_DENIED')) THEN 1 ELSE 0 END) AS error_count,
+                SUM(CASE WHEN ar.status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END) AS s2xx,
+                SUM(CASE WHEN ar.status_code BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS s4xx,
+                SUM(CASE WHEN ar.status_code >= 500 THEN 1 ELSE 0 END) AS s5xx,
+                AVG(ar.latency_ms) AS avg_latency,
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ar.latency_ms) AS p95_latency,
+                MAX(ar.created_at) AS last_seen_at
+            FROM admin_routes r
+            LEFT JOIN admin_audit_requests ar ON ar.route_id = r.id AND ar.created_at >= :since
+            {tf_route}
+            GROUP BY r.id, r.path_pattern, r.methods, r.display_color
+            ORDER BY total_requests DESC, r.path_pattern ASC
+        """), params)).all()
+
+        series_rows = (await self._session.execute(text(f"""
+            SELECT
+                ar.route_id AS route_id,
+                to_timestamp(floor(extract(epoch from ar.created_at) / :bucket) * :bucket) AS bucket_start,
+                COUNT(*) AS cnt
+            FROM admin_audit_requests ar
+            JOIN admin_routes r ON r.id = ar.route_id
+            WHERE ar.created_at >= :since {tf_audit}
+            GROUP BY ar.route_id, bucket_start
+            ORDER BY bucket_start ASC
+        """), params)).all()
+
+        routes = []
+        for r in route_rows:
+            methods = [m.strip() for m in (r.methods or "").split(",") if m.strip()]
+            routes.append({
+                "route_id": r.route_id,
+                "route_label": r.route_label,
+                "display_color": r.display_color or "#2dd4bf",
+                "methods": methods,
+                "total_requests": int(r.total_requests or 0),
+                "success_count": int(r.success_count or 0),
+                "denied_count": int(r.denied_count or 0),
+                "error_count": int(r.error_count or 0),
+                "status_2xx": int(r.s2xx or 0),
+                "status_4xx": int(r.s4xx or 0),
+                "status_5xx": int(r.s5xx or 0),
+                "avg_latency_ms": round(float(r.avg_latency or 0), 2),
+                "p95_latency_ms": round(float(r.p95_latency or 0), 2),
+                "last_seen_at": r.last_seen_at,
+            })
+
+        return {
+            "window_seconds": seconds,
+            "bucket_seconds": bucket_seconds,
+            "generated_at": datetime.now(timezone.utc),
+            "routes": routes,
+            "series": [
+                {"route_id": r.route_id, "bucket_start": r.bucket_start, "count": int(r.cnt or 0)}
+                for r in series_rows
+            ],
+        }
+

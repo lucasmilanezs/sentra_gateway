@@ -11,12 +11,14 @@ class AdminRouteCreate(BaseModel):
     path_pattern: str = Field(min_length=1, max_length=512)
     methods: list[HttpMethod] = Field(min_length=1)
     backend_url: str = Field(min_length=1, max_length=2048)
+    display_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class AdminRouteUpdate(BaseModel):
     path_pattern: str | None = Field(default=None, min_length=1, max_length=512)
     methods: list[HttpMethod] | None = Field(default=None, min_length=1)
     backend_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    display_color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
 class AdminRouteResponse(BaseModel):
@@ -27,5 +29,6 @@ class AdminRouteResponse(BaseModel):
     path_pattern: str
     methods: list[HttpMethod]
     backend_url: str
+    display_color: str
     created_at: datetime
     updated_at: datetime

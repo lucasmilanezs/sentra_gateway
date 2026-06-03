@@ -13,8 +13,9 @@ def _row_to_route(row: dict) -> AdminRoute:
         id=row["id"],
         tenant_id=row["tenant_id"],
         path_pattern=row["path_pattern"],
-        method=HttpMethod(row["method"]),
+        methods=[HttpMethod(m) for m in row.get("methods", row.get("method", "GET")).split(",") if m],
         backend_url=row["backend_url"],
+        display_color=row.get("display_color") or "#2dd4bf",
         created_at=_parse_dt(row["created_at"]),
         updated_at=_parse_dt(row["updated_at"]),
     )
@@ -25,8 +26,9 @@ def _route_to_row(r: AdminRoute) -> dict:
         "id": r.id,
         "tenant_id": r.tenant_id,
         "path_pattern": r.path_pattern,
-        "method": r.method.value,
+        "methods": ",".join(m.value for m in r.methods),
         "backend_url": r.backend_url,
+        "display_color": r.display_color,
         "created_at": _serialize_dt(r.created_at),
         "updated_at": _serialize_dt(r.updated_at),
     }

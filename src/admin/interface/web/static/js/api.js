@@ -145,6 +145,10 @@ export const auditApi = {
     const q = appendQuery(new URLSearchParams({ hours: String(hours) }), { tenant_id: tenantId });
     return request('GET', `/metrics/summary?${q}`);
   },
+  routeMetrics: (tenantId = null, seconds = 3600, bucketSeconds = 60) => {
+    const q = appendQuery(new URLSearchParams({ seconds: String(seconds), bucket_seconds: String(bucketSeconds) }), { tenant_id: tenantId });
+    return request('GET', `/metrics/routes?${q}`);
+  },
 };
 
 export const rawLogsApi = {

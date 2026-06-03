@@ -820,15 +820,18 @@ async function loadRoutes() {
         : `<span class="policy-off">sem política</span>`;
 
       const methodsJson = esc(JSON.stringify(methods));
+      const color = _normalizeColor(r.display_color);
       const tr = document.createElement('tr');
+      tr.className = 'route-colored-row';
+      tr.style.setProperty('--route-display-color', color);
       tr.innerHTML = `
         <td>${methodBadges}</td>
-        <td style="font-family:monospace;font-size:.85rem">${r.path_pattern}</td>
+        <td style="font-family:monospace;font-size:.85rem"><span class="route-color-dot" style="background:${color}"></span>${r.path_pattern}</td>
         <td style="font-size:.8rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.backend_url}">${r.backend_url}</td>
         <td>${policyHtml}</td>
         <td>
           <button class="btn-icon" onclick="_openPolicyModal('${r.id}','${esc(r.path_pattern)}')">Política</button>
-          <button class="btn-icon" onclick="_editRoute('${r.id}','${methodsJson}','${esc(r.path_pattern)}','${esc(r.backend_url)}')">Editar</button>
+          <button class="btn-icon" onclick="_editRoute('${r.id}','${methodsJson}','${esc(r.path_pattern)}','${esc(r.backend_url)}','${color}')">Editar</button>
           <button class="btn-icon danger" onclick="_deleteRoute('${r.id}','${esc(r.path_pattern)}')">Excluir</button>
         </td>`;
       tbody.appendChild(tr);
@@ -851,12 +854,13 @@ document.querySelectorAll('input[name="r-methods"]').forEach(cb => {
   });
 });
 
-function _openRouteModal(id='', methods=[], path='', backend='') {
+function _openRouteModal(id='', methods=[], path='', backend='', displayColor='#2dd4bf') {
   document.getElementById('modal-route-title').textContent = id ? 'Editar rota' : 'Nova rota';
   document.getElementById('r-edit-id').value = id;
   _setMethodCheckboxes(Array.isArray(methods) ? methods : []);
   document.getElementById('r-path').value    = path;
   document.getElementById('r-backend').value = backend;
+  _setRouteColor(displayColor);
   document.getElementById('r-error').style.display = 'none';
   document.getElementById('r-wildcard').classList.toggle('visible', path.includes('/*'));
   document.getElementById('modal-route').style.display = 'flex';
@@ -867,10 +871,24 @@ document.getElementById('r-path').addEventListener('input', e => {
   document.getElementById('r-wildcard').classList.toggle('visible', e.target.value.includes('/*'));
 });
 
-window._editRoute = (id, methodsJson, path, backend) => {
+function _normalizeColor(value) {
+  const raw = String(value || '#2dd4bf').trim();
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw.toLowerCase() : '#2dd4bf';
+}
+function _setRouteColor(value) {
+  const color = _normalizeColor(value);
+  const picker = document.getElementById('r-display-color');
+  const text = document.getElementById('r-display-color-text');
+  if (picker) picker.value = color;
+  if (text) text.value = color;
+}
+document.getElementById('r-display-color')?.addEventListener('input', e => _setRouteColor(e.target.value));
+document.getElementById('r-display-color-text')?.addEventListener('input', e => _setRouteColor(e.target.value));
+
+window._editRoute = (id, methodsJson, path, backend, displayColor='#2dd4bf') => {
   let methods = [];
   try { methods = JSON.parse(methodsJson); } catch {}
-  _openRouteModal(id, methods, path, backend);
+  _openRouteModal(id, methods, path, backend, displayColor);
 };
 
 document.getElementById('btn-new-route').addEventListener('click', () => _openRouteModal());
@@ -882,6 +900,7 @@ document.getElementById('r-save').addEventListener('click', async () => {
   const methods = [...document.querySelectorAll('input[name="r-methods"]:checked')].map(el => el.value);
   const path    = document.getElementById('r-path').value.trim();
   const backend = document.getElementById('r-backend').value.trim();
+  const displayColor = _normalizeColor(document.getElementById('r-display-color-text')?.value);
   const errEl   = document.getElementById('r-error');
   errEl.style.display = 'none';
 
@@ -891,9 +910,9 @@ document.getElementById('r-save').addEventListener('click', async () => {
 
   try {
     if (id) {
-      await routesApi.update(id, { methods, path_pattern: path, backend_url: backend });
+      await routesApi.update(id, { methods, path_pattern: path, backend_url: backend, display_color: displayColor });
     } else {
-      await routesApi.create({ tenant_id: tenant?.id, methods, path_pattern: path, backend_url: backend });
+      await routesApi.create({ tenant_id: tenant?.id, methods, path_pattern: path, backend_url: backend, display_color: displayColor });
     }
     document.getElementById('modal-route').style.display = 'none';
     loadRoutes();
@@ -1194,19 +1213,362 @@ document.getElementById('raw-log-close')?.addEventListener('click', () => { docu
 document.getElementById('modal-raw-log')?.addEventListener('click', e => { if (e.target.id === 'modal-raw-log') document.getElementById('modal-raw-log').style.display = 'none'; });
 
 // ── MÉTRICAS ──────────────────────────────────────────────────────────────
-async function loadMetrics() {
-  try {
-    const m = await auditApi.metrics(tenant?.id || null, 24);
-    document.getElementById('mt-total').textContent     = m.total_requests;
-    document.getElementById('mt-status').textContent    = `${m.status_2xx} / ${m.status_4xx} / ${m.status_5xx}`;
-    document.getElementById('mt-avg-lat').textContent   = `${m.avg_latency_ms} ms`;
-    document.getElementById('mt-p95-lat').textContent   = m.p95_latency_ms ? `p95: ${m.p95_latency_ms} ms` : '';
-    const top = (m.top_routes || []).map(t => `${t.route_label || 'rota não resolvida'} (${t.count})`).join(', ');
-    document.getElementById('mt-top-routes').textContent = top || '—';
-  } catch {
-    document.getElementById('mt-total').textContent = '—';
+const METRICS_SUMMARY_SECONDS = 7 * 24 * 60 * 60;
+const CHART_UNIT_SECONDS = {
+  second: 1,
+  minute: 60,
+  hour: 60 * 60,
+  day: 24 * 60 * 60,
+  month: 30 * 24 * 60 * 60,
+  year: 365 * 24 * 60 * 60,
+};
+const CHART_UNIT_LABELS = {
+  second: 'segundos',
+  minute: 'minutos',
+  hour: 'horas',
+  day: 'dias',
+  month: 'meses',
+  year: 'anos',
+};
+let _metricsChartUnit = 'minute';
+let _metricsChartAmount = 10;
+let _metricsWindowSeconds = _metricsChartAmount * CHART_UNIT_SECONDS[_metricsChartUnit];
+let _metricsBucketSeconds = _bucketForWindow(_metricsWindowSeconds);
+let _metricsChartMode = 'all';
+let _metricsSelectedRouteId = null;
+let _metricsChartHitLines = [];
+let _metricsChartHoveredRouteId = null;
+let _lastChartMetrics = null;
+let _lastRouteSummaryMetrics = null;
+
+function _metricsWindowLabel(seconds) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}min`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  if (seconds < 2592000) return `${Math.round(seconds / 86400)}d`;
+  if (seconds < 31536000) return `${Math.round(seconds / 2592000)}m`;
+  return `${Math.round(seconds / 31536000)}a`;
+}
+
+function _bucketForWindow(seconds) {
+  const targetPoints = 80;
+  const raw = Math.max(1, Math.ceil(seconds / targetPoints));
+  const candidates = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 604800, 2592000];
+  return candidates.find(v => v >= raw) || candidates[candidates.length - 1];
+}
+
+function _graphWindowSeconds() {
+  const unit = document.getElementById('mt-chart-unit')?.value || _metricsChartUnit;
+  const amount = Math.max(1, Math.min(999, Number(document.getElementById('mt-chart-amount')?.value || _metricsChartAmount)));
+  _metricsChartUnit = unit;
+  _metricsChartAmount = amount;
+  _metricsWindowSeconds = amount * (CHART_UNIT_SECONDS[unit] || 60);
+  _metricsBucketSeconds = _bucketForWindow(_metricsWindowSeconds);
+  return _metricsWindowSeconds;
+}
+
+function _formatMilestone(ts, unit) {
+  const d = new Date(ts);
+  if (unit === 'second' || unit === 'minute') return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: unit === 'second' ? '2-digit' : undefined });
+  if (unit === 'hour') return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit' });
+  if (unit === 'day') return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  if (unit === 'month') return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+  return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+}
+
+function _rgba(hex, alpha) {
+  const color = _normalizeColor(hex).replace('#', '');
+  const r = parseInt(color.slice(0, 2), 16);
+  const g = parseInt(color.slice(2, 4), 16);
+  const b = parseInt(color.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function _routeMetricCard(route) {
+  const color = _normalizeColor(route.display_color);
+  const lastSeen = route.last_seen_at ? new Date(route.last_seen_at).toLocaleString('pt-BR') : 'sem eventos na última semana';
+  const methods = (route.methods || []).map(m => `<span class="badge m-${m}">${escHtml(m)}</span>`).join('');
+  return `<article class="route-metric-item" id="metric-route-${escHtml(route.route_id)}" style="--route-display-color:${color}">
+    <button class="route-metric-summary" data-route-id="${escHtml(route.route_id)}">
+      <span class="route-metric-main">
+        <strong>${escHtml(route.route_label)}</strong>
+        <small>${methods || 'métodos não informados'}</small>
+      </span>
+      <span class="route-metric-kpi"><b>${route.total_requests}</b><small>requisições</small></span>
+      <span class="route-metric-kpi"><b>${Math.round(route.avg_latency_ms || 0)} ms</b><small>lat. média</small></span>
+      <span class="route-metric-kpi"><b>${route.status_5xx || 0}</b><small>5xx</small></span>
+      <span class="route-metric-chevron">▾</span>
+    </button>
+    <div class="route-metric-details">
+      <div><span>Sucesso</span><strong>${route.success_count}</strong></div>
+      <div><span>Negadas por política</span><strong>${route.denied_count}</strong></div>
+      <div><span>Erros</span><strong>${route.error_count}</strong></div>
+      <div><span>2xx / 4xx / 5xx</span><strong>${route.status_2xx} / ${route.status_4xx} / ${route.status_5xx}</strong></div>
+      <div><span>p95</span><strong>${Math.round(route.p95_latency_ms || 0)} ms</strong></div>
+      <div><span>Último evento</span><strong>${escHtml(lastSeen)}</strong></div>
+    </div>
+  </article>`;
+}
+
+function _renderRouteMetrics(data) {
+  const list = document.getElementById('mt-route-list');
+  const empty = document.getElementById('mt-route-empty');
+  if (!list || !empty) return;
+  const routes = data.routes || [];
+  list.innerHTML = routes.map(_routeMetricCard).join('');
+  empty.style.display = routes.length ? 'none' : 'block';
+
+  list.querySelectorAll('.route-metric-summary').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('.route-metric-item')?.classList.toggle('expanded'));
+  });
+
+  const selector = document.getElementById('mt-route-selector');
+  if (selector) {
+    const previous = _metricsSelectedRouteId;
+    selector.innerHTML = routes.map(r => `<option value="${escHtml(r.route_id)}">${escHtml(r.route_label)}</option>`).join('');
+    _metricsSelectedRouteId = routes.some(r => r.route_id === previous) ? previous : (routes[0]?.route_id || null);
+    if (_metricsSelectedRouteId) selector.value = _metricsSelectedRouteId;
   }
 }
+
+function _routeMetadataMap(summaryData, chartData) {
+  const map = new Map();
+  (summaryData?.routes || []).forEach(r => map.set(r.route_id, r));
+  (chartData?.routes || []).forEach(r => {
+    if (!map.has(r.route_id)) map.set(r.route_id, r);
+  });
+  return map;
+}
+
+function _buildChartSeries(chartData) {
+  const routeMap = _routeMetadataMap(_lastRouteSummaryMetrics, chartData);
+  const allRoutes = Array.from(routeMap.values());
+  const visibleRoutes = _metricsChartMode === 'single' && _metricsSelectedRouteId
+    ? allRoutes.filter(r => r.route_id === _metricsSelectedRouteId)
+    : allRoutes;
+  const bucketMs = (chartData.bucket_seconds || _metricsBucketSeconds || 60) * 1000;
+  const end = new Date(chartData.generated_at || Date.now()).getTime();
+  const start = end - (chartData.window_seconds || _metricsWindowSeconds) * 1000;
+  const buckets = [];
+  for (let t = Math.floor(start / bucketMs) * bucketMs; t <= end; t += bucketMs) buckets.push(t);
+  const values = new Map();
+  (chartData.series || []).forEach(p => {
+    const t = new Date(p.bucket_start).getTime();
+    values.set(`${p.route_id}:${t}`, p.count);
+  });
+  return visibleRoutes.map(route => ({
+    route,
+    points: buckets.map(t => ({ x: t, y: values.get(`${route.route_id}:${t}`) || 0 })),
+    color: _normalizeColor(route.display_color),
+    label: route.route_label,
+  }));
+}
+
+function _drawMetricsChart(chartData) {
+  const canvas = document.getElementById('mt-line-chart');
+  if (!canvas) return;
+  _lastChartMetrics = chartData;
+  const ctx = canvas.getContext('2d');
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || 1000;
+  const height = canvas.clientHeight || 320;
+  canvas.width = Math.floor(width * ratio);
+  canvas.height = Math.floor(height * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  _metricsChartHitLines = [];
+
+  const series = _buildChartSeries(chartData);
+  const unit = _metricsChartUnit;
+  const pad = { left: 44, right: 18, top: 18, bottom: 42 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const maxY = Math.max(1, ...series.flatMap(s => s.points.map(p => p.y)));
+  const minX = Math.min(...series.flatMap(s => s.points.map(p => p.x)), Date.now() - 1000);
+  const maxX = Math.max(...series.flatMap(s => s.points.map(p => p.x)), Date.now());
+  const xOf = x => pad.left + ((x - minX) / Math.max(1, maxX - minX)) * plotW;
+  const yOf = y => pad.top + plotH - (y / maxY) * plotH;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, height);
+  bg.addColorStop(0, '#050810');
+  bg.addColorStop(1, '#090d16');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px DM Mono, monospace';
+  ctx.fillStyle = 'rgba(180,200,240,0.52)';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
+    ctx.fillText(String(Math.round(maxY - (maxY / 4) * i)), 10, y + 4);
+  }
+
+  const milestones = 5;
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.055)';
+  for (let i = 0; i <= milestones; i++) {
+    const x = pad.left + (plotW / milestones) * i;
+    const t = minX + ((maxX - minX) / milestones) * i;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke();
+    ctx.fillStyle = 'rgba(180,200,240,0.50)';
+    ctx.textAlign = i === 0 ? 'left' : i === milestones ? 'right' : 'center';
+    ctx.fillText(_formatMilestone(t, unit), x, height - 14);
+  }
+  ctx.textAlign = 'left';
+
+  series.forEach(s => {
+    if (!s.points.length) return;
+    const isHovered = _metricsChartHoveredRouteId === s.route.route_id;
+    const opacity = _metricsChartHoveredRouteId ? (isHovered ? 1 : 0.18) : 0.42;
+    ctx.strokeStyle = _rgba(s.color, opacity);
+    ctx.lineWidth = isHovered ? 2.8 : 1.8;
+    ctx.beginPath();
+    const linePoints = [];
+    s.points.forEach((p, idx) => {
+      const x = xOf(p.x), y = yOf(p.y);
+      linePoints.push({x, y});
+      idx ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+    if (isHovered) {
+      ctx.shadowColor = _rgba(s.color, 0.45);
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    _metricsChartHitLines.push({ route: s.route, color: s.color, label: s.label, points: linePoints });
+  });
+}
+
+function _nearestChartLine(x, y) {
+  let best = null;
+  for (const line of _metricsChartHitLines) {
+    for (let i = 1; i < line.points.length; i++) {
+      const a = line.points[i - 1], b = line.points[i];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / len2));
+      const px = a.x + t * dx, py = a.y + t * dy;
+      const dist = Math.hypot(x - px, y - py);
+      if (!best || dist < best.dist) best = { ...line, dist };
+    }
+  }
+  return best && best.dist <= 14 ? best : null;
+}
+
+function _focusRouteMetric(routeId) {
+  const el = document.getElementById(`metric-route-${routeId}`);
+  if (!el) return;
+  el.classList.add('expanded', 'metric-focus-glow');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => el.classList.remove('metric-focus-glow'), 2600);
+}
+
+function _wireMetricsChartInteractions() {
+  const canvas = document.getElementById('mt-line-chart');
+  const tooltip = document.getElementById('mt-chart-tooltip');
+  if (!canvas || canvas.dataset.wired === '1') return;
+  canvas.dataset.wired = '1';
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const hit = _nearestChartLine(e.clientX - rect.left, e.clientY - rect.top);
+    const nextHovered = hit?.route?.route_id || null;
+    if (_metricsChartHoveredRouteId !== nextHovered) {
+      _metricsChartHoveredRouteId = nextHovered;
+      if (_lastChartMetrics) _drawMetricsChart(_lastChartMetrics);
+    }
+    if (!hit || !tooltip) { if (tooltip) tooltip.style.display = 'none'; canvas.style.cursor = 'default'; return; }
+    tooltip.textContent = hit.label;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${e.clientX - rect.left + 14}px`;
+    tooltip.style.top = `${e.clientY - rect.top + 10}px`;
+    tooltip.style.borderColor = hit.color;
+    canvas.style.cursor = 'pointer';
+  });
+  canvas.addEventListener('mouseleave', () => {
+    _metricsChartHoveredRouteId = null;
+    if (_lastChartMetrics) _drawMetricsChart(_lastChartMetrics);
+    if (tooltip) tooltip.style.display = 'none';
+    canvas.style.cursor = 'default';
+  });
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const hit = _nearestChartLine(e.clientX - rect.left, e.clientY - rect.top);
+    if (hit) _focusRouteMetric(hit.route.route_id);
+  });
+}
+
+function _renderMetricsSummary(data) {
+  _lastRouteSummaryMetrics = data;
+  const total = (data.routes || []).reduce((sum, r) => sum + Number(r.total_requests || 0), 0);
+  const s2xx = (data.routes || []).reduce((sum, r) => sum + Number(r.status_2xx || 0), 0);
+  const s4xx = (data.routes || []).reduce((sum, r) => sum + Number(r.status_4xx || 0), 0);
+  const s5xx = (data.routes || []).reduce((sum, r) => sum + Number(r.status_5xx || 0), 0);
+  const avg = total ? Math.round((data.routes || []).reduce((sum, r) => sum + (Number(r.avg_latency_ms || 0) * Number(r.total_requests || 0)), 0) / total) : 0;
+  const p95 = Math.max(0, ...(data.routes || []).map(r => Number(r.p95_latency_ms || 0)));
+  document.getElementById('mt-total').textContent = total;
+  document.getElementById('mt-status').textContent = `${s2xx} / ${s4xx} / ${s5xx}`;
+  document.getElementById('mt-avg-lat').textContent = `${avg} ms`;
+  document.getElementById('mt-p95-lat').textContent = p95 ? `maior p95: ${Math.round(p95)} ms` : '';
+  document.getElementById('mt-window-label').textContent = 'últimos 7 dias';
+  _renderRouteMetrics(data);
+}
+
+function _renderMetricsChartOnly(data) {
+  const caption = document.getElementById('mt-chart-caption');
+  if (caption) caption.textContent = `gráfico: últimos ${_metricsWindowLabel(data.window_seconds || _metricsWindowSeconds)} · bucket ${_metricsWindowLabel(data.bucket_seconds || _metricsBucketSeconds)}`;
+  _drawMetricsChart(data);
+  _wireMetricsChartInteractions();
+}
+
+async function loadMetrics() {
+  try {
+    _graphWindowSeconds();
+    const tenantId = tenant?.id || null;
+    const [summaryData, chartData] = await Promise.all([
+      auditApi.routeMetrics(tenantId, METRICS_SUMMARY_SECONDS, 86400),
+      auditApi.routeMetrics(tenantId, _metricsWindowSeconds, _metricsBucketSeconds),
+    ]);
+    _renderMetricsSummary(summaryData);
+    _renderMetricsChartOnly(chartData);
+  } catch (err) {
+    document.getElementById('mt-total').textContent = '—';
+    document.getElementById('mt-route-list').innerHTML = `<div class="metric-error">${escHtml(err.detail || 'Erro ao carregar métricas.')}</div>`;
+  }
+}
+
+function _reloadMetricsChartOnly() {
+  _graphWindowSeconds();
+  auditApi.routeMetrics(tenant?.id || null, _metricsWindowSeconds, _metricsBucketSeconds)
+    .then(_renderMetricsChartOnly)
+    .catch(err => {
+      const caption = document.getElementById('mt-chart-caption');
+      if (caption) caption.textContent = err.detail || 'Erro ao atualizar gráfico.';
+    });
+}
+
+document.getElementById('mt-chart-apply')?.addEventListener('click', _reloadMetricsChartOnly);
+document.getElementById('mt-chart-unit')?.addEventListener('change', _reloadMetricsChartOnly);
+document.getElementById('mt-chart-amount')?.addEventListener('change', _reloadMetricsChartOnly);
+document.getElementById('mt-chart-all')?.addEventListener('click', () => {
+  _metricsChartMode = 'all';
+  document.getElementById('mt-chart-all').classList.add('active');
+  document.getElementById('mt-chart-single').classList.remove('active');
+  document.getElementById('mt-route-selector-shell').classList.remove('visible');
+  if (_lastChartMetrics) _drawMetricsChart(_lastChartMetrics);
+});
+document.getElementById('mt-chart-single')?.addEventListener('click', () => {
+  _metricsChartMode = 'single';
+  document.getElementById('mt-chart-single').classList.add('active');
+  document.getElementById('mt-chart-all').classList.remove('active');
+  document.getElementById('mt-route-selector-shell').classList.add('visible');
+  if (_lastChartMetrics) _drawMetricsChart(_lastChartMetrics);
+});
+document.getElementById('mt-route-selector')?.addEventListener('change', e => {
+  _metricsSelectedRouteId = e.target.value;
+  if (_lastChartMetrics) _drawMetricsChart(_lastChartMetrics);
+});
 
 // ── CONTA ─────────────────────────────────────────────────────────────────
 function loadConta() {

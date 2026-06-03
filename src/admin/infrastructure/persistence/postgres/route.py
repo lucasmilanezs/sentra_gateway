@@ -24,6 +24,7 @@ def _orm_to_entity(row: AdminRouteORM) -> AdminRoute:
         path_pattern=row.path_pattern,
         methods=_parse_methods(row.methods),
         backend_url=row.backend_url,
+        display_color=getattr(row, "display_color", None) or "#2dd4bf",
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -36,6 +37,7 @@ def _entity_to_orm(route: AdminRoute) -> AdminRouteORM:
         path_pattern=route.path_pattern,
         methods=_serialize_methods(route.methods),
         backend_url=route.backend_url,
+        display_color=route.display_color,
         created_at=route.created_at,
         updated_at=route.updated_at,
     )
@@ -66,6 +68,7 @@ class RouteRepository(AdminRouteRepositoryPort):
             existing.path_pattern = route.path_pattern
             existing.methods = _serialize_methods(route.methods)
             existing.backend_url = route.backend_url
+            existing.display_color = route.display_color
             existing.updated_at = route.updated_at
         else:
             self._session.add(_entity_to_orm(route))

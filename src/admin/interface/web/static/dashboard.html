@@ -318,10 +318,11 @@
     <!-- MÉTRICAS -->
     <section class="page" id="page-metrics">
       <div class="page-header"><h1 class="page-title">Métricas</h1></div>
-      <div class="metrics-grid">
+      <div class="metrics-grid metrics-overview-grid">
         <div class="metric-card">
-          <div class="metric-label">Requisições (24h)</div>
+          <div class="metric-label">Requisições na janela</div>
           <div class="metric-value" id="mt-total">—</div>
+          <div class="metric-sub" id="mt-window-label">janela atual</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">2xx / 4xx / 5xx</div>
@@ -332,9 +333,51 @@
           <div class="metric-value" id="mt-avg-lat">—</div>
           <div class="metric-sub" id="mt-p95-lat"></div>
         </div>
-        <div class="metric-card">
-          <div class="metric-label">Top rotas</div>
-          <div class="metric-value" id="mt-top-routes" style="font-size:.85rem">—</div>
+      </div>
+
+      <div class="card metrics-route-card">
+        <div class="metrics-section-header">
+          <div>
+            <h2>Métricas por rota</h2>
+            <p>Resumo por rota cadastrada. Clique em uma rota para expandir os detalhes.</p>
+          </div>
+        </div>
+        <div id="mt-route-list" class="route-metrics-list"></div>
+        <p class="tbl-empty" id="mt-route-empty" style="display:none">Nenhuma rota cadastrada para o tenant selecionado.</p>
+      </div>
+
+      <div class="card metrics-chart-card">
+        <div class="metrics-chart-header">
+          <div class="chart-mode-row">
+            <button class="chart-mode-btn active" id="mt-chart-all">Todas as rotas</button>
+            <button class="chart-mode-btn" id="mt-chart-single">Rota específica</button>
+            <div class="route-selector-shell" id="mt-route-selector-shell">
+              <select id="mt-route-selector"></select>
+            </div>
+          </div>
+          <div class="metric-sub" id="mt-chart-caption">requisições por rota ao longo da janela</div>
+        </div>
+        <div class="metrics-chart-wrap">
+          <canvas id="mt-line-chart" width="1200" height="380"></canvas>
+          <div id="mt-chart-tooltip" class="chart-tooltip" style="display:none"></div>
+        </div>
+        <div class="chart-window-controls" id="mt-window-controls">
+          <label>
+            <span>Unidade</span>
+            <select id="mt-chart-unit">
+              <option value="second">Segundo</option>
+              <option value="minute" selected>Minuto</option>
+              <option value="hour">Hora</option>
+              <option value="day">Dia</option>
+              <option value="month">Mês</option>
+              <option value="year">Ano</option>
+            </select>
+          </label>
+          <label>
+            <span>Janela</span>
+            <input type="number" id="mt-chart-amount" min="1" max="999" value="10" />
+          </label>
+          <button class="chart-apply-btn" id="mt-chart-apply">Aplicar</button>
         </div>
       </div>
     </section>
@@ -557,6 +600,14 @@
     <div class="modal-field">
       <label>Backend URL</label>
       <input type="text" id="r-backend" placeholder="http://servico:3000" />
+    </div>
+    <div class="modal-field">
+      <label>Cor de exibição</label>
+      <div class="color-field-row">
+        <input type="color" id="r-display-color" value="#2dd4bf" />
+        <input type="text" id="r-display-color-text" value="#2dd4bf" maxlength="7" />
+      </div>
+      <p class="field-help">Usada para identificar a rota nas listas e gráficos de métricas.</p>
     </div>
     <p class="modal-error" id="r-error" style="display:none"></p>
     <div class="modal-actions">

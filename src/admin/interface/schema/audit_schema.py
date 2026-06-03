@@ -64,6 +64,38 @@ class MetricsSummaryResponse(BaseModel):
     window_hours: int = Field(default=24)
 
 
+
+class RouteMetricSummary(BaseModel):
+    route_id: str
+    route_label: str
+    display_color: str = "#2dd4bf"
+    methods: list[str] = Field(default_factory=list)
+    total_requests: int
+    success_count: int = 0
+    denied_count: int = 0
+    error_count: int = 0
+    status_2xx: int = 0
+    status_4xx: int = 0
+    status_5xx: int = 0
+    avg_latency_ms: float = 0
+    p95_latency_ms: float = 0
+    last_seen_at: datetime | None = None
+
+
+class RouteMetricPoint(BaseModel):
+    route_id: str
+    bucket_start: datetime
+    count: int
+
+
+class RouteMetricsResponse(BaseModel):
+    window_seconds: int
+    bucket_seconds: int
+    generated_at: datetime
+    routes: list[RouteMetricSummary]
+    series: list[RouteMetricPoint]
+
+
 class RawGatewayLogResponse(BaseModel):
     id: str
     timestamp: datetime | None

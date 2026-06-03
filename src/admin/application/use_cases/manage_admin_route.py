@@ -71,6 +71,7 @@ class ManageAdminRoute:
         path_pattern: str,
         methods: list[HttpMethod],
         backend_url: str,
+        display_color: str | None = None,
         caller_user_id: str | None = None,
     ) -> AdminRoute:
         effective_tenant = TenantAccessControl.resolve_write_scope(
@@ -89,6 +90,7 @@ class ManageAdminRoute:
             methods=methods,
             backend_url=backend_url,
             now=now,
+            display_color=display_color,
         )
         await self._routes.save(route)
         await self._audit.record(

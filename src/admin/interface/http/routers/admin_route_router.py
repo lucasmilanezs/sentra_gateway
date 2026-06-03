@@ -21,6 +21,7 @@ def _to_response(r) -> AdminRouteResponse:
         path_pattern=r.path_pattern,
         methods=r.methods,
         backend_url=r.backend_url,
+        display_color=r.display_color,
         created_at=r.created_at,
         updated_at=r.updated_at,
     )
@@ -53,6 +54,7 @@ async def create_route(
         path_pattern=body.path_pattern,
         methods=body.methods,
         backend_url=body.backend_url,
+        display_color=body.display_color,
         caller_user_id=claims.sub,
     )
     return _to_response(r)

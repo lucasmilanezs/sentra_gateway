@@ -18,3 +18,8 @@ class QueryAudit:
 
     async def metrics_summary(self, *, tenant_id=None, hours=24):
         return await self._audit.metrics_summary(tenant_id=tenant_id, hours=hours)
+
+    async def metrics_by_route(self, *, tenant_id=None, seconds=3600, bucket_seconds=60):
+        seconds = max(10, min(int(seconds or 3600), 60 * 60 * 24 * 14))
+        bucket_seconds = max(1, min(int(bucket_seconds or 60), seconds))
+        return await self._audit.metrics_by_route(tenant_id=tenant_id, seconds=seconds, bucket_seconds=bucket_seconds)
