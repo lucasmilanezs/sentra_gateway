@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from sqlalchemy import text
 
-from src.shared.runtime.redis_diagnostics import classify_connection_error, parse_redis_endpoint, tcp_probe
+from src.shared.runtime.redis_diagnostics import classify_connection_error, tcp_probe, safe_redis_url
 
 
 def _now() -> str:
@@ -80,26 +80,69 @@ async def check_postgres(session_factory) -> dict[str, Any]:
         return _component("error", f"PostgreSQL do Admin não respondeu ao SELECT 1: {exc}", error_type=type(exc).__name__)
 
 
-async def check_redis(settings) -> dict[str, Any]:
+async def check_redis(admin) -> dict[str, Any]:
+    settings = getattr(admin, "settings", None)
     if settings is None:
         return _component("not_configured", "Configurações Redis do Admin não estão disponíveis.")
+
+    registry = getattr(admin, "dependency_status", None)
     try:
-        endpoint = parse_redis_endpoint(settings.redis_url)
-        await tcp_probe(endpoint.host, endpoint.port, timeout=float(getattr(settings, "redis_connect_timeout_seconds", 1.0)))
+        await tcp_probe(
+            settings.redis_host,
+            int(settings.redis_port),
+            timeout=float(getattr(settings, "redis_connect_timeout_seconds", 1.0)),
+        )
+        if registry:
+            registry.mark_ok(
+                "redis",
+                "Redis administrativo aceitou conexão TCP.",
+                reason_code="tcp_probe_ok",
+                phase="operational",
+                redis_url=safe_redis_url(settings.redis_url),
+                redis_host=settings.redis_host,
+                redis_port=settings.redis_port,
+            )
+            # A successful health probe reopens admin-side Redis adapters. The
+            # actual publish/read operation will still be attempted only when the
+            # relevant use case needs it.
+            for dependent in ("redis_notifier", "redis_raw_log_reader"):
+                current = registry.get(dependent)
+                if current.status in {"error", "inactive", "degraded"}:
+                    registry.mark_degraded(
+                        dependent,
+                        "Redis voltou a aceitar conexão; componente liberado para tentar novamente na próxima operação real.",
+                        reason_code="redis_recovered",
+                        phase="rearmed",
+                    )
         return _component(
             "ok",
-            "Redis do Admin acessível via conexão TCP.",
-            redis_host=endpoint.host,
-            redis_port=endpoint.port,
+            "Redis administrativo aceitou conexão TCP.",
+            reason_code="tcp_probe_ok",
+            redis_host=settings.redis_host,
+            redis_port=settings.redis_port,
         )
     except Exception as exc:
         reason_code, human_reason = classify_connection_error(exc)
+        if registry:
+            registry.mark_error(
+                "redis",
+                exc,
+                detail=human_reason,
+                reason_code=reason_code,
+                human_reason=human_reason,
+                phase="health_probe_failed",
+                redis_url=safe_redis_url(settings.redis_url),
+                redis_host=settings.redis_host,
+                redis_port=settings.redis_port,
+            )
         return _component(
             "error",
             human_reason,
             reason_code=reason_code,
             error_type=type(exc).__name__,
             last_error=str(exc),
+            redis_host=settings.redis_host,
+            redis_port=settings.redis_port,
         )
 
 
@@ -161,7 +204,7 @@ async def fetch_gateway_health(base_url: str, *, timeout: float) -> dict[str, An
 
 async def build_admin_health(admin, *, include_components: bool = False) -> dict[str, Any]:
     postgres = await check_postgres(getattr(admin, "_session_factory", None))
-    redis = await check_redis(getattr(admin, "settings", None))
+    redis = await check_redis(admin)
     if postgres["status"] != "ok":
         status = "error"
         detail = "Admin indisponível: PostgreSQL administrativo não está saudável."
@@ -182,10 +225,17 @@ async def build_admin_health(admin, *, include_components: bool = False) -> dict
         "redis_connected": redis.get("status") == "ok",
     }
     if include_components:
-        payload["checks"] = {
+        checks = {
             "postgres": postgres,
             "redis": redis,
         }
+        registry = getattr(admin, "dependency_status", None)
+        if registry:
+            for name, item in registry.as_dict().items():
+                if name == "redis" and redis.get("status") == "ok":
+                    continue
+                checks[name] = item
+        payload["checks"] = checks
     else:
         payload["checks"] = {
             "postgres": {"status": postgres.get("status"), "detail": postgres.get("detail")},

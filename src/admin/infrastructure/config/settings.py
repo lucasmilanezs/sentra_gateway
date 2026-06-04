@@ -38,6 +38,8 @@ class AdminSettings(BaseSettings):
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
     redis_connect_timeout_seconds: float = Field(default=1.0, alias="ADMIN_REDIS_CONNECT_TIMEOUT_SECONDS")
     redis_operation_timeout_seconds: float = Field(default=1.5, alias="ADMIN_REDIS_OPERATION_TIMEOUT_SECONDS")
+    redis_runtime_max_failures: int = Field(default=3, alias="ADMIN_REDIS_RUNTIME_MAX_FAILURES")
+    redis_retry_cooldown_seconds: float = Field(default=10.0, alias="ADMIN_REDIS_RETRY_COOLDOWN_SECONDS")
 
 
     # Email

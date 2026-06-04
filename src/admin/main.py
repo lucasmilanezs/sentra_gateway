@@ -26,9 +26,9 @@ def _load_env() -> None:
 _load_env()
 
 # Imports após carregar .env para que os settings leiam as variáveis corretas
-from src.admin.infrastructure.config.settings import AdminSettings  # noqa: E402
-from src.admin.interface.http.exception_handlers import register_domain_exception_handlers  # noqa: E402
-from src.admin.interface.http.routers import (  # noqa: E402
+from src.admin.infrastructure.config.settings import AdminSettings 
+from src.admin.interface.http.exception_handlers import register_domain_exception_handlers  
+from src.admin.interface.http.routers import (  
     admin_route_router,
     audit_router,
     auth_router,

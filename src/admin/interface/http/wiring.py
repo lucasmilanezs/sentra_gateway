@@ -43,6 +43,7 @@ from src.admin.infrastructure.persistence.postgres.change_audit import ChangeAud
 from src.admin.infrastructure.security.bcrypt_password_hasher import BcryptPasswordHasher
 from src.admin.infrastructure.security.jwt_token_service import JwtTokenService
 from src.shared.security.secret_cipher import SecretCipher
+from src.shared.runtime.dependency_status import DependencyStatusRegistry
 
 
 class AdminWiring:
@@ -70,7 +71,16 @@ class AdminWiring:
                 mail_from=settings.smtp_from or "noreply@sentra.local",
             )
 
-        self._redis_client = aioredis.from_url(
+        self.dependency_status = DependencyStatusRegistry()
+        self.dependency_status.mark_degraded(
+            "redis",
+            "Redis administrativo ainda não foi verificado.",
+            reason_code="not_checked",
+            phase="startup",
+            redis_url=settings.redis_url,
+        )
+
+        self._redis_notify_client = aioredis.from_url(
             settings.redis_url,
             decode_responses=True,
             socket_connect_timeout=settings.redis_connect_timeout_seconds,
@@ -78,8 +88,29 @@ class AdminWiring:
             health_check_interval=None,
             retry_on_timeout=False,
         )
-        self.publisher = RedisConfigNotifier(client=self._redis_client)
-        self.raw_gateway_log_repository = RedisGatewayLogRepository(client=self._redis_client)
+        self._redis_log_client = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_operation_timeout_seconds,
+            health_check_interval=None,
+            retry_on_timeout=False,
+        )
+        self._redis_client = self._redis_notify_client  # Backward-compatible alias.
+        self.publisher = RedisConfigNotifier(
+            client=self._redis_notify_client,
+            redis_url=settings.redis_url,
+            status_registry=self.dependency_status,
+            max_failures=settings.redis_runtime_max_failures,
+            retry_cooldown_seconds=settings.redis_retry_cooldown_seconds,
+        )
+        self.raw_gateway_log_repository = RedisGatewayLogRepository(
+            client=self._redis_log_client,
+            redis_url=settings.redis_url,
+            status_registry=self.dependency_status,
+            max_failures=settings.redis_runtime_max_failures,
+            retry_cooldown_seconds=settings.redis_retry_cooldown_seconds,
+        )
         self.query_gateway_logs = QueryGatewayLogs(self.raw_gateway_log_repository)
 
         if settings.use_postgres:
@@ -162,6 +193,9 @@ class AdminWiring:
         w.email_sender = self.email_sender
         w._engine = self._engine
         w._session_factory = self._session_factory
+        w.dependency_status = self.dependency_status
+        w._redis_notify_client = self._redis_notify_client
+        w._redis_log_client = self._redis_log_client
         w._redis_client = self._redis_client
         w.publisher = self.publisher
         w.raw_gateway_log_repository = self.raw_gateway_log_repository
@@ -223,4 +257,10 @@ class AdminWiring:
     async def dispose(self) -> None:
         if self._engine:
             await self._engine.dispose()
-        await self._redis_client.aclose()
+        for client_name in ("_redis_notify_client", "_redis_log_client"):
+            client = getattr(self, client_name, None)
+            if client is not None:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass

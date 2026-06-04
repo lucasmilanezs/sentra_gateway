@@ -411,6 +411,31 @@ function _setOverviewCard(id, status, sub = '') {
   }
 }
 
+function _isCriticalPostgresStatus(status) {
+  return ['error', 'inactive', 'not_loaded'].includes(String(status || '').toLowerCase());
+}
+
+function _renderPostgresCriticalWarning(adminPostgres, gatewayPostgres) {
+  const warning = document.getElementById('ov-postgres-critical-warning');
+  if (!warning) return;
+
+  const adminStatus = adminPostgres?.status || 'unknown';
+  const gatewayStatus = gatewayPostgres?.status || 'unknown';
+  const shouldShow = _isCriticalPostgresStatus(adminStatus) || _isCriticalPostgresStatus(gatewayStatus);
+
+  warning.style.display = shouldShow ? 'block' : 'none';
+  if (!shouldShow) return;
+
+  const affected = [];
+  if (_isCriticalPostgresStatus(adminStatus)) affected.push('Admin');
+  if (_isCriticalPostgresStatus(gatewayStatus)) affected.push('Gateway');
+
+  const text = warning.querySelector('.overview-critical-text');
+  if (text) {
+    text.textContent = `PostgreSQL indisponível no ${affected.join(' e ')}: o Admin perde a fonte de verdade para configurar políticas e a auditoria pode falhar. O Gateway segue com a última snapshot, mas a configuração está comprometida. Reinicie ou investigue o banco.`;
+  }
+}
+
 function _translateHealthDetail(text) {
   if (!text) return '';
   const raw = String(text);
@@ -522,6 +547,8 @@ function _renderOverview(adminHealth, gatewayHealth) {
   _setOverviewCard('ov-postgres', postgresStatus, postgresStatus === 'ok' ? 'PostgreSQL conectado nos dois planos' : 'falha de PostgreSQL em um dos planos');
   _setOverviewCard('ov-redis', redisStatus, redisStatus === 'ok' ? 'Redis conectado nos dois planos' : 'Redis indisponível ou degradado');
   _setOverviewCard('ov-snapshot', snapshotStatus, snapshotDetail);
+
+  _renderPostgresCriticalWarning(c.admin_postgres, c.gateway_postgres);
 
   const healthSummary = document.getElementById('ov-health-summary');
   if (healthSummary) {

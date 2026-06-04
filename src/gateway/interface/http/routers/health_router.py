@@ -73,16 +73,15 @@ async def _redis_ping(
         if registry:
             registry.mark_ok(
                 name,
-                "Redis acessível via conexão TCP",
-                reason_code="tcp_connect_ok",
+                "Redis respondeu ao PING",
+                reason_code="pong",
                 redis_url=safe_redis_url(redis_url),
                 redis_host=endpoint.host,
                 redis_port=endpoint.port,
             )
-            _reactivate_redis_dependents(registry)
         restart = getattr(request.app.state, "restart_redis_subscriber_if_needed", None)
         if restart is not None:
-            restarted = await restart("redis health tcp probe recovered")
+            restarted = await restart("redis health ping recovered")
             if restarted and registry:
                 registry.mark_degraded(
                     "redis_pubsub",
@@ -90,7 +89,7 @@ async def _redis_ping(
                     reason_code="redis_recovered_restart_requested",
                     phase="restarting",
                 )
-        return registry.as_dict()[name] if registry else {"status": "ok", "detail": "Redis acessível via conexão TCP"}
+        return registry.as_dict()[name] if registry else {"status": "ok", "detail": "Redis respondeu ao PING"}
     except Exception as exc:
         reason_code, human_reason = classify_connection_error(exc)
         if registry:
@@ -104,44 +103,9 @@ async def _redis_ping(
                 redis_host=endpoint.host,
                 redis_port=endpoint.port,
             )
-            _degrade_redis_dependents_due_to_ping(registry, human_reason=human_reason, reason_code=reason_code)
             return registry.as_dict()[name]
         return {"status": "error", "detail": human_reason, "reason_code": reason_code, "error_type": type(exc).__name__}
 
-
-def _reactivate_redis_dependents(registry: DependencyStatusRegistry) -> None:
-    for component, detail in {
-        "redis_rate_limit": "Redis voltou a responder; o rate limit tentará validar a próxima escrita real.",
-        "redis_raw_logs": "Redis voltou a responder; os logs operacionais tentarão validar a próxima escrita real.",
-    }.items():
-        state = registry.get(component)
-        if state.status in {"inactive", "error"}:
-            registry.mark_degraded(
-                component,
-                detail,
-                reason_code="redis_recovered_waiting_real_operation",
-                phase="waiting_next_operation",
-            )
-            state = registry.get(component)
-            state.next_retry_at = None
-            state.disabled_at = None
-            state.attempts = 0
-
-
-def _degrade_redis_dependents_due_to_ping(registry: DependencyStatusRegistry, *, human_reason: str, reason_code: str) -> None:
-    for component, detail in {
-        "redis_rate_limit": "Rate limit degradado porque a conectividade geral com Redis falhou. O gateway deve operar em fail-open sem tocar no Redis no caminho crítico.",
-        "redis_raw_logs": "Logs operacionais degradados porque a conectividade geral com Redis falhou. A auditoria persistente não é afetada.",
-    }.items():
-        state = registry.get(component)
-        if state.status not in {"inactive", "error"}:
-            registry.mark_degraded(
-                component,
-                detail,
-                reason_code=reason_code,
-                human_reason=human_reason,
-                phase="redis_connectivity_unavailable",
-            )
 
 async def _postgres_ping(database_url: str) -> dict[str, Any]:
     engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)

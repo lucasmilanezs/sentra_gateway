@@ -142,6 +142,13 @@
           <div class="metric-sub" id="ov-snapshot-sub">config em memória</div>
         </div>
       </div>
+      <div id="ov-postgres-critical-warning" class="overview-critical-warning" style="display:none">
+        <div class="overview-critical-title">Falha crítica</div>
+        <div class="overview-critical-text">
+          PostgreSQL indisponível: o sistema perde a fonte de verdade para configurar políticas e dados de auditoria podem ser perdidos.
+          O Gateway segue operacional com a última snapshot, mas a configuração está comprometida. Reinicie os serviços ou investigue o motivo da indisponibilidade.
+        </div>
+      </div>
       <div class="card" id="ov-health-details" style="margin-top:16px">
         <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:10px">Saúde dos componentes</div>
         <div class="domain-hint" id="ov-health-summary">Carregando estado dos serviços…</div>
