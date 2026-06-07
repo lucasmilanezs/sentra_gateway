@@ -11,6 +11,12 @@ class ConflictError(DomainError):
 
 
 class AuthError(DomainError):
+    """Authentication failure: missing, invalid or expired credentials. Maps to HTTP 401."""
+    pass
+
+
+class ForbiddenError(DomainError):
+    """Authorization failure: authenticated caller is not allowed to perform the action. Maps to HTTP 403."""
     pass
 
 

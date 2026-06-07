@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.admin.domain.entities.user import User
-from src.admin.domain.exceptions import AuthError, ValidationError
+from src.admin.domain.exceptions import ForbiddenError, ValidationError
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
 
 
@@ -23,17 +23,17 @@ class TenantAccessControl:
     @classmethod
     def ensure_has_permission(cls, claims: JwtClaims, permission: str) -> None:
         if not claims.has_permission(permission):
-            raise AuthError(f"permissão '{permission}' necessária")
+            raise ForbiddenError(f"permissão '{permission}' necessária")
 
     @classmethod
     def ensure_admin_like_claims(cls, claims: JwtClaims) -> None:
         if not claims.is_admin_like():
-            raise AuthError("acesso restrito a administradores")
+            raise ForbiddenError("acesso restrito a administradores")
 
     @classmethod
     def ensure_superuser_claims(cls, claims: JwtClaims) -> None:
         if not claims.is_superuser():
-            raise AuthError("acesso restrito ao superuser")
+            raise ForbiddenError("acesso restrito ao superuser")
 
     @staticmethod
     def ensure_tenant_access(
@@ -45,7 +45,7 @@ class TenantAccessControl:
         if caller_role == "superuser":
             return
         if caller_tenant_id != resource_tenant_id:
-            raise AuthError("acesso negado ao tenant")
+            raise ForbiddenError("acesso negado ao tenant")
 
     @staticmethod
     def resolve_read_scope(
@@ -64,7 +64,7 @@ class TenantAccessControl:
                 raise ValidationError("tenant_id é obrigatório para superuser")
             return requested_tenant_id
         if not caller_tenant_id:
-            raise AuthError("caller sem tenant vinculado não pode executar esta ação")
+            raise ForbiddenError("caller sem tenant vinculado não pode executar esta ação")
         return caller_tenant_id
 
     @classmethod
@@ -81,18 +81,18 @@ class TenantAccessControl:
             return target_tenant_id
         if caller_role == "admin":
             if not caller_tenant_id:
-                raise AuthError("admin sem tenant vinculado não pode criar sub-usuários")
+                raise ForbiddenError("admin sem tenant vinculado não pode criar sub-usuários")
             if target_tenant_id and target_tenant_id != caller_tenant_id:
-                raise AuthError("admin não pode criar sub-usuário em outro tenant")
+                raise ForbiddenError("admin não pode criar sub-usuário em outro tenant")
             return caller_tenant_id
-        raise AuthError("apenas admin ou superuser podem criar sub-usuários")
+        raise ForbiddenError("apenas admin ou superuser podem criar sub-usuários")
 
     @classmethod
     def ensure_can_list_members(
         cls, *, caller_role: str, caller_tenant_id: str | None, tenant_id: str
     ) -> None:
         if caller_role not in ("superuser", "admin"):
-            raise AuthError("acesso negado")
+            raise ForbiddenError("acesso negado")
         cls.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
@@ -104,11 +104,11 @@ class TenantAccessControl:
         cls, *, caller_role: str, caller_tenant_id: str | None, target: User
     ) -> None:
         if target.role != "member":
-            raise AuthError("não é permitido modificar usuários admin ou superuser por esta rota")
+            raise ForbiddenError("não é permitido modificar usuários admin ou superuser por esta rota")
         if caller_role not in ("superuser", "admin"):
-            raise AuthError("acesso negado")
+            raise ForbiddenError("acesso negado")
         if target.tenant_id is None:
-            raise AuthError("member sem tenant vinculado não pode ser modificado")
+            raise ForbiddenError("member sem tenant vinculado não pode ser modificado")
         cls.ensure_tenant_access(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,

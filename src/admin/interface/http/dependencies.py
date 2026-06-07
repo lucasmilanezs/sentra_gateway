@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.application.use_cases.query_audit import QueryAudit
 from src.admin.application.use_cases.query_gateway_logs import QueryGatewayLogs
-from src.admin.domain.exceptions import AuthError
+from src.admin.domain.exceptions import AuthError, ForbiddenError
 from src.admin.domain.services.access_control import TenantAccessControl
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
@@ -79,7 +79,7 @@ def require_permission(permission: str):
     ) -> JwtClaims:
         try:
             TenantAccessControl.ensure_has_permission(claims, permission)
-        except AuthError as e:
+        except ForbiddenError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(e),
@@ -99,7 +99,7 @@ def require_admin():
     ) -> JwtClaims:
         try:
             TenantAccessControl.ensure_admin_like_claims(claims)
-        except AuthError as e:
+        except ForbiddenError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(e),
@@ -116,7 +116,7 @@ def require_superuser():
     ) -> JwtClaims:
         try:
             TenantAccessControl.ensure_superuser_claims(claims)
-        except AuthError as e:
+        except ForbiddenError as e:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=str(e),
