@@ -171,4 +171,5 @@ export const subUsersApi = {
   listByTenant:      (tenantId)            => request('GET',    `/sub-users/${tenantId}`),
   updatePermissions: (userId, permissions) => request('PATCH',  `/sub-users/${userId}/permissions`, { permissions }),
   delete:            (userId)              => request('DELETE', `/sub-users/${userId}`),
+  deleteMe:          ()                    => request('DELETE', '/sub-users/me'),
 };

@@ -1522,3 +1522,43 @@ html, body {
   font-size: .82rem;
   line-height: 1.45;
 }
+
+/* Member permission alignment */
+.modal-field-title {
+  display: block;
+  margin-bottom: 10px;
+}
+.permission-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.permission-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
+  font-weight: 400;
+  cursor: pointer;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+.permission-option input[type="checkbox"] {
+  margin: 2px 0 0 0;
+  width: 16px;
+  height: 16px;
+  justify-self: center;
+}
+.permission-option span {
+  min-width: 0;
+}
+.profile-danger-card {
+  border-color: rgba(220, 38, 38, .32);
+  background: rgba(127, 29, 29, .06);
+}
+.danger-hint {
+  margin: 0 0 14px 0;
+  color: var(--text-secondary);
+  font-size: .82rem;
+  line-height: 1.45;
+}

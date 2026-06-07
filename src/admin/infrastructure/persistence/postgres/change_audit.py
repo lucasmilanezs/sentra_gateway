@@ -1,4 +1,4 @@
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.admin.domain.entities.admin_change_event import AdminChangeEvent
 from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
@@ -10,7 +10,7 @@ def _to_entity(row) -> AdminChangeEvent:
     tenant = row[1]
     actor = row[2]
     tenant_label = tenant.name if tenant else None
-    actor_label = actor.email if actor else f"{audit.actor_role}"
+    actor_label = "usuário deletado" if audit.actor_id == "deleted_user" else (actor.email if actor else f"{audit.actor_role}")
     return AdminChangeEvent(
         id=audit.id, tenant_id=audit.tenant_id, actor_id=audit.actor_id,
         actor_role=audit.actor_role, action=audit.action, resource_type=audit.resource_type,
@@ -64,3 +64,19 @@ class ChangeAuditRepository(ChangeAuditRepositoryPort):
         q = q.order_by(AdminChangeAuditORM.created_at.desc()).limit(limit).offset(offset)
         result = await self._session.execute(q)
         return [_to_entity(r) for r in result.all()], total
+    async def anonymize_user_references(self, user_id: str) -> None:
+        if not user_id:
+            return
+
+        await self._session.execute(
+            update(AdminChangeAuditORM)
+            .where(AdminChangeAuditORM.actor_id == user_id)
+            .values(actor_id="deleted_user")
+        )
+        await self._session.execute(
+            update(AdminChangeAuditORM)
+            .where(AdminChangeAuditORM.resource_id == user_id)
+            .where(func.lower(AdminChangeAuditORM.resource_type).in_(("member", "admin", "user", "member_permissions")))
+            .values(resource_id="deleted_user", resource_summary="deleted_user")
+        )
+        await self._session.flush()

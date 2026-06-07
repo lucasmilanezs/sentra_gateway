@@ -105,6 +105,40 @@ class TenantAccessControl:
     ) -> None:
         if target.role != "member":
             raise ForbiddenError("não é permitido modificar usuários admin ou superuser por esta rota")
+        cls.ensure_can_delete_user(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            caller_user_id=None,
+            target=target,
+            allow_self_member_delete=False,
+        )
+
+    @classmethod
+    def ensure_can_delete_user(
+        cls,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        caller_user_id: str | None,
+        target: User,
+        allow_self_member_delete: bool = True,
+    ) -> None:
+        if target.role == "superuser":
+            raise ForbiddenError("não é permitido remover o superuser")
+
+        if target.role == "admin":
+            if caller_role != "superuser":
+                raise ForbiddenError("somente superuser pode remover usuários administrativos")
+            if not target.tenant_id:
+                raise ForbiddenError("admin sem tenant vinculado não pode ser removido")
+            return
+
+        if target.role != "member":
+            raise ForbiddenError("tipo de usuário não pode ser removido")
+
+        if allow_self_member_delete and caller_user_id and caller_user_id == target.id:
+            return
+
         if caller_role not in ("superuser", "admin"):
             raise ForbiddenError("acesso negado")
         if target.tenant_id is None:

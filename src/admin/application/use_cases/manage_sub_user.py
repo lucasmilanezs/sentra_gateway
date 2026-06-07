@@ -87,25 +87,57 @@ class ManageSubUser:
         )
         return await self._users.list_members_by_tenant(tenant_id)
 
-    async def delete(self, *, caller_role: str, caller_tenant_id: str | None, user_id: str, caller_user_id: str | None = None) -> None:
+    async def delete(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        user_id: str,
+        caller_user_id: str | None = None,
+        allow_self_member_delete: bool = True,
+    ) -> None:
         target = await self._users.get_by_id(user_id)
         if not target:
             raise NotFoundError("usuário não encontrado")
-        TenantAccessControl.ensure_can_modify_member(
+
+        TenantAccessControl.ensure_can_delete_user(
             caller_role=caller_role,
             caller_tenant_id=caller_tenant_id,
+            caller_user_id=caller_user_id,
             target=target,
+            allow_self_member_delete=allow_self_member_delete,
         )
-        await self._users.delete(user_id)
+
+        resource_type = "admin" if target.role == "admin" else "member"
         await self._audit.record(
             tenant_id=target.tenant_id,
             actor_id=caller_user_id,
             actor_role=caller_role,
             action="DELETE",
-            resource_type="member",
+            resource_type=resource_type,
             resource_id=target.id,
             resource_summary=target.email,
-            detail={"permissions": target.permissions},
+            detail={"role": target.role, "permissions": target.permissions},
+        )
+
+        await self._audit.anonymize_user_references(target.id)
+
+        if not await self._users.delete(user_id):
+            raise NotFoundError("usuário não encontrado")
+
+    async def delete_current_member(
+        self,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        caller_user_id: str,
+    ) -> None:
+        await self.delete(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            user_id=caller_user_id,
+            caller_user_id=caller_user_id,
+            allow_self_member_delete=True,
         )
 
     async def update_permissions(

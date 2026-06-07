@@ -13,3 +13,11 @@ class ChangeAuditRepositoryPort(ABC):
         action: str | None = None, actor_role: str | None = None,
         search: str | None = None, date_from: datetime | None = None,
         date_to: datetime | None = None) -> tuple[list[AdminChangeEvent], int]: ...
+
+    async def anonymize_user_references(self, user_id: str) -> None:
+        """Best-effort hook used before user deletion to preserve audit integrity.
+
+        Implementations should remove direct personal identifiers from audit rows
+        that refer to the deleted user while preserving the event record itself.
+        """
+        return None

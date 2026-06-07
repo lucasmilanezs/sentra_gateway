@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from src.admin.application.use_cases.manage_sub_user import ManageSubUser
 from src.admin.domain.value_objects.jwt_claims import JwtClaims
-from src.admin.interface.http.dependencies import get_manage_sub_user, require_admin
+from src.admin.interface.http.dependencies import get_current_claims, get_manage_sub_user, require_admin
 from src.admin.interface.schema.sub_user_schema import (
     SubUserCreate,
     SubUserResponse,
@@ -106,6 +106,18 @@ async def update_permissions(
         caller_user_id=claims.sub,
     )
     return _to_response(user)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_current_member(
+    claims: Annotated[JwtClaims, Depends(get_current_claims)],
+    uc: Annotated[ManageSubUser, Depends(get_manage_sub_user)],
+):
+    await uc.delete_current_member(
+        caller_role=claims.role or "",
+        caller_tenant_id=claims.tenant_id,
+        caller_user_id=claims.sub,
+    )
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

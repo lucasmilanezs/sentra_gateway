@@ -15,6 +15,8 @@ def _row_to_user(row: dict) -> User:
         tenant_id=row.get("tenant_id"),
         created_at=_parse_dt(row["created_at"]),
         updated_at=_parse_dt(row["updated_at"]),
+        role=row.get("role", "admin"),
+        permissions=row.get("permissions") or [],
     )
 
 
@@ -24,6 +26,8 @@ def _user_to_row(u: User) -> dict:
         "email": u.email,
         "password_hash": u.password_hash,
         "tenant_id": u.tenant_id,
+        "role": u.role,
+        "permissions": list(u.permissions),
         "created_at": _serialize_dt(u.created_at),
         "updated_at": _serialize_dt(u.updated_at),
     }
@@ -59,3 +63,23 @@ class UserRepository(UserRepositoryPort):
             users.append(row)
 
         await self._store.mutate_async(mut)
+
+    async def list_members_by_tenant(self, tenant_id: str) -> list[User]:
+        doc = await self._store.read_async()
+        return [
+            _row_to_user(r)
+            for r in doc["users"]
+            if r.get("tenant_id") == tenant_id and r.get("role", "admin") == "member"
+        ]
+
+    async def delete(self, user_id: str) -> bool:
+        deleted = False
+
+        def mut(doc: dict) -> None:
+            nonlocal deleted
+            original = len(doc["users"])
+            doc["users"] = [r for r in doc["users"] if r.get("id") != user_id]
+            deleted = len(doc["users"]) != original
+
+        await self._store.mutate_async(mut)
+        return deleted

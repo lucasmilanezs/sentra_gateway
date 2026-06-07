@@ -333,6 +333,11 @@ function navigate(pageId) {
       document.getElementById('profile-perms').textContent = me.permissions.join(', ');
     }
 
+    const profileDeleteCard = document.getElementById('profile-delete-card');
+    if (profileDeleteCard) {
+      profileDeleteCard.style.display = me.role === 'member' ? '' : 'none';
+    }
+
     // btn-switch e nav-tenants: apenas superuser real (role confirmado pelo servidor)
     if (me.role === 'superuser') {
       document.getElementById('btn-switch').style.display  = 'inline-block';
@@ -1848,3 +1853,20 @@ function _policyConstraintSummary(p) {
   if (p.forbidden_params?.length) parts.push(`forbP:${p.forbidden_params.length}`);
   return parts.length ? ` · ${parts.join(' · ')}` : '';
 }
+
+
+document.getElementById('btn-delete-profile-member')?.addEventListener('click', async () => {
+  const msg = document.getElementById('profile-delete-msg');
+  if (msg) { msg.textContent = ''; msg.className = 'inline-msg'; }
+  if (!confirm('Excluir sua conta de membro? Esta ação encerra sua sessão e anonimiza suas referências em auditoria.')) return;
+  try {
+    await subUsersApi.deleteMe();
+    sessionStorage.clear();
+    window.location.href = '/index.html';
+  } catch (err) {
+    if (msg) {
+      msg.textContent = err.detail || 'Erro ao excluir conta.';
+      msg.className = 'inline-msg error';
+    }
+  }
+});

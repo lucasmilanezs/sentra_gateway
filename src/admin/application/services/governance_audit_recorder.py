@@ -35,3 +35,8 @@ class GovernanceAuditRecorder:
             detail=detail,
         )
         await self._repository.record(event)
+
+    async def anonymize_user_references(self, user_id: str) -> None:
+        if not self._repository:
+            return
+        await self._repository.anonymize_user_references(user_id)

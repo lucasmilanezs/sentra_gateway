@@ -411,6 +411,12 @@
           <span class="profile-value" id="profile-perms">—</span>
         </div>
       </div>
+      <div class="card profile-danger-card" id="profile-delete-card" style="display:none">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:8px">Excluir minha conta</div>
+        <p class="danger-hint">Remove sua sessão de membro e anonimiza suas referências em auditoria de governança.</p>
+        <p class="inline-msg" id="profile-delete-msg"></p>
+        <button class="btn-danger-ghost" id="btn-delete-profile-member">Excluir minha conta de membro</button>
+      </div>
       <div class="card">
         <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:18px">Alterar senha</div>
         <div class="form-field">
@@ -743,21 +749,21 @@
       <input type="password" id="m-password" placeholder="Mínimo 8 caracteres" />
     </div>
     <div class="modal-field">
-      <label style="margin-bottom:10px;display:block">Permissões</label>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+      <label class="modal-field-title">Permissões</label>
+      <div class="permission-checklist">
+        <label class="permission-option">
           <input type="checkbox" id="m-perm-domains" value="domains" />
           <span><strong>Domains</strong> — cadastrar e editar domains do gateway</span>
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+        <label class="permission-option">
           <input type="checkbox" id="m-perm-routes" value="routes" />
           <span><strong>Rotas</strong> — cadastrar e editar rotas e políticas</span>
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+        <label class="permission-option">
           <input type="checkbox" id="m-perm-audit" value="audit" />
           <span><strong>Auditoria</strong> — visualizar eventos de requisições</span>
         </label>
-        <label style="display:flex;align-items:center;gap:10px;font-weight:400;cursor:pointer;color:var(--text-primary)">
+        <label class="permission-option">
           <input type="checkbox" id="m-perm-metrics" value="metrics" />
           <span><strong>Métricas</strong> — visualizar dashboard de desempenho</span>
         </label>
