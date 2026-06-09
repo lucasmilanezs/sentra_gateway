@@ -618,8 +618,29 @@
     <div class="modal-field">
       <label>Cor de exibição</label>
       <div class="color-field-row">
-        <input type="color" id="r-display-color" value="#2dd4bf" />
+        <button type="button" class="color-trigger" id="r-display-color-trigger" aria-label="Escolher cor da rota">
+          <span id="r-display-color-swatch"></span>
+          Escolher cor
+        </button>
         <input type="text" id="r-display-color-text" value="#2dd4bf" maxlength="7" />
+      </div>
+      <div class="route-color-popover" id="route-color-popover" aria-hidden="true">
+        <div class="route-color-panel">
+          <div class="route-color-head">
+            <strong>Cor de exibição</strong>
+            <button type="button" class="btn-icon" id="route-color-close">Fechar</button>
+          </div>
+          <p class="route-color-help">Escolha uma cor para identificar a rota em listas e gráficos. O valor salvo continua sendo hexadecimal.</p>
+          <div class="route-color-grid" id="route-color-grid"></div>
+          <label class="route-color-custom">
+            Hex customizado
+            <input type="text" id="route-color-custom" value="#2dd4bf" maxlength="7" />
+          </label>
+          <div class="route-color-actions">
+            <button type="button" class="btn-ghost" id="route-color-cancel">Cancelar</button>
+            <button type="button" class="btn-primary" id="route-color-apply">Aplicar</button>
+          </div>
+        </div>
       </div>
       <p class="field-help">Usada para identificar a rota nas listas e gráficos de métricas.</p>
     </div>

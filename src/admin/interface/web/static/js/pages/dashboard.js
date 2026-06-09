@@ -909,12 +909,62 @@ function _normalizeColor(value) {
 }
 function _setRouteColor(value) {
   const color = _normalizeColor(value);
-  const picker = document.getElementById('r-display-color');
   const text = document.getElementById('r-display-color-text');
-  if (picker) picker.value = color;
+  const swatch = document.getElementById('r-display-color-swatch');
+  const trigger = document.getElementById('r-display-color-trigger');
+  const custom = document.getElementById('route-color-custom');
   if (text) text.value = color;
+  if (custom) custom.value = color;
+  if (swatch) swatch.style.background = color;
+  if (trigger) trigger.style.setProperty('--route-picked-color', color);
+  document.querySelectorAll('.route-color-option').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.color === color);
+  });
 }
-document.getElementById('r-display-color')?.addEventListener('input', e => _setRouteColor(e.target.value));
+const ROUTE_COLOR_PALETTE = ['#2dd4bf','#38bdf8','#60a5fa','#818cf8','#a78bfa','#c084fc','#f472b6','#fb7185','#f97316','#f59e0b','#eab308','#84cc16','#22c55e','#14b8a6','#94a3b8','#64748b'];
+let _routeColorDraft = '#2dd4bf';
+function _renderRouteColorPalette() {
+  const grid = document.getElementById('route-color-grid');
+  if (!grid || grid.dataset.ready === '1') return;
+  ROUTE_COLOR_PALETTE.forEach(color => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'route-color-option';
+    btn.dataset.color = color;
+    btn.style.setProperty('--option-color', color);
+    btn.title = color;
+    btn.addEventListener('click', () => {
+      _routeColorDraft = color;
+      const custom = document.getElementById('route-color-custom');
+      if (custom) custom.value = color;
+      document.querySelectorAll('.route-color-option').forEach(el => el.classList.toggle('active', el === btn));
+    });
+    grid.appendChild(btn);
+  });
+  grid.dataset.ready = '1';
+}
+function _openRouteColorPopover() {
+  _renderRouteColorPalette();
+  _routeColorDraft = _normalizeColor(document.getElementById('r-display-color-text')?.value);
+  const popover = document.getElementById('route-color-popover');
+  const custom = document.getElementById('route-color-custom');
+  if (custom) custom.value = _routeColorDraft;
+  document.querySelectorAll('.route-color-option').forEach(btn => btn.classList.toggle('active', btn.dataset.color === _routeColorDraft));
+  popover?.classList.add('visible');
+  popover?.setAttribute('aria-hidden', 'false');
+  custom?.focus();
+}
+function _closeRouteColorPopover() {
+  const popover = document.getElementById('route-color-popover');
+  popover?.classList.remove('visible');
+  popover?.setAttribute('aria-hidden', 'true');
+}
+document.getElementById('r-display-color-trigger')?.addEventListener('click', _openRouteColorPopover);
+document.getElementById('route-color-close')?.addEventListener('click', _closeRouteColorPopover);
+document.getElementById('route-color-cancel')?.addEventListener('click', _closeRouteColorPopover);
+document.getElementById('route-color-popover')?.addEventListener('click', e => { if (e.target.id === 'route-color-popover') _closeRouteColorPopover(); });
+document.getElementById('route-color-custom')?.addEventListener('input', e => { _routeColorDraft = _normalizeColor(e.target.value); });
+document.getElementById('route-color-apply')?.addEventListener('click', () => { _setRouteColor(_routeColorDraft); _closeRouteColorPopover(); });
 document.getElementById('r-display-color-text')?.addEventListener('input', e => _setRouteColor(e.target.value));
 
 window._editRoute = (id, methodsJson, path, backend, displayColor='#2dd4bf') => {
