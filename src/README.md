@@ -1,79 +1,118 @@
-# Estrutura da Aplicação
+# Source Code
 
-Este diretório contém o código principal da aplicação Sentra.
+O código-fonte principal fica em `src/` e é dividido em três módulos:
 
-O sistema é dividido em dois planos principais de operação:
-
-- **Gateway (Data Plane)** – responsável por receber requisições externas, aplicar políticas de segurança e encaminhar requisições válidas para os serviços backend dos clientes.
-
-- **Admin (Control Plane)** – responsável pela gestão e configuração da plataforma, incluindo cadastro de tenants, definição de rotas protegidas, configuração de políticas e visualização de logs.
-
-Além desses dois módulos principais, existe também:
-
-- **Shared** – módulo contendo utilidades e componentes compartilhados entre gateway e admin.
-
----
-
-# Abordagem Arquitetural
-
-O projeto segue princípios inspirados em:
-
-- **Hexagonal Architecture**
-- **Clean Architecture**
-- **DDD (Domain Driven Design) leve**
-
-Essa abordagem busca separar claramente:
-
-- lógica de domínio
-- orquestração da aplicação
-- comunicação externa
-- infraestrutura
-
-O objetivo dessa separação é melhorar:
-
-- manutenibilidade
-- testabilidade
-- organização do código
-- independência entre camadas
-
----
-
-# Estrutura Geral
-
-```
+```text
 src/
 ├─ admin/
-│  ├─ application/        # Casos de uso e serviços de aplicação do módulo administrativo
-│  ├─ domain/             # Entidades e regras de negócio do domínio administrativo
-│  ├─ infrastructure/     # Integrações externas, persistência e adaptações técnicas
-│  └─ interface/          # Controladores HTTP e pontos de entrada do módulo admin
-│
 ├─ gateway/
-│  ├─ application/        # Orquestração das requisições e execução das políticas do gateway
-│  ├─ domain/             # Modelos de domínio e definições de políticas do gateway
-│  ├─ infrastructure/     # Componentes técnicos de rede, roteamento e integrações externas
-│  └─ interface/          # Interface de entrada para requisições processadas pelo gateway
-│
-├─ shared/                # Códigos e funções generalistas para reutilização ( duplicado no deploy )
-│  ├─ config/
-│  ├─ db/
-│  ├─ errors/
-│  ├─ http/
-│  ├─ logging/           
-│  ├─ observability/       
-│  └─ security/
-│
-└─ readme.md
+└─ shared/
 ```
 
 ---
 
-# Filosofia de Desenvolvimento
+# Admin Plane
 
-A arquitetura prioriza:
+O `admin/` representa o plano de controle.
 
-- separação clara de responsabilidades
-- baixo acoplamento entre componentes
-- dependências sempre apontando para dentro (em direção ao domínio)
+Ele é responsável por:
 
-Camadas internas não devem depender diretamente de detalhes de infraestrutura ou frameworks.
+- autenticação administrativa;
+- gerenciamento de tenants;
+- gerenciamento de domínios;
+- gerenciamento de rotas;
+- configuração de policies;
+- gerenciamento de members;
+- auditoria de governança;
+- visualização de logs, auditoria e métricas.
+
+---
+
+# Gateway Plane
+
+O `gateway/` representa o plano de dados.
+
+Ele é responsável por:
+
+- receber requisições;
+- resolver tenant, domínio e rota;
+- aplicar policies;
+- executar rate limiting;
+- registrar auditoria de requisição;
+- registrar logs operacionais;
+- encaminhar para o upstream configurado.
+
+---
+
+# Shared
+
+O `shared/` contém utilitários reutilizados pelos dois planos.
+
+Exemplos:
+
+- configuração compartilhada;
+- helpers HTTP;
+- criptografia de secrets;
+- diagnóstico de dependências;
+- utilitários de runtime.
+
+---
+
+# Camadas
+
+Cada plano segue a mesma separação arquitetural:
+
+```text
+interface/
+application/
+domain/
+infrastructure/
+```
+
+## Interface
+
+Camada de exposição.
+
+Exemplos:
+
+- routers HTTP;
+- schemas Pydantic;
+- assets web;
+- tradução final para HTTP.
+
+## Application
+
+Camada de orquestração.
+
+Contém casos de uso e coordena domínio, portas e infraestrutura.
+
+Não deve conter regra de negócio central.
+
+## Domain
+
+Centro do sistema.
+
+Contém entidades, invariantes, regras de negócio e serviços de domínio.
+
+Não conhece banco, Redis, HTTP, FastAPI ou frameworks externos.
+
+## Infrastructure
+
+Integrações concretas.
+
+Exemplos:
+
+- PostgreSQL;
+- Redis;
+- pub/sub;
+- proxy upstream;
+- health checks;
+- envio de e-mail.
+
+---
+
+# Regra de dependência
+
+As dependências devem apontar para dentro.
+
+Camadas externas podem conhecer camadas internas. O domínio não deve depender de camadas externas.

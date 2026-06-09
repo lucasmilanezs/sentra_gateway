@@ -1,119 +1,119 @@
-# Gateway (Data Plane)
+# Gateway Plane (Data Plane)
 
 O módulo **gateway** representa o plano de dados da plataforma Sentra.
 
-Ele é responsável por receber requisições externas, aplicar políticas de segurança e encaminhar requisições válidas para os serviços backend dos clientes.
-
-Esse componente opera diretamente no caminho das requisições, portanto prioriza:
-
-- desempenho
-- previsibilidade
-- confiabilidade
-- baixo acoplamento com infraestrutura
+Ele recebe requisições HTTP, resolve a configuração aplicável, executa policies e encaminha tráfego válido para o backend configurado.
 
 ---
 
 # Responsabilidades
 
-O gateway é responsável por:
+Entre as principais responsabilidades estão:
 
-- identificar o tenant da requisição
-- validar autenticação
-- aplicar autorização
-- aplicar rate limiting
-- validar requisições
-- encaminhar requisições válidas para serviços upstream
-- registrar logs e eventos de auditoria
-
-O gateway **não persiste o conteúdo do payload das requisições**. Os dados são tratados apenas durante o runtime.
+- receber requisições HTTP;
+- decompor método, path, host, headers, query params e body;
+- resolver tenant por domínio;
+- resolver rota por tenant, path e método;
+- aplicar policy por rota ou fallback do domínio;
+- validar token em níveis progressivos;
+- validar headers e query params;
+- executar rate limiting;
+- registrar auditoria de requisições;
+- registrar logs operacionais densos;
+- encaminhar requisições válidas ao upstream;
+- preservar resposta do backend quando aplicável.
 
 ---
 
-# Estrutura Interna
+# Não responsabilidades
 
-O gateway segue uma estrutura inspirada em **Hexagonal Architecture** e **DDD** leve onde é conveniente:
+O Gateway não é responsável por:
 
-```
+- emitir tokens de sessão;
+- renovar sessão de usuários externos;
+- revogar tokens do contratante;
+- interpretar regras de autorização fina do backend;
+- substituir a autenticação final do serviço protegido;
+- executar regras de negócio da aplicação protegida.
+
+O Gateway reduz superfície de ataque e aplica pré-controles configuráveis, mas a autoridade final de sessão e autorização permanece no backend protegido.
+
+---
+
+# Estrutura interna
+
+```text
 gateway/
 ├─ application/
-│  ├─ dtos/               # Objetos de transferência de dados entre camadas ( se aplicável )
-│  └─ use_cases/          # Casos de uso responsáveis pelo fluxo de aplicação do gateway
+│  └─ use_cases/          # Orquestração do processamento de requisições
 │
 ├─ domain/
-│  ├─ models/             # Modelos centrais e entidades de negócio do domínio do gateway
-│  ├─ ports/              # Contratos e abstrações para comunicação com camadas externas
-│  └─ services/           # Serviços de domínio com regras de negócio e validações centrais
+│  ├─ models/             # Entidades e modelos centrais do Gateway
+│  ├─ ports/              # Contratos abstratos de saída
+│  └─ services/           # Avaliação de policies, auditoria, logs e rate limit
 │
 ├─ infrastructure/
-│  ├─ cache/              # Componentes de cache e armazenamento temporário de dados
-│  ├─ observability/      # Instrumentação de métricas, tracing e monitoramento
-│  ├─ persistence/        # Implementações de persistência e acesso a dados
-│  ├─ proxy/              # Componentes responsáveis pelo encaminhamento das requisições
-│  └─ pubsub/             # Mecanismos de mensageria e comunicação assíncrona
+│  ├─ config/             # Configuração do plano de dados
+│  ├─ observability/      # Escrita de auditoria/logs
+│  ├─ persistence/        # Snapshot carregada do PostgreSQL
+│  ├─ proxy/              # Encaminhamento upstream
+│  ├─ pubsub/             # Assinatura de eventos de atualização
+│  └─ redis/              # Rate limiting
 │
 ├─ interface/
-│  ├─ http/               # Camada de entrada HTTP do gateway
-│  │  └─ routers/         # Definição e organização das rotas expostas
-│  └─ schema/             # Esquemas de validação e serialização de dados do Pydantic
+│  └─ http/               # Parser e routers HTTP
 │
-└─ README.md              # Documentação específica da estrutura do módulo gateway
+└─ main.py                # Inicialização do Gateway Plane
 ```
 
 ---
 
-# Camadas da Aplicação
+# Fluxo simplificado
 
-## Interface
-
-Responsável pela comunicação com o mundo externo.
-
-Exemplos:
-
-- rotas HTTP
-- parsing de requisições
-- formatação de respostas
-- integração com frameworks (FastAPI)
-
-Essa camada não deve conter lógica de negócio.
-
----
-
-## Application
-
-Contém os **casos de uso** da aplicação.
-
-Responsável por:
-
-- orquestrar fluxo de execução
-- coordenar serviços de domínio
-- integrar componentes do sistema
+```text
+Request
+↓
+Parse HTTP
+↓
+Resolve tenant/domain
+↓
+Resolve route
+↓
+Select policy
+↓
+Evaluate policy
+↓
+Rate limit
+↓
+Audit + operational log
+↓
+Forward upstream
+↓
+Return response
+```
 
 ---
 
-## Domain
+# Snapshot operacional
 
-Contém as **regras centrais do sistema**.
+O Gateway usa uma snapshot em memória com configurações vindas do PostgreSQL.
 
-Exemplos:
+Essa snapshot não é persistência primária. Ela é uma cópia operacional temporária para reduzir latência no caminho crítico.
 
-- avaliação de políticas
-- controle de rate limiting
-- resolução de rotas
-- identificação de tenants
-
-Essa camada deve permanecer independente de frameworks e infraestrutura.
+A fonte de verdade continua sendo o PostgreSQL gerenciado pelo Admin Plane.
 
 ---
 
-## Infrastructure
+# Validação de token
 
-Implementações concretas de integração externa.
+O Gateway trabalha com níveis configuráveis de validação.
 
-Exemplos:
+Ele pode apenas exigir Bearer token, validar estrutura JWT, pré-validar claims declaradas ou validar assinatura criptográfica quando o contratante fornecer material apropriado.
 
-- acesso a banco de dados
-- integração com Redis
-- mecanismos de cache
-- encaminhamento HTTP para serviços upstream
+A validação do Gateway não substitui o backend protegido como autoridade final de sessão, claims, roles, scopes ou revogação.
 
-Infraestrutura depende do domínio, mas o domínio não depende da infraestrutura.
+Consulte:
+
+```text
+docs/security-model.md
+```
