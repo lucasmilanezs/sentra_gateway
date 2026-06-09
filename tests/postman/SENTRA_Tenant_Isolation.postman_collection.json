@@ -1,0 +1,2888 @@
+{
+  "info": {
+    "_postman_id": "ddcf5d25-dced-44ef-97dc-c9c3c22bc5b7",
+    "name": "SENTRA — Tenant Isolation & Permission Enforcement",
+    "description": "Validates that the tenant_ownership_guard patch is correctly blocking cross-tenant IDOR attacks, enforcing member permission scoping, and preserving superuser bypass. Run 00·Setup first, then any folder independently.\n\nRequired collection variables (set before running):\n  base_url            http://localhost:8000\n  superuser_email     admin@sentra.local\n  superuser_password  (from .env SUPERUSER_PASSWORD)\n  admin_a_email       admin_a@acme.test\n  admin_a_password    adminpassA1\n  admin_b_email       admin_b@globex.test\n  admin_b_password    adminpassB1\n  member_routes_email    member_routes@acme.test\n  member_routes_password memberpassR1\n  member_domains_email   member_domains@acme.test\n  member_domains_password memberpassD1\n  member_noperms_email   member_audit@acme.test\n  member_noperms_password memberpassN1\n  garbage_token       thisisnotavalidjwt",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "superuser_email",
+      "value": "admin@sentra.local"
+    },
+    {
+      "key": "superuser_password",
+      "value": ""
+    },
+    {
+      "key": "admin_a_email",
+      "value": "admin_a@acme.test"
+    },
+    {
+      "key": "admin_a_password",
+      "value": "adminpassA1"
+    },
+    {
+      "key": "admin_b_email",
+      "value": "admin_b@globex.test"
+    },
+    {
+      "key": "admin_b_password",
+      "value": "adminpassB1"
+    },
+    {
+      "key": "member_routes_email",
+      "value": "member_routes@acme.test"
+    },
+    {
+      "key": "member_routes_password",
+      "value": "memberpassR1"
+    },
+    {
+      "key": "member_domains_email",
+      "value": "member_domains@acme.test"
+    },
+    {
+      "key": "member_domains_password",
+      "value": "memberpassD1"
+    },
+    {
+      "key": "member_noperms_email",
+      "value": "member_audit@acme.test"
+    },
+    {
+      "key": "member_noperms_password",
+      "value": "memberpassN1"
+    },
+    {
+      "key": "garbage_token",
+      "value": "thisisnotavalidjwt"
+    },
+    {
+      "key": "superuser_token",
+      "value": ""
+    },
+    {
+      "key": "admin_a_token",
+      "value": ""
+    },
+    {
+      "key": "admin_b_token",
+      "value": ""
+    },
+    {
+      "key": "member_routes_token",
+      "value": ""
+    },
+    {
+      "key": "member_domains_token",
+      "value": ""
+    },
+    {
+      "key": "member_noperms_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_a_id",
+      "value": ""
+    },
+    {
+      "key": "tenant_b_id",
+      "value": ""
+    },
+    {
+      "key": "route_a_id",
+      "value": ""
+    },
+    {
+      "key": "route_b_id",
+      "value": ""
+    },
+    {
+      "key": "domain_a_id",
+      "value": ""
+    },
+    {
+      "key": "domain_b_id",
+      "value": ""
+    },
+    {
+      "key": "member_routes_id",
+      "value": ""
+    },
+    {
+      "key": "member_domains_id",
+      "value": ""
+    },
+    {
+      "key": "member_noperms_id",
+      "value": ""
+    },
+    {
+      "key": "injected_route_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 · Setup",
+      "item": [
+        {
+          "name": "Login superuser",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{superuser_email}}\",\n  \"password\": \"{{superuser_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"superuser_token\", pm.response.json()[\"access_token\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Tenant A + admin_a",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_a_email}}\",\n  \"password\": \"{{admin_a_password}}\",\n  \"company_name\": \"Acme Corp\",\n  \"company_alias\": \"acme\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"admin_a_token\", pm.response.json()[\"access_token\"]);",
+                  "pm.collectionVariables.set(\"tenant_a_id\", pm.response.json()[\"tenant\"][\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Tenant B + admin_b",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_b_email}}\",\n  \"password\": \"{{admin_b_password}}\",\n  \"company_name\": \"Globex Corp\",\n  \"company_alias\": \"globex\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"admin_b_token\", pm.response.json()[\"access_token\"]);",
+                  "pm.collectionVariables.set(\"tenant_b_id\", pm.response.json()[\"tenant\"][\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create route in Tenant A (superuser)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_a_id}}\",\n  \"path_pattern\": \"/api/v1/orders\",\n  \"methods\": [\n    \"GET\",\n    \"POST\"\n  ],\n  \"backend_url\": \"http://orders.acme.internal\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"route_a_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create route in Tenant B (superuser)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_b_id}}\",\n  \"path_pattern\": \"/api/v1/inventory\",\n  \"methods\": [\n    \"GET\"\n  ],\n  \"backend_url\": \"http://inventory.globex.internal\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"route_b_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create domain in Tenant A (superuser)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domain\": \"api.acme.local\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"domain_a_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create domain in Tenant B (superuser)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domain\": \"api.globex.local\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"domain_b_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create member_routes in Tenant A (admin_a)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_routes_email}}\",\n  \"password\": \"{{member_routes_password}}\",\n  \"permissions\": [\n    \"routes\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"member_routes_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login member_routes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_routes_email}}\",\n  \"password\": \"{{member_routes_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"member_routes_token\", pm.response.json()[\"access_token\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create member_domains in Tenant A (admin_a)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_domains_email}}\",\n  \"password\": \"{{member_domains_password}}\",\n  \"permissions\": [\n    \"domains\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"member_domains_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login member_domains",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_domains_email}}\",\n  \"password\": \"{{member_domains_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"member_domains_token\", pm.response.json()[\"access_token\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create member_no_perms in Tenant A (admin_a)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_noperms_email}}\",\n  \"password\": \"{{member_noperms_password}}\",\n  \"permissions\": [\n    \"audit\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"member_noperms_id\", pm.response.json()[\"id\"]);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login member_no_perms",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{member_noperms_email}}\",\n  \"password\": \"{{member_noperms_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"member_noperms_token\", pm.response.json()[\"access_token\"]);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Bootstraps two tenants, their admins, and three members with different permission sets in Tenant A."
+    },
+    {
+      "name": "01 · Cross-Tenant IDOR (admin_a → Tenant B)",
+      "item": [
+        {
+          "name": "[BLOCK] GET route_b with admin_a token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            },
+            "description": "admin_a must not read a route belonging to Tenant B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] PATCH route_b with admin_a token",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backend_url\": \"http://evil.attacker.com\"\n}"
+            },
+            "description": "admin_a must not overwrite Tenant B's backend_url."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] DELETE route_b with admin_a token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            },
+            "description": "admin_a must not delete a route belonging to Tenant B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] POST route into Tenant B with admin_a token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_b_id}}\",\n  \"path_pattern\": \"/injected\",\n  \"methods\": [\n    \"GET\"\n  ],\n  \"backend_url\": \"http://evil.attacker.com\"\n}"
+            },
+            "description": "admin_a body.tenant_id must be ignored; route must land in Tenant A. Verify tenant_id in response."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Route created in caller tenant, not body tenant_id\", () => {",
+                  "  const tid = pm.response.json().tenant_id;",
+                  "  pm.expect(tid).to.equal(pm.collectionVariables.get(\"tenant_a_id\"));",
+                  "  pm.collectionVariables.set(\"injected_route_id\", pm.response.json().id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] GET Tenant B via admin_a token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}"
+              ]
+            },
+            "description": "admin_a must not read Tenant B metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] PATCH Tenant B via admin_a token",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hacked Corp\"\n}"
+            },
+            "description": "admin_a must not rename Tenant B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] GET domain_b via admin_a token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains"
+              ]
+            },
+            "description": "admin_a must not list domains of Tenant B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] POST domain into Tenant B via admin_a token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domain\": \"evil.acme.local\"\n}"
+            },
+            "description": "admin_a must not register a domain under Tenant B."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] DELETE domain_b via admin_a token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains/{{domain_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains",
+                "{{domain_b_id}}"
+              ]
+            },
+            "description": "admin_a must not delete Tenant B's domain."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] GET policy of route_b via admin_a token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}",
+                "policy"
+              ]
+            },
+            "description": "admin_a must not read Tenant B's route policy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] PUT policy on route_b via admin_a token",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": null,\n  \"allowed_roles\": []\n}"
+            },
+            "description": "admin_a must not disable auth on Tenant B's route."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] DELETE policy on route_b via admin_a token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}",
+                "policy"
+              ]
+            },
+            "description": "admin_a must not delete Tenant B's route policy."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cleanup injected route (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{injected_route_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{injected_route_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 · Superuser Bypass (must ALLOW)",
+      "item": [
+        {
+          "name": "[ALLOW] GET route_b as superuser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            },
+            "description": "Superuser must be able to read any tenant's resources."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] GET Tenant B as superuser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] GET domains of Tenant B as superuser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] PUT policy on route_b as superuser",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": true,\n  \"rate_limit_per_minute\": 60,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] List routes filtered by Tenant B as superuser",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes?tenant_id={{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes?tenant_id={{tenant_b_id}}"
+              ]
+            },
+            "description": "Superuser can pass arbitrary tenant_id query param."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"All routes belong to Tenant B\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_b_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 · Member Permission Enforcement (Tenant A)",
+      "item": [
+        {
+          "name": "[ALLOW] member_routes can list routes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            },
+            "description": "member with 'routes' permission can list routes. Must only see Tenant A routes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Only Tenant A routes returned\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_a_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] member_routes can GET route_a",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] member_routes can PUT policy on route_a",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": true,\n  \"rate_limit_per_minute\": 30,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_routes cannot GET route_b (cross-tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            },
+            "description": "member must be blocked by ownership guard even with 'routes' permission."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_routes cannot access domains (wrong permission)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains"
+              ]
+            },
+            "description": "member with only 'routes' permission must be blocked from 'domains' endpoints."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_routes cannot access audit (wrong permission)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_routes cannot access metrics (wrong permission)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/metrics/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "metrics",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] member_domains can list domains of Tenant A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_domains_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[ALLOW] member_domains can PUT domain policy",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_domains_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains/{{domain_a_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains",
+                "{{domain_a_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": true,\n  \"rate_limit_per_minute\": null,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_domains cannot list domains of Tenant B (cross-tenant)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_domains_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains"
+              ]
+            },
+            "description": "member must be blocked even on their allowed 'domains' permission when crossing tenants."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_domains cannot access routes (wrong permission)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_domains_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_domains cannot access routes policy (wrong permission)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_domains_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": null,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_noperms cannot access routes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_noperms_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_noperms cannot access domains",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_noperms_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member_noperms cannot manage sub-users (requires admin role)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_noperms_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users/{{tenant_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users",
+                "{{tenant_a_id}}"
+              ]
+            },
+            "description": "Sub-user management requires role=admin, not just a permission."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 · No Auth / Invalid Token",
+      "item": [
+        {
+          "name": "[BLOCK] GET routes without token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] GET routes with garbage token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{garbage_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] POST route without token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"any\",\n  \"path_pattern\": \"/x\",\n  \"methods\": [\n    \"GET\"\n  ],\n  \"backend_url\": \"http://x.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] DELETE route without token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] PUT policy without token",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}",
+                "policy"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": null,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 · List Scope Isolation",
+      "item": [
+        {
+          "name": "admin_a lists routes — only Tenant A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"All routes belong to Tenant A\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  pm.expect(rows.length).to.be.above(0);",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_a_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin_b lists routes — only Tenant B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_b_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"All routes belong to Tenant B\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  pm.expect(rows.length).to.be.above(0);",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_b_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin_a passes tenant_b_id as query param — must be ignored",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes?tenant_id={{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes?tenant_id={{tenant_b_id}}"
+              ]
+            },
+            "description": "Non-superuser tenant_id query param must be overridden by caller's own tenant."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Query param tenant_id ignored for non-superuser\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_a_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "superuser lists routes with tenant_b filter — only Tenant B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes?tenant_id={{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes?tenant_id={{tenant_b_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Superuser filter returns only Tenant B routes\", () => {",
+                  "  const rows = pm.response.json();",
+                  "  rows.forEach(r => pm.expect(r.tenant_id).to.equal(pm.collectionVariables.get(\"tenant_b_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "audit scoped to Tenant A for admin_a",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ]
+            },
+            "description": "Audit entries returned must all belong to Tenant A regardless of query param."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 · Sub-User Management Isolation",
+      "item": [
+        {
+          "name": "[ALLOW] admin_a lists members of Tenant A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users/{{tenant_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users",
+                "{{tenant_a_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] admin_a lists members of Tenant B",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_a_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users/{{tenant_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users",
+                "{{tenant_b_id}}"
+              ]
+            },
+            "description": "admin_a must not enumerate Tenant B's sub-users."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] admin_a deletes member of Tenant B (if id known)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_b_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users/{{member_routes_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users",
+                "{{member_routes_id}}"
+              ]
+            },
+            "description": "admin_b must not delete a member that belongs to Tenant A."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[BLOCK] member cannot create sub-users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{member_routes_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sub-users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "sub-users"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new@evil.com\",\n  \"password\": \"password123\",\n  \"permissions\": [\n    \"routes\"\n  ]\n}"
+            },
+            "description": "Sub-user creation requires role=admin."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 · Teardown",
+      "item": [
+        {
+          "name": "Delete domain_a (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_a_id}}/domains/{{domain_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_a_id}}",
+                "domains",
+                "{{domain_a_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete domain_b (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tenants/{{tenant_b_id}}/domains/{{domain_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tenants",
+                "{{tenant_b_id}}",
+                "domains",
+                "{{domain_b_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete route_a policy (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}",
+                "policy"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 or 404 acceptable (policy may not exist)\", () => {",
+                  "  pm.expect([204, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete route_b policy (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}/policy",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}",
+                "policy"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 or 404 acceptable\", () => {",
+                  "  pm.expect([204, 404]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete route_a (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_a_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_a_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete route_b (superuser)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superuser_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes/{{route_b_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "routes",
+                "{{route_b_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

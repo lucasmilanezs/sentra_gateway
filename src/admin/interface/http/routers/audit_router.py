@@ -1,0 +1,101 @@
+from datetime import datetime
+from typing import Annotated
+from fastapi import APIRouter, Depends, Query
+from src.admin.application.use_cases.query_audit import QueryAudit
+from src.admin.domain.ports.change_audit_repository import ChangeAuditRepositoryPort
+from src.admin.domain.value_objects.jwt_claims import JwtClaims
+from src.admin.interface.http.dependencies import get_change_audit, get_query_audit, require_permission
+from src.admin.interface.schema.audit_schema import (
+    AuditFilteredResponse, AuditRequestResponse,
+    ChangeEventFilteredResponse, ChangeEventResponse, MetricsSummaryResponse, RouteMetricsResponse,
+)
+
+router = APIRouter()
+
+@router.get("/audit", response_model=list[AuditRequestResponse])
+async def list_audit(
+    claims: Annotated[JwtClaims, Depends(require_permission("audit"))],
+    uc: Annotated[QueryAudit, Depends(get_query_audit)],
+    tenant_id: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=100),
+):
+    scope = claims.resolve_tenant_scope(tenant_id)
+    rows = await uc.list_recent(tenant_id=scope, limit=limit)
+    return [AuditRequestResponse.model_validate(r) for r in rows]
+
+@router.get("/audit/requests", response_model=AuditFilteredResponse)
+async def list_audit_filtered(
+    claims: Annotated[JwtClaims, Depends(require_permission("audit"))],
+    uc: Annotated[QueryAudit, Depends(get_query_audit)],
+    tenant_id: str | None = Query(default=None),
+    route_id: str | None = Query(default=None),
+    outcome: str | None = Query(default=None),
+    method: str | None = Query(default=None),
+    path_contains: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    scope = claims.resolve_tenant_scope(tenant_id)
+    items, total = await uc.list_filtered(tenant_id=scope, route_id=route_id, outcome=outcome, method=method, path_contains=path_contains, date_from=date_from, date_to=date_to, limit=limit, offset=offset)
+    return AuditFilteredResponse(items=[AuditRequestResponse.model_validate(r) for r in items], total=total)
+
+@router.get("/audit/changes", response_model=ChangeEventFilteredResponse)
+async def list_change_audit(
+    claims: Annotated[JwtClaims, Depends(require_permission("audit"))],
+    change_audit: Annotated[ChangeAuditRepositoryPort | None, Depends(get_change_audit)],
+    tenant_id: str | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    action: str | None = Query(default=None),
+    actor_role: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    if change_audit is None:
+        return ChangeEventFilteredResponse(items=[], total=0)
+    scope = claims.resolve_tenant_scope(tenant_id)
+    items, total = await change_audit.list_for_tenant(
+        tenant_id=scope, limit=limit, offset=offset,
+        resource_type=resource_type.strip() if resource_type else None,
+        action=action.strip() if action else None,
+        actor_role=actor_role.strip() if actor_role else None,
+        search=search.strip() if search else None,
+        date_from=date_from, date_to=date_to,
+    )
+    return ChangeEventFilteredResponse(items=[ChangeEventResponse.model_validate(r) for r in items], total=total)
+
+@router.get("/metrics/summary", response_model=MetricsSummaryResponse)
+async def metrics_summary(
+    claims: Annotated[JwtClaims, Depends(require_permission("metrics"))],
+    uc: Annotated[QueryAudit, Depends(get_query_audit)],
+    tenant_id: str | None = Query(default=None),
+    hours: int = Query(default=24, ge=1, le=168),
+):
+    scope = claims.resolve_tenant_scope(tenant_id)
+    data = await uc.metrics_summary(tenant_id=scope, hours=hours)
+    return MetricsSummaryResponse(**data)
+
+
+@router.get("/metrics/routes", response_model=RouteMetricsResponse)
+async def metrics_by_route(
+    claims: Annotated[JwtClaims, Depends(require_permission("metrics"))],
+    uc: Annotated[QueryAudit, Depends(get_query_audit)],
+    tenant_id: str | None = Query(default=None),
+    seconds: int = Query(default=3600, ge=10, le=60 * 60 * 24 * 366),
+    bucket_seconds: int = Query(default=60, ge=1, le=60 * 60 * 24 * 31),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+):
+    scope = claims.resolve_tenant_scope(tenant_id)
+    data = await uc.metrics_by_route(
+        tenant_id=scope,
+        seconds=seconds,
+        bucket_seconds=bucket_seconds,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return RouteMetricsResponse(**data)

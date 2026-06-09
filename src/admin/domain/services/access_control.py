@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+from src.admin.domain.entities.user import User
+from src.admin.domain.exceptions import ForbiddenError, ValidationError
+from src.admin.domain.value_objects.jwt_claims import JwtClaims
+
+
+class TenantAccessControl:
+    """Domain service that enforces tenant isolation, RBAC and admin/member boundaries."""
+
+    @staticmethod
+    def is_superuser(role: str | None) -> bool:
+        return role == "superuser"
+
+    @staticmethod
+    def is_admin(role: str | None) -> bool:
+        return role == "admin"
+
+    @classmethod
+    def is_admin_like(cls, role: str | None) -> bool:
+        return cls.is_superuser(role) or cls.is_admin(role)
+
+    @classmethod
+    def ensure_has_permission(cls, claims: JwtClaims, permission: str) -> None:
+        if not claims.has_permission(permission):
+            raise ForbiddenError(f"permissão '{permission}' necessária")
+
+    @classmethod
+    def ensure_admin_like_claims(cls, claims: JwtClaims) -> None:
+        if not claims.is_admin_like():
+            raise ForbiddenError("acesso restrito a administradores")
+
+    @classmethod
+    def ensure_superuser_claims(cls, claims: JwtClaims) -> None:
+        if not claims.is_superuser():
+            raise ForbiddenError("acesso restrito ao superuser")
+
+    @staticmethod
+    def ensure_tenant_access(
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        resource_tenant_id: str,
+    ) -> None:
+        if caller_role == "superuser":
+            return
+        if caller_tenant_id != resource_tenant_id:
+            raise ForbiddenError("acesso negado ao tenant")
+
+    @staticmethod
+    def resolve_read_scope(
+        *, caller_role: str | None, caller_tenant_id: str | None, requested_tenant_id: str | None
+    ) -> str | None:
+        if caller_role == "superuser":
+            return requested_tenant_id
+        return caller_tenant_id
+
+    @staticmethod
+    def resolve_write_scope(
+        *, caller_role: str | None, caller_tenant_id: str | None, requested_tenant_id: str | None
+    ) -> str:
+        if caller_role == "superuser":
+            if not requested_tenant_id:
+                raise ValidationError("tenant_id é obrigatório para superuser")
+            return requested_tenant_id
+        if not caller_tenant_id:
+            raise ForbiddenError("caller sem tenant vinculado não pode executar esta ação")
+        return caller_tenant_id
+
+    @classmethod
+    def resolve_member_target_tenant(
+        cls,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        target_tenant_id: str | None,
+    ) -> str:
+        if caller_role == "superuser":
+            if not target_tenant_id:
+                raise ValidationError("superuser deve informar tenant_id ao criar sub-usuário")
+            return target_tenant_id
+        if caller_role == "admin":
+            if not caller_tenant_id:
+                raise ForbiddenError("admin sem tenant vinculado não pode criar sub-usuários")
+            if target_tenant_id and target_tenant_id != caller_tenant_id:
+                raise ForbiddenError("admin não pode criar sub-usuário em outro tenant")
+            return caller_tenant_id
+        raise ForbiddenError("apenas admin ou superuser podem criar sub-usuários")
+
+    @classmethod
+    def ensure_can_list_members(
+        cls, *, caller_role: str, caller_tenant_id: str | None, tenant_id: str
+    ) -> None:
+        if caller_role not in ("superuser", "admin"):
+            raise ForbiddenError("acesso negado")
+        cls.ensure_tenant_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=tenant_id,
+        )
+
+    @classmethod
+    def ensure_can_modify_member(
+        cls, *, caller_role: str, caller_tenant_id: str | None, target: User
+    ) -> None:
+        if target.role != "member":
+            raise ForbiddenError("não é permitido modificar usuários admin ou superuser por esta rota")
+        cls.ensure_can_delete_user(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            caller_user_id=None,
+            target=target,
+            allow_self_member_delete=False,
+        )
+
+    @classmethod
+    def ensure_can_delete_user(
+        cls,
+        *,
+        caller_role: str,
+        caller_tenant_id: str | None,
+        caller_user_id: str | None,
+        target: User,
+        allow_self_member_delete: bool = True,
+    ) -> None:
+        if target.role == "superuser":
+            raise ForbiddenError("não é permitido remover o superuser")
+
+        if target.role == "admin":
+            if caller_role != "superuser":
+                raise ForbiddenError("somente superuser pode remover usuários administrativos")
+            if not target.tenant_id:
+                raise ForbiddenError("admin sem tenant vinculado não pode ser removido")
+            return
+
+        if target.role != "member":
+            raise ForbiddenError("tipo de usuário não pode ser removido")
+
+        if allow_self_member_delete and caller_user_id and caller_user_id == target.id:
+            return
+
+        if caller_role not in ("superuser", "admin"):
+            raise ForbiddenError("acesso negado")
+        if target.tenant_id is None:
+            raise ForbiddenError("member sem tenant vinculado não pode ser modificado")
+        cls.ensure_tenant_access(
+            caller_role=caller_role,
+            caller_tenant_id=caller_tenant_id,
+            resource_tenant_id=target.tenant_id,
+        )
+
+    # Compatibility alias for the older guard naming used by existing use cases.
+    assert_access = ensure_tenant_access

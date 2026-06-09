@@ -1,0 +1,1107 @@
+{
+  "info": {
+    "name": "Sentra Admin API",
+    "description": "Coleção completa para testar o plano Admin do Sentra Gateway. Fluxo recomendado: Register → Login → copiar token → testar endpoints protegidos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8001", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "tenant_id", "value": "", "type": "string" },
+    { "key": "route_id", "value": "", "type": "string" },
+    { "key": "user_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "Verifica se o admin está rodando e se Postgres está conectado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register — usuário sem tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"password\": \"senha1234\"\n}"
+            },
+            "description": "Cria usuário admin sem tenant_id. Salva token automaticamente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test('tem access_token', () => pm.expect(j.access_token).to.be.a('string'));",
+                  "pm.test('tem user.id', () => pm.expect(j.user.id).to.be.a('string'));",
+                  "pm.collectionVariables.set('token', j.access_token);",
+                  "pm.collectionVariables.set('user_id', j.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/register — email duplicado (espera 409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"password\": \"outrasenha\"\n}"
+            },
+            "description": "Deve retornar 409 Conflict."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/register — senha curta (espera 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"fraco@sentra.local\",\n  \"password\": \"123\"\n}"
+            },
+            "description": "Pydantic deve rejeitar senha < 8 chars com 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — credenciais corretas",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"password\": \"senha1234\"\n}"
+            },
+            "description": "Login normal. Sobrescreve o token na collection variable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('token presente', () => pm.expect(j.access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('token', j.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — senha errada (espera 401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"password\": \"senhaerrada\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — email inexistente (espera 401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"naoexiste@sentra.local\",\n  \"password\": \"senha1234\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me — token válido",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Retorna dados do usuário autenticado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('email correto', () => pm.expect(j.email).to.eql('admin@sentra.local'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me — sem token (espera 401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "description": "Sem Authorization header."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me — token inválido (espera 401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer token.invalido.aqui" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/change-password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/change-password",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"senha1234\",\n  \"new_password\": \"novasenha5678\"\n}"
+            },
+            "description": "Troca a senha. Após isso é necessário fazer login novamente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — com nova senha",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"password\": \"novasenha5678\"\n}"
+            },
+            "description": "Valida que a troca de senha funcionou. Atualiza token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/change-password — senha atual errada (espera 401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/change-password",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"senhaerrada\",\n  \"new_password\": \"novasenha9999\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/forgot-password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/forgot-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\"\n}"
+            },
+            "description": "Gera código de reset. Como ConsoleEmailSender está ativo, o código aparece nos logs do servidor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/forgot-password — email inexistente (silent 202)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/forgot-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"naoexiste@sentra.local\"\n}"
+            },
+            "description": "Deve retornar 202 mesmo para email inexistente (não revela se o usuário existe)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202 (silencioso)', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/reset-password — código do log",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/reset-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"code\": \"COLE_O_CODIGO_DO_LOG_AQUI\",\n  \"new_password\": \"resetada5678\"\n}"
+            },
+            "description": "Cole o código de 6 dígitos que apareceu no log do servidor após o forgot-password."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/reset-password — código errado (espera 401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/reset-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sentra.local\",\n  \"code\": \"000000\",\n  \"new_password\": \"resetada9999\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tenants",
+      "item": [
+        {
+          "name": "GET /tenants — lista vazia inicial",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('é array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /tenants — criar tenant principal",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme\",\n  \"domain\": \"acme.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test('slug correto', () => pm.expect(j.slug).to.eql('acme'));",
+                  "pm.test('tem id', () => pm.expect(j.id).to.be.a('string'));",
+                  "pm.collectionVariables.set('tenant_id', j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /tenants — slug duplicado (espera 409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Outro Corp\",\n  \"slug\": \"acme\",\n  \"domain\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /tenants — slug inválido com maiúsculas (espera 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bad Slug\",\n  \"slug\": \"BadSlug\",\n  \"domain\": null\n}"
+            },
+            "description": "Slug deve ser lowercase kebab-case."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /tenants — segundo tenant sem domain",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Beta Labs\",\n  \"slug\": \"beta-labs\",\n  \"domain\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('domain null', () => pm.expect(pm.response.json().domain).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /tenants — lista com 2 tenants",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/tenants",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('2 tenants', () => pm.expect(pm.response.json().length).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /tenants/:id — busca por id",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('id correto', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('tenant_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /tenants/:id — id inexistente (espera 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/tenants/00000000-0000-0000-0000-000000000000",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /tenants/:id — atualiza name e domain",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corporation\",\n  \"domain\": \"acme.corp\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('name atualizado', () => pm.expect(j.name).to.eql('Acme Corporation'));",
+                  "pm.test('domain atualizado', () => pm.expect(j.domain).to.eql('acme.corp'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /tenants/:id — body vazio (retorna tenant sem alterar)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /tenants — sem token (espera 401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/tenants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Routes",
+      "item": [
+        {
+          "name": "GET /routes — lista vazia inicial",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('é array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — criar rota GET",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/api/users\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://users.acme.internal\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test('path correto', () => pm.expect(j.path_pattern).to.eql('/api/users'));",
+                  "pm.test('backend_url correto', () => pm.expect(j.backend_url).to.eql('https://users.acme.internal'));",
+                  "pm.collectionVariables.set('route_id', j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — criar rota POST",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/api/orders\",\n  \"method\": \"POST\",\n  \"backend_url\": \"https://orders.acme.internal\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — tenant inexistente (espera 404)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"path_pattern\": \"/api/nada\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://nada.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — backend_url inválida (espera 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/api/teste\",\n  \"method\": \"GET\",\n  \"backend_url\": \"nao-eh-url-valida\"\n}"
+            },
+            "description": "backend_url deve ser http(s). Espera ValidationError → 422."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — path sem barra inicial (espera 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"api/sem-barra\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://valido.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /routes — método inválido (espera 422)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/api/teste\",\n  \"method\": \"CONECTE\",\n  \"backend_url\": \"https://valido.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /routes — lista todas as rotas",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('tem rotas', () => pm.expect(pm.response.json().length).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /routes?tenant_id=... — filtra por tenant",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/routes?tenant_id={{tenant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "routes"],
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const items = pm.response.json();",
+                  "pm.test('todas do tenant correto', () => items.forEach(r => pm.expect(r.tenant_id).to.eql(pm.collectionVariables.get('tenant_id'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /routes/:id — busca por id",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/routes/{{route_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('id correto', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('route_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /routes/:id — inexistente (espera 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/routes/00000000-0000-0000-0000-000000000000",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /routes/:id — atualiza backend_url e method",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/routes/{{route_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backend_url\": \"https://users-v2.acme.internal\",\n  \"method\": \"GET\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('backend atualizado', () => pm.expect(pm.response.json().backend_url).to.eql('https://users-v2.acme.internal'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /routes/:id — body vazio (idempotente)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/routes/{{route_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleanup / Edge Cases",
+      "item": [
+        {
+          "name": "POST /tenants — register usuário vinculado ao tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@acme.com\",\n  \"password\": \"acmepass1\",\n  \"tenant_id\": \"{{tenant_id}}\"\n}"
+            },
+            "description": "Cria usuário vinculado ao tenant. Valida que tenant_id aparece no /me."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test('tenant_id vinculado', () => pm.expect(j.user.tenant_id).to.eql(pm.collectionVariables.get('tenant_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /tenants/:id — com rotas vinculadas (espera 409)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Deve falhar com 409 enquanto houver rotas vinculadas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /routes/:id — remove a rota",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/routes/{{route_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /routes/:id — já deletada (espera 404)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/routes/{{route_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /routes — remove a segunda rota manualmente (ajuste route_id)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/routes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Liste as rotas restantes para pegar o id da segunda e deletá-la manualmente antes de tentar deletar o tenant."
+          }
+        },
+        {
+          "name": "DELETE /tenants/:id — sem rotas vinculadas",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "description": "Após remover todas as rotas, o tenant pode ser deletado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /tenants/:id — já deletado (espera 404)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

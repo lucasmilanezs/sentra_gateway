@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SENTRA – Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="topbar">
+  <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+    <path d="M16 2L4 7.5V15c0 6.5 5.1 12.6 12 14 6.9-1.4 12-7.5 12-14V7.5L16 2z"
+          fill="none" stroke="#dce4f5" stroke-width="1.5"/>
+    <line x1="11" y1="11" x2="21" y2="21" stroke="#dce4f5" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="21" y1="11" x2="11" y2="21" stroke="#dce4f5" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="11" cy="11" r="2" fill="#dce4f5"/>
+    <circle cx="21" cy="11" r="2" fill="#dce4f5"/>
+    <circle cx="11" cy="21" r="2" fill="#dce4f5"/>
+    <circle cx="21" cy="21" r="2" fill="#dce4f5"/>
+  </svg>
+  <span class="logo-text">Sentra</span>
+  <span class="topbar-tenant-badge" id="topbar-tenant"></span>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbar-user"></span>
+    <button class="btn-switch-tenant" id="btn-switch" style="display:none">← Tenants</button>
+    <button class="topbar-logout" id="btn-logout">Sair</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <span class="nav-section-label">Visão geral</span>
+    <button class="nav-item" data-page="overview">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+        <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+      </svg>
+      Overview
+    </button>
+
+    <span class="nav-section-label">Configuração</span>
+    <button class="nav-item" id="nav-tenants" data-page="tenants" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="1" y="4" width="14" height="10" rx="1.5"/>
+        <path d="M5 4V3a3 3 0 016 0v1"/>
+      </svg>
+      Tenants
+    </button>
+    <button class="nav-item" id="nav-domains" data-page="domains" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M2 8h12M8 2c-2 2-3 4-3 6s1 4 3 6M8 2c2 2 3 4 3 6s-1 4-3 6"/>
+      </svg>
+      Domains
+    </button>
+    <button class="nav-item" id="nav-routes" data-page="routes" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M2 8h12M9 4l5 4-5 4"/>
+      </svg>
+      Rotas
+    </button>
+    <button class="nav-item" id="nav-members" data-page="members" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="5.5" cy="5" r="2.5"/>
+        <path d="M1 13c0-2.5 2-4.5 4.5-4.5"/>
+        <circle cx="12" cy="7" r="2"/>
+        <path d="M9.5 13c0-1.933 1.119-3.5 2.5-3.5s2.5 1.567 2.5 3.5"/>
+        <line x1="12" y1="3" x2="12" y2="5.2" stroke-linecap="round"/>
+        <line x1="11" y1="4.1" x2="13" y2="4.1" stroke-linecap="round"/>
+      </svg>
+      Membros
+    </button>
+
+    <span class="nav-section-label">Observabilidade</span>
+    <button class="nav-item" id="nav-audit" data-page="audit" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M2 4h12M2 8h8M2 12h5"/>
+      </svg>
+      Auditoria
+    </button>
+    <button class="nav-item" id="nav-raw-logs" data-page="raw-logs" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+        <path d="M5 6h6M5 9h6M5 12h3"/>
+      </svg>
+      Logs
+    </button>
+    <button class="nav-item" id="nav-metrics" data-page="metrics" style="display:none">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M1 13l4-5 3 3 3-6 4 2"/>
+      </svg>
+      Métricas
+    </button>
+
+    <span class="nav-section-label">Conta</span>
+    <button class="nav-item" data-page="conta">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="8" cy="5" r="3"/><path d="M1 14c0-3.314 3.134-6 7-6s7 2.686 7 6"/>
+      </svg>
+      Meu perfil
+    </button>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+
+    <!-- OVERVIEW -->
+    <section class="page" id="page-overview">
+      <div class="page-header"><h1 class="page-title">Overview</h1></div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Sistema</div>
+          <div class="metric-value" id="ov-status">—</div>
+          <div class="metric-sub" id="ov-status-sub">health geral</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Admin</div>
+          <div class="metric-value" id="ov-admin">—</div>
+          <div class="metric-sub" id="ov-admin-sub">painel de controle</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Gateway</div>
+          <div class="metric-value" id="ov-gateway">—</div>
+          <div class="metric-sub" id="ov-gateway-sub">plano de dados</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">PostgreSQL</div>
+          <div class="metric-value" id="ov-postgres">—</div>
+          <div class="metric-sub" id="ov-postgres-sub"></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Redis</div>
+          <div class="metric-value" id="ov-redis">—</div>
+          <div class="metric-sub" id="ov-redis-sub">admin/gateway</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Snapshot Gateway</div>
+          <div class="metric-value" id="ov-snapshot">—</div>
+          <div class="metric-sub" id="ov-snapshot-sub">config em memória</div>
+        </div>
+      </div>
+      <div id="ov-postgres-critical-warning" class="overview-critical-warning" style="display:none">
+        <div class="overview-critical-title">Falha crítica</div>
+        <div class="overview-critical-text">
+          PostgreSQL indisponível: o sistema perde a fonte de verdade para configurar políticas e dados de auditoria podem ser perdidos.
+          O Gateway segue operacional com a última snapshot, mas a configuração está comprometida. Reinicie os serviços ou investigue o motivo da indisponibilidade.
+        </div>
+      </div>
+      <div class="card" id="ov-health-details" style="margin-top:16px">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:10px">Saúde dos componentes</div>
+        <div class="domain-hint" id="ov-health-summary">Carregando estado dos serviços…</div>
+        <div id="ov-health-grid" class="semantic-grid" style="margin-top:14px"></div>
+      </div>
+    </section>
+
+    <!-- TENANTS (superuser only) -->
+    <section class="page" id="page-tenants">
+      <div class="page-header">
+        <h1 class="page-title">Tenants</h1>
+        <button class="btn-primary" id="btn-new-tenant">+ Novo tenant</button>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Nome</th><th>alias</th><th>Domains</th><th>Criado em</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-tenants"></tbody>
+        </table>
+        <p class="tbl-empty" id="tenants-empty" style="display:none">Nenhum tenant cadastrado.</p>
+      </div>
+    </section>
+
+    <!-- DOMAINS -->
+    <section class="page" id="page-domains">
+      <div class="page-header">
+        <h1 class="page-title">Domains</h1>
+        <button class="btn-primary" id="btn-new-domain">+ Novo domain</button>
+      </div>
+      <p class="context-badge" id="domains-tenant-badge"></p>
+      <div class="domain-hint" id="domain-gateway-hint">
+        O gateway identifica o tenant pelo <code>Host</code> header da requisição.
+        Cadastre aqui os domains/subdomains que correspondem a este tenant.
+        Exemplo: <code>api.empresa.com</code> → requisições com <code>Host: api.empresa.com</code> serão roteadas para este tenant.
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Domain</th><th>Política global</th><th>Criado em</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-domains"></tbody>
+        </table>
+        <p class="tbl-empty" id="domains-empty" style="display:none">Nenhum domain cadastrado. Sem domain, o gateway não consegue rotear requisições para este tenant.</p>
+      </div>
+    </section>
+
+    <!-- ROTAS -->
+    <section class="page" id="page-routes">
+      <div class="page-header">
+        <h1 class="page-title">Rotas</h1>
+        <button class="btn-primary" id="btn-new-route">+ Nova rota</button>
+      </div>
+      <p class="context-badge" id="routes-tenant-badge"></p>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>Métodos</th><th>Path</th><th>Backend URL</th><th>Política</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="tbody-routes"></tbody>
+        </table>
+        <p class="tbl-empty" id="routes-empty" style="display:none">Nenhuma rota cadastrada.</p>
+      </div>
+    </section>
+
+    <!-- MEMBROS -->
+    <section class="page" id="page-members">
+      <div class="page-header">
+        <h1 class="page-title">Membros</h1>
+        <button class="btn-primary" id="btn-new-member">+ Novo membro</button>
+      </div>
+      <p class="context-badge" id="members-tenant-badge"></p>
+      <div class="card">
+        <table class="data-table">
+          <thead><tr>
+            <th>E-mail</th><th>Permissões</th><th>Criado em</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-members"></tbody>
+        </table>
+        <p class="tbl-empty" id="members-empty" style="display:none">Nenhum membro cadastrado ainda.</p>
+      </div>
+    </section>
+
+      <!-- AUDITORIA -->
+    <section class="page" id="page-audit">
+      <div class="page-header"><h1 class="page-title">Auditoria</h1></div>
+      <p class="context-badge" id="audit-tenant-badge"></p>
+      <div class="audit-tabs">
+        <button class="audit-tab active" id="audit-tab-gateway" data-audit-view="gateway">Requisições do gateway</button>
+        <button class="audit-tab" id="audit-tab-governance" data-audit-view="governance">Governança do admin</button>
+      </div>
+      <div class="card" id="audit-gateway-panel">
+        <div class="query-bar">
+          <input id="audit-filter-path" type="text" placeholder="Filtrar path contém…" />
+          <select id="audit-filter-method">
+            <option value="">Todos os métodos</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+          </select>
+          <select id="audit-filter-outcome">
+            <option value="">Todos os outcomes</option><option>SUCCESS</option><option>POLICY_DENIED</option><option>TENANT_NOT_FOUND</option><option>ROUTE_NOT_FOUND</option><option>DOMAIN_NOT_FOUND</option><option>UNEXPECTED_ERROR</option>
+          </select>
+          <input id="audit-filter-from" type="date" title="A partir de" />
+          <input id="audit-filter-to" type="date" title="Até" />
+          <select id="audit-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="method">Agrupar por método</option><option value="outcome">Agrupar por outcome</option>
+          </select>
+          <button class="btn-icon" id="audit-apply-filters">Aplicar</button>
+          <button class="btn-icon" id="audit-clear-filters">Limpar</button>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Quando</th><th>Método</th><th>Path</th><th>Rota</th><th>Status</th><th>Outcome</th><th>Latência</th><th>IP</th>
+          </tr></thead>
+          <tbody id="tbody-audit"></tbody>
+        </table>
+        <p class="tbl-empty" id="audit-empty" style="display:none">Nenhuma requisição registrada ainda.</p>
+      </div>
+      <div class="card" id="audit-governance-panel" style="display:none">
+        <div class="query-bar">
+          <input id="governance-filter-search" type="text" placeholder="Buscar recurso, ator ou detalhe…" />
+          <select id="governance-filter-resource">
+            <option value="">Todos os recursos</option><option value="tenant">Tenant</option><option value="domain">Domain</option><option value="domain_policy">Domain policy</option><option value="route">Rota</option><option value="policy">Policy</option><option value="member">Membro</option><option value="member_permissions">Permissões</option>
+          </select>
+          <select id="governance-filter-action">
+            <option value="">Todas as ações</option><option value="create">create</option><option value="update">update</option><option value="delete">delete</option><option value="upsert">upsert</option>
+          </select>
+          <select id="governance-filter-role">
+            <option value="">Todos os atores</option><option value="superuser">superuser</option><option value="admin">admin</option><option value="member">member</option>
+          </select>
+          <input id="governance-filter-from" type="date" title="A partir de" />
+          <input id="governance-filter-to" type="date" title="Até" />
+          <select id="governance-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="resource_type">Agrupar por recurso</option><option value="action">Agrupar por ação</option>
+          </select>
+          <button class="btn-icon" id="governance-apply-filters">Aplicar</button>
+          <button class="btn-icon" id="governance-clear-filters">Limpar</button>
+        </div>
+        <table class="data-table">
+          <thead><tr>
+            <th>Quando</th><th>Ator</th><th>Ação</th><th>Recurso</th><th>Resumo</th><th>Detalhe</th>
+          </tr></thead>
+          <tbody id="tbody-governance-audit"></tbody>
+        </table>
+        <p class="tbl-empty" id="governance-audit-empty" style="display:none">Nenhum evento de governança registrado ainda.</p>
+      </div>
+    </section>
+
+    <!-- LOGS -->
+    <section class="page" id="page-raw-logs">
+      <div class="page-header"><h1 class="page-title">Logs</h1></div>
+      <p class="context-badge" id="raw-logs-tenant-badge"></p>
+      <div class="domain-hint">
+        Esta tela mostra logs operacionais densos do gateway vindos do Redis Streams. Eles têm retenção curta e são separados da auditoria formal. Clique em uma linha para abrir o registro completo.
+      </div>
+      <div class="card">
+        <div class="query-bar">
+          <select id="logs-group-by">
+            <option value="none">Sem agrupamento</option><option value="day">Agrupar por dia</option><option value="year">Agrupar por ano</option><option value="method">Agrupar por método</option><option value="outcome">Agrupar por outcome</option><option value="route">Agrupar por rota</option>
+          </select>
+          <select id="logs-sort-by">
+            <option value="created_desc">Mais recentes</option><option value="created_asc">Mais antigos</option><option value="latency_desc">Maior latência</option><option value="latency_asc">Menor latência</option><option value="method">Método</option>
+          </select>
+          <button class="btn-icon" id="logs-refresh">Atualizar</button>
+        </div>
+        <table class="data-table raw-log-table">
+          <thead><tr>
+            <th>Quando</th><th>Resumo</th><th>Outcome</th><th>Latência</th><th>Rota</th>
+          </tr></thead>
+          <tbody id="tbody-raw-logs"></tbody>
+        </table>
+        <p class="tbl-empty" id="raw-logs-empty" style="display:none">Nenhum log bruto disponível.</p>
+      </div>
+    </section>
+
+    <!-- MÉTRICAS -->
+    <section class="page" id="page-metrics">
+      <div class="page-header"><h1 class="page-title">Métricas</h1></div>
+      <div class="metrics-grid metrics-overview-grid">
+        <div class="metric-card">
+          <div class="metric-label">Requisições na janela</div>
+          <div class="metric-value" id="mt-total">—</div>
+          <div class="metric-sub" id="mt-window-label">janela atual</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">2xx / 4xx / 5xx</div>
+          <div class="metric-value" id="mt-status" style="font-size:1.1rem">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Latência média</div>
+          <div class="metric-value" id="mt-avg-lat">—</div>
+          <div class="metric-sub" id="mt-p95-lat"></div>
+        </div>
+      </div>
+
+      <div class="card metrics-route-card">
+        <div class="metrics-section-header">
+          <div>
+            <h2>Métricas por rota</h2>
+            <p>Resumo por rota cadastrada. Clique em uma rota para expandir os detalhes.</p>
+          </div>
+        </div>
+        <div id="mt-route-list" class="route-metrics-list"></div>
+        <p class="tbl-empty" id="mt-route-empty" style="display:none">Nenhuma rota cadastrada para o tenant selecionado.</p>
+      </div>
+
+      <div class="card metrics-chart-card">
+        <div class="metrics-chart-header">
+          <div class="chart-mode-row">
+            <button class="chart-mode-btn active" id="mt-chart-all">Todas as rotas</button>
+            <button class="chart-mode-btn" id="mt-chart-single">Rota específica</button>
+            <div class="route-selector-shell" id="mt-route-selector-shell">
+              <select id="mt-route-selector"></select>
+            </div>
+          </div>
+          <div class="metric-sub" id="mt-chart-caption">requisições por rota ao longo da janela</div>
+        </div>
+        <div class="metrics-chart-wrap">
+          <canvas id="mt-line-chart" width="1200" height="380"></canvas>
+          <div id="mt-chart-tooltip" class="chart-tooltip" style="display:none"></div>
+        </div>
+        <div class="chart-window-controls" id="mt-window-controls">
+          <label>
+            <span>Unidade</span>
+            <select id="mt-chart-unit">
+              <option value="second">Segundo</option>
+              <option value="minute" selected>Minuto</option>
+              <option value="hour">Hora</option>
+              <option value="day">Dia</option>
+              <option value="week">Semana</option>
+              <option value="month">Mês</option>
+              <option value="year">Ano</option>
+            </select>
+          </label>
+          <label>
+            <span>Janela</span>
+            <input type="number" id="mt-chart-amount" min="1" value="10" title="" />
+          </label>
+          <button class="chart-apply-btn" id="mt-chart-apply">Aplicar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTA -->
+    <section class="page" id="page-conta">
+      <div class="page-header"><h1 class="page-title">Meu perfil</h1></div>
+      <div class="card">
+        <div class="profile-row">
+          <span class="profile-label">E-mail</span>
+          <span class="profile-value" id="profile-email">—</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Papel</span>
+          <span class="profile-value" id="profile-role">—</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Tenant</span>
+          <span class="profile-value" id="profile-tenant">—</span>
+        </div>
+        <div class="profile-row" id="profile-perms-row" style="display:none">
+          <span class="profile-label">Permissões</span>
+          <span class="profile-value" id="profile-perms">—</span>
+        </div>
+      </div>
+      <div class="card profile-danger-card" id="profile-delete-card" style="display:none">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:8px">Excluir minha conta</div>
+        <p class="danger-hint">Remove sua sessão de membro e anonimiza suas referências em auditoria de governança.</p>
+        <p class="inline-msg" id="profile-delete-msg"></p>
+        <button class="btn-danger-ghost" id="btn-delete-profile-member">Excluir minha conta de membro</button>
+      </div>
+      <div class="card">
+        <div class="card-title" style="font-size:.95rem;font-weight:600;margin-bottom:18px">Alterar senha</div>
+        <div class="form-field">
+          <label for="pw-current">Senha atual</label>
+          <input type="password" id="pw-current" />
+        </div>
+        <div class="form-field">
+          <label for="pw-new">Nova senha</label>
+          <input type="password" id="pw-new" />
+        </div>
+        <div class="form-field">
+          <label for="pw-confirm">Confirmar nova senha</label>
+          <input type="password" id="pw-confirm" />
+        </div>
+        <p class="inline-msg" id="pw-msg"></p>
+        <button class="btn-primary" id="btn-change-pw" style="margin-top:8px">Alterar senha</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal: Tenant -->
+<div class="modal-overlay" id="modal-tenant" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-tenant-title">Novo tenant</h2>
+    <input type="hidden" id="tenant-edit-id" />
+    <div class="modal-field">
+      <label>Nome</label>
+      <input type="text" id="t-name" placeholder="Empresa XYZ" />
+    </div>
+    <div class="modal-field">
+      <label>alias</label>
+      <input type="text" id="t-alias" placeholder="empresa-xyz" />
+    </div>
+    <p class="modal-error" id="t-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="t-cancel">Cancelar</button>
+      <button class="btn-primary" id="t-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Domain -->
+<div class="modal-overlay" id="modal-domain" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title">Novo domain</h2>
+    <div class="modal-field">
+      <label>Domain / Subdomínio</label>
+      <input type="text" id="d-domain" placeholder="api.empresa.com" />
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-sub);font-style:italic;margin-top:-8px">
+      Requisições com <strong>Host:</strong> igual a este valor serão roteadas para este tenant.
+    </p>
+    <p class="modal-error" id="d-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="d-cancel">Cancelar</button>
+      <button class="btn-primary" id="d-save">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Domain Policy -->
+<!-- Modal: DomainPolicy -->
+<div class="modal-overlay" id="modal-domain-policy" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <h2 class="modal-title">Política global — <span id="dp-domain-name" style="font-style:italic;font-weight:400"></span></h2>
+    <input type="hidden" id="dp-domain-id" />
+    <p style="font-size:0.78rem;color:var(--text-sub);font-style:italic;margin-top:-8px">
+      Aplicada a todas as rotas deste tenant que não tenham política individual configurada.
+    </p>
+    <div class="policy-section-heading">
+      <h3>Controles de tráfego</h3>
+      <p>Limites, headers e parâmetros avaliados antes do encaminhamento ao backend.</p>
+    </div>
+    <div class="policy-grid">
+      <div class="modal-field">
+        <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
+        <input type="number" id="dp-rate-limit" min="1" placeholder="ex: 100" />
+      </div>
+      <div class="modal-field">
+        <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-required-headers" placeholder="x-client-id, authorization" />
+      </div>
+      <div class="modal-field">
+        <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-forbidden-headers" placeholder="x-debug-token" />
+      </div>
+      <div class="modal-field">
+        <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-required-params" placeholder="client_id" />
+      </div>
+      <div class="modal-field">
+        <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="dp-forbidden-params" placeholder="debug" />
+      </div>
+    </div>
+
+    <div class="policy-section-heading policy-section-heading-token">
+      <h3>Validação de token</h3>
+      <p>Opcional. O backend protegido continua responsável por sessão, revogação e autorização fina.</p>
+    </div>
+    <div class="policy-auth-note">
+      O SENTRA não gerencia sessão, revogação, roles ou autorização fina do contratante. Estes níveis apenas reduzem ruído e superfície de entrada antes do backend protegido.
+    </div>
+
+    <div class="policy-auth-panel" data-policy-prefix="dp">
+      <div class="modal-field">
+        <label>Modo de validação de token</label>
+        <select id="dp-auth-mode" class="policy-auth-mode">
+          <option value="none">Nenhuma validação no Gateway</option>
+          <option value="bearer">Exigir Bearer token</option>
+          <option value="jwt_structural">Pré-validar estrutura JWT</option>
+          <option value="jwt_claims">Pré-validar exp/issuer/audience declarados</option>
+          <option value="jwt_signed">Validar assinatura JWT localmente</option>
+        </select>
+        <p class="field-help" id="dp-auth-help"></p>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_claims">
+        <div class="modal-field">
+          <label class="modal-check">
+            <input type="checkbox" id="dp-jwt-validate-exp" checked />
+            Rejeitar JWT expirado <span style="opacity:.55">(claim exp)</span>
+          </label>
+          <p class="field-help">Sem assinatura válida, esta checagem é apenas um pré-filtro do valor declarado no token.</p>
+        </div>
+        <div class="modal-field">
+          <label>Clock skew permitido <span style="opacity:.5">— segundos</span></label>
+          <input type="number" id="dp-jwt-clock-skew" min="0" max="300" placeholder="30" />
+        </div>
+        <div class="modal-field">
+          <label>Issuer esperado <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="dp-jwt-issuer" placeholder="https://auth.empresa.local" />
+          <p class="field-help">Em modo não assinado, é apenas comparação com a claim declarada.</p>
+        </div>
+        <div class="modal-field">
+          <label>Audience esperada <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="dp-jwt-audience" placeholder="api-interna" />
+        </div>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_signed">
+        <div class="modal-field">
+          <label>Algoritmo de assinatura</label>
+          <select id="dp-jwt-signing-algorithm">
+            <option value="HS256">HS256 — secret HMAC compartilhada</option>
+            <option value="HS384">HS384 — secret HMAC compartilhada</option>
+            <option value="HS512">HS512 — secret HMAC compartilhada</option>
+            <option value="RS256">RS256 — chave pública RSA/PEM</option>
+            <option value="RS384">RS384 — chave pública RSA/PEM</option>
+            <option value="RS512">RS512 — chave pública RSA/PEM</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Material de validação <span style="opacity:.5">— write-only</span></label>
+          <textarea id="dp-jwt-signing-key" rows="4" placeholder="Cole a secret HMAC ou a chave pública PEM do emissor. O valor será armazenado de forma protegida e não será exibido novamente."></textarea>
+          <p class="field-help" id="dp-jwt-signing-key-status">Nenhum material de assinatura configurado.</p>
+        </div>
+      </div>
+    </div>
+    <p class="modal-error" id="dp-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="dp-delete">Remover política</button>
+      <button class="btn-ghost" id="dp-cancel">Cancelar</button>
+      <button class="btn-primary" id="dp-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rota -->
+<div class="modal-overlay" id="modal-route" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-route-title">Nova rota</h2>
+    <input type="hidden" id="r-edit-id" />
+    <div class="modal-field">
+      <label>Métodos aceitos</label>
+      <div class="methods-grid" id="methods-grid">
+        <label class="method-check" data-method="GET"><input type="checkbox" name="r-methods" value="GET"> GET</label>
+        <label class="method-check" data-method="POST"><input type="checkbox" name="r-methods" value="POST"> POST</label>
+        <label class="method-check" data-method="PUT"><input type="checkbox" name="r-methods" value="PUT"> PUT</label>
+        <label class="method-check" data-method="PATCH"><input type="checkbox" name="r-methods" value="PATCH"> PATCH</label>
+        <label class="method-check" data-method="DELETE"><input type="checkbox" name="r-methods" value="DELETE"> DELETE</label>
+        <label class="method-check" data-method="OPTIONS"><input type="checkbox" name="r-methods" value="OPTIONS"> OPTIONS</label>
+        <label class="method-check" data-method="HEAD"><input type="checkbox" name="r-methods" value="HEAD"> HEAD</label>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Path pattern</label>
+      <input type="text" id="r-path" placeholder="/api/usuarios/*" />
+    </div>
+    <div class="wildcard-warn" id="r-wildcard">
+      ⚠ Usar /* aceita qualquer path. Não recomendado em produção.
+    </div>
+    <div class="modal-field">
+      <label>Backend URL</label>
+      <input type="text" id="r-backend" placeholder="http://servico:3000" />
+    </div>
+    <div class="modal-field">
+      <label>Cor de exibição</label>
+      <div class="color-field-row">
+        <button type="button" class="color-trigger" id="r-display-color-trigger" aria-label="Escolher cor da rota">
+          <span id="r-display-color-swatch"></span>
+          Escolher cor
+        </button>
+        <input type="text" id="r-display-color-text" value="#2dd4bf" maxlength="7" />
+      </div>
+      <div class="route-color-popover" id="route-color-popover" aria-hidden="true">
+        <div class="route-color-panel">
+          <div class="route-color-head">
+            <strong>Cor de exibição</strong>
+            <button type="button" class="btn-icon" id="route-color-close">Fechar</button>
+          </div>
+          <p class="route-color-help">Escolha uma cor para identificar a rota em listas e gráficos. O valor salvo continua sendo hexadecimal.</p>
+          <div class="route-color-grid" id="route-color-grid"></div>
+          <label class="route-color-custom">
+            Hex customizado
+            <input type="text" id="route-color-custom" value="#2dd4bf" maxlength="7" />
+          </label>
+          <div class="route-color-actions">
+            <button type="button" class="btn-ghost" id="route-color-cancel">Cancelar</button>
+            <button type="button" class="btn-primary" id="route-color-apply">Aplicar</button>
+          </div>
+        </div>
+      </div>
+      <p class="field-help">Usada para identificar a rota nas listas e gráficos de métricas.</p>
+    </div>
+    <p class="modal-error" id="r-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="r-cancel">Cancelar</button>
+      <button class="btn-primary" id="r-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Política por rota -->
+<div class="modal-overlay" id="modal-policy" style="display:none">
+  <div class="modal-box modal-box-wide">
+    <h2 class="modal-title">Política — <span id="p-route-path" style="font-style:italic;font-weight:400"></span></h2>
+    <input type="hidden" id="p-route-id" />
+    <div class="policy-section-heading">
+      <h3>Controles de tráfego</h3>
+      <p>Limites, headers e parâmetros avaliados antes do encaminhamento ao backend.</p>
+    </div>
+    <div class="policy-grid">
+      <div class="modal-field">
+        <label>Rate limit (req/min) <span style="opacity:.5">— vazio = sem limite</span></label>
+        <input type="number" id="p-rate-limit" min="1" placeholder="ex: 60" />
+      </div>
+      <div class="modal-field">
+        <label>Headers obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-required-headers" placeholder="x-client-id, authorization" />
+      </div>
+      <div class="modal-field">
+        <label>Headers proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-forbidden-headers" placeholder="x-debug-token" />
+      </div>
+      <div class="modal-field">
+        <label>Params obrigatórios <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-required-params" placeholder="client_id" />
+      </div>
+      <div class="modal-field">
+        <label>Params proibidos <span style="opacity:.5">— nomes separados por vírgula</span></label>
+        <input type="text" id="p-forbidden-params" placeholder="debug" />
+      </div>
+    </div>
+
+    <div class="policy-section-heading policy-section-heading-token">
+      <h3>Validação de token</h3>
+      <p>Opcional. O backend protegido continua responsável por sessão, revogação e autorização fina.</p>
+    </div>
+    <div class="policy-auth-note">
+      O SENTRA não gerencia sessão, revogação, roles ou autorização fina do contratante. Estes níveis apenas reduzem ruído e superfície de entrada antes do backend protegido.
+    </div>
+
+    <div class="policy-auth-panel" data-policy-prefix="p">
+      <div class="modal-field">
+        <label>Modo de validação de token</label>
+        <select id="p-auth-mode" class="policy-auth-mode">
+          <option value="none">Nenhuma validação no Gateway</option>
+          <option value="bearer">Exigir Bearer token</option>
+          <option value="jwt_structural">Pré-validar estrutura JWT</option>
+          <option value="jwt_claims">Pré-validar exp/issuer/audience declarados</option>
+          <option value="jwt_signed">Validar assinatura JWT localmente</option>
+        </select>
+        <p class="field-help" id="p-auth-help"></p>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_claims">
+        <div class="modal-field">
+          <label class="modal-check">
+            <input type="checkbox" id="p-jwt-validate-exp" checked />
+            Rejeitar JWT expirado <span style="opacity:.55">(claim exp)</span>
+          </label>
+          <p class="field-help">Sem assinatura válida, esta checagem é apenas um pré-filtro do valor declarado no token.</p>
+        </div>
+        <div class="modal-field">
+          <label>Clock skew permitido <span style="opacity:.5">— segundos</span></label>
+          <input type="number" id="p-jwt-clock-skew" min="0" max="300" placeholder="30" />
+        </div>
+        <div class="modal-field">
+          <label>Issuer esperado <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="p-jwt-issuer" placeholder="https://auth.empresa.local" />
+          <p class="field-help">Em modo não assinado, é apenas comparação com a claim declarada.</p>
+        </div>
+        <div class="modal-field">
+          <label>Audience esperada <span style="opacity:.5">— opcional</span></label>
+          <input type="text" id="p-jwt-audience" placeholder="api-interna" />
+        </div>
+      </div>
+
+      <div class="policy-auth-section" data-min-mode="jwt_signed">
+        <div class="modal-field">
+          <label>Algoritmo de assinatura</label>
+          <select id="p-jwt-signing-algorithm">
+            <option value="HS256">HS256 — secret HMAC compartilhada</option>
+            <option value="HS384">HS384 — secret HMAC compartilhada</option>
+            <option value="HS512">HS512 — secret HMAC compartilhada</option>
+            <option value="RS256">RS256 — chave pública RSA/PEM</option>
+            <option value="RS384">RS384 — chave pública RSA/PEM</option>
+            <option value="RS512">RS512 — chave pública RSA/PEM</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Material de validação <span style="opacity:.5">— write-only</span></label>
+          <textarea id="p-jwt-signing-key" rows="4" placeholder="Cole a secret HMAC ou a chave pública PEM do emissor. O valor será armazenado de forma protegida e não será exibido novamente."></textarea>
+          <p class="field-help" id="p-jwt-signing-key-status">Nenhum material de assinatura configurado.</p>
+        </div>
+      </div>
+    </div>
+    <p class="modal-error" id="p-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="p-delete">Remover política</button>
+      <button class="btn-ghost" id="p-cancel">Cancelar</button>
+      <button class="btn-primary" id="p-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Membro -->
+<div class="modal-overlay" id="modal-member" style="display:none">
+  <div class="modal-box">
+    <h2 class="modal-title" id="modal-member-title">Novo membro</h2>
+    <input type="hidden" id="member-edit-id" />
+    <div class="modal-field">
+      <label>E-mail</label>
+      <input type="email" id="m-email" placeholder="usuario@empresa.com" />
+    </div>
+    <div class="modal-field" id="m-password-field">
+      <label>Senha</label>
+      <input type="password" id="m-password" placeholder="Mínimo 8 caracteres" />
+    </div>
+    <div class="modal-field">
+      <label class="modal-field-title">Permissões</label>
+      <div class="permission-checklist">
+        <label class="permission-option">
+          <input type="checkbox" id="m-perm-domains" value="domains" />
+          <span><strong>Domains</strong> — cadastrar e editar domains do gateway</span>
+        </label>
+        <label class="permission-option">
+          <input type="checkbox" id="m-perm-routes" value="routes" />
+          <span><strong>Rotas</strong> — cadastrar e editar rotas e políticas</span>
+        </label>
+        <label class="permission-option">
+          <input type="checkbox" id="m-perm-audit" value="audit" />
+          <span><strong>Auditoria</strong> — visualizar eventos de requisições</span>
+        </label>
+        <label class="permission-option">
+          <input type="checkbox" id="m-perm-metrics" value="metrics" />
+          <span><strong>Métricas</strong> — visualizar dashboard de desempenho</span>
+        </label>
+      </div>
+    </div>
+    <p class="modal-error" id="m-error" style="display:none"></p>
+    <div class="modal-actions">
+      <button class="btn-danger-ghost" id="m-delete" style="display:none">Remover membro</button>
+      <button class="btn-ghost" id="m-cancel">Cancelar</button>
+      <button class="btn-primary" id="m-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Log operacional bruto -->
+<div class="modal-overlay" id="modal-raw-log" style="display:none">
+  <div class="modal-box" style="max-width:920px;width:92vw">
+    <h2 class="modal-title">Detalhes do log operacional</h2>
+    <div id="raw-log-semantic" style="margin-bottom:14px"></div>
+    <pre id="raw-log-detail" style="max-height:420px;overflow:auto;background:#111827;color:#e5e7eb;border-radius:10px;padding:14px;font-size:.78rem;white-space:pre-wrap"></pre>
+    <div class="modal-actions">
+      <button class="btn-primary" id="raw-log-close">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/pages/dashboard.js"></script>
+
+</body>
+</html>

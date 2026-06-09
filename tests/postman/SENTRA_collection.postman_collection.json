@@ -1,0 +1,721 @@
+{
+  "info": {
+    "name": "SENTRA — Validação Completa",
+    "description": "Valida o pipeline completo: auth, tenant, rotas, políticas, proxy e rate limiting.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "admin_url",   "value": "http://localhost:8001" },
+    { "key": "gateway_url", "value": "http://localhost:8000" },
+    { "key": "token",       "value": "" },
+    { "key": "tenant_id",   "value": "" },
+    { "key": "route_id",    "value": "" },
+    { "key": "user_email",  "value": "admin@sentra.dev" },
+    { "key": "user_pass",   "value": "sentra1234" }
+  ],
+  "item": [
+
+    {
+      "name": "00 · Health",
+      "item": [
+        {
+          "name": "Admin health",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/health"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Admin healthy', () => {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.json().status).to.eql('ok');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Gateway health",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/health"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Gateway healthy', () => {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.json().status).to.eql('ok');",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "01 · Auth",
+      "item": [
+        {
+          "name": "Registrar usuário",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_pass}}\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Registro 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('Token retornado', () => pm.expect(body.access_token).to.be.a('string'));",
+            "pm.collectionVariables.set('token', body.access_token);"
+          ]}}]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_pass}}\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Login 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Token retornado', () => pm.expect(body.access_token).to.be.a('string'));",
+            "pm.collectionVariables.set('token', body.access_token);"
+          ]}}]
+        },
+        {
+          "name": "Me (token válido)",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Me 200', () => pm.response.to.have.status(200));",
+            "pm.test('Email correto', () => {",
+            "  pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get('user_email'));",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Login com senha errada (deve falhar)",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"senhaerrada\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Credencial inválida retorna 401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Alterar senha",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/auth/change-password",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{user_pass}}\",\n  \"new_password\": \"{{user_pass}}\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Alteração de senha 204', () => pm.response.to.have.status(204));"
+          ]}}]
+        },
+        {
+          "name": "Solicitar reset de senha",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/auth/forgot-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Reset solicitado 202', () => pm.response.to.have.status(202));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "02 · Tenants",
+      "item": [
+        {
+          "name": "Criar tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/tenants",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"domain\": \"acme.local\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Tenant criado 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('ID presente', () => pm.expect(body.id).to.be.a('string'));",
+            "pm.collectionVariables.set('tenant_id', body.id);"
+          ]}}]
+        },
+        {
+          "name": "Listar tenants",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/tenants",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Lista 200', () => pm.response.to.have.status(200));",
+            "pm.test('Array retornado', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "Buscar tenant por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Tenant encontrado 200', () => pm.response.to.have.status(200));",
+            "pm.test('Slug correto', () => pm.expect(pm.response.json().slug).to.eql('acme-corp'));"
+          ]}}]
+        },
+        {
+          "name": "Atualizar tenant",
+          "request": {
+            "method": "PATCH",
+            "url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corporation\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Atualizado 200', () => pm.response.to.have.status(200));",
+            "pm.test('Nome atualizado', () => {",
+            "  pm.expect(pm.response.json().name).to.eql('Acme Corporation');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Tenant inexistente retorna 404",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/tenants/id-que-nao-existe",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 para tenant inexistente', () => pm.response.to.have.status(404));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "03 · Rotas",
+      "item": [
+        {
+          "name": "Criar rota",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/test/postman\",\n  \"method\": \"GET\",\n  \"backend_url\": \"https://httpbin.org\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rota criada 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.test('ID presente', () => pm.expect(body.id).to.be.a('string'));",
+            "pm.collectionVariables.set('route_id', body.id);"
+          ]}}]
+        },
+        {
+          "name": "Listar rotas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{admin_url}}/api/v1/routes?tenant_id={{tenant_id}}",
+              "query": [{ "key": "tenant_id", "value": "{{tenant_id}}" }]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Lista 200', () => pm.response.to.have.status(200));",
+            "pm.test('Rota criada presente', () => {",
+            "  const routes = pm.response.json();",
+            "  const found = routes.find(r => r.id === pm.collectionVariables.get('route_id'));",
+            "  pm.expect(found).to.not.be.undefined;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Buscar rota por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rota encontrada 200', () => pm.response.to.have.status(200));",
+            "pm.test('Path correto', () => {",
+            "  pm.expect(pm.response.json().path_pattern).to.eql('/test/postman');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Atualizar rota",
+          "request": {
+            "method": "PATCH",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"backend_url\": \"https://httpbin.org\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Atualizada 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Backend URL inválida retorna 422",
+          "request": {
+            "method": "POST",
+            "url": "{{admin_url}}/api/v1/routes",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"path_pattern\": \"/invalida\",\n  \"method\": \"GET\",\n  \"backend_url\": \"nao-e-uma-url\"\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('URL inválida retorna erro', () => {",
+            "  pm.expect(pm.response.code).to.be.oneOf([422, 400]);",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "04 · Políticas",
+      "item": [
+        {
+          "name": "Configurar política (rate limit 5 req/min)",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": 5,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política criada 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Rate limit configurado', () => {",
+            "  pm.expect(body.rate_limit_per_minute).to.eql(5);",
+            "});",
+            "pm.test('Route ID correto', () => {",
+            "  pm.expect(body.route_id).to.eql(pm.collectionVariables.get('route_id'));",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Buscar política da rota",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política encontrada 200', () => pm.response.to.have.status(200));",
+            "pm.test('Rate limit correto', () => {",
+            "  pm.expect(pm.response.json().rate_limit_per_minute).to.eql(5);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Atualizar política (adicionar auth)",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": true,\n  \"rate_limit_per_minute\": 5,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política atualizada 200', () => pm.response.to.have.status(200));",
+            "pm.test('Auth ativado', () => {",
+            "  pm.expect(pm.response.json().requires_auth).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Voltar política sem auth (para teste de gateway)",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": 5,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política restaurada 200', () => pm.response.to.have.status(200));",
+            "// Aguarda propagação pub/sub ao gateway",
+            "setTimeout(() => {}, 500);"
+          ]}}]
+        },
+        {
+          "name": "Rate limit inválido retorna 422",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": -1,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rate limit negativo retorna erro', () => {",
+            "  pm.expect(pm.response.code).to.be.oneOf([422, 400]);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Política para rota inexistente retorna 404",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/id-inexistente/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": 10,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 para rota inexistente', () => pm.response.to.have.status(404));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "05 · Gateway — Proxy",
+      "description": "Aguarde ~1s após configurar políticas antes de rodar este grupo (propagação pub/sub).",
+      "item": [
+        {
+          "name": "Rota existente — forward bem sucedido",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/test/postman/get"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Gateway encaminhou e retornou 200', () => {",
+            "  pm.response.to.have.status(200);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Rota não cadastrada retorna 404",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/rota/que/nao/existe"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rota não cadastrada retorna 404', () => {",
+            "  pm.response.to.have.status(404);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Método não permitido retorna 405",
+          "request": {
+            "method": "DELETE",
+            "url": "{{gateway_url}}/test/postman/delete"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Método não permitido retorna 405', () => {",
+            "  pm.response.to.have.status(405);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Status code upstream preservado (404 do backend)",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/test/postman/status/404"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Gateway propagou 404 do upstream', () => {",
+            "  pm.response.to.have.status(404);",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "06 · Gateway — Auth",
+      "item": [
+        {
+          "name": "Configurar rota com auth obrigatório",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": true,\n  \"rate_limit_per_minute\": 100,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Auth ativado na política', () => pm.response.to.have.status(200));",
+            "setTimeout(() => {}, 500);"
+          ]}}]
+        },
+        {
+          "name": "Requisição sem token retorna 401",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/test/postman/get"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Sem token retorna 401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Requisição com token Bearer passa",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_url}}/test/postman/get",
+            "header": [{ "key": "Authorization", "value": "Bearer token-qualquer-valido-criptograficamente" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "// Neste estágio o gateway valida presença do Bearer, não a assinatura JWT.",
+            "// Quando JwtValidator estiver implementado, este teste precisará de token real.",
+            "pm.test('Com Bearer passa pela verificação de auth', () => {",
+            "  pm.expect(pm.response.code).to.not.eql(401);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Restaurar política sem auth",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": 5,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política restaurada', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "07 · Gateway — Rate Limiting",
+      "description": "Dispara 6 requisições seguidas numa rota com limite de 5/min. A 6ª deve retornar 429.",
+      "item": [
+        {
+          "name": "Req 1 — dentro do limite",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 1 passou', () => pm.expect(pm.response.code).to.not.eql(429));"
+          ]}}]
+        },
+        {
+          "name": "Req 2 — dentro do limite",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 2 passou', () => pm.expect(pm.response.code).to.not.eql(429));"
+          ]}}]
+        },
+        {
+          "name": "Req 3 — dentro do limite",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 3 passou', () => pm.expect(pm.response.code).to.not.eql(429));"
+          ]}}]
+        },
+        {
+          "name": "Req 4 — dentro do limite",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 4 passou', () => pm.expect(pm.response.code).to.not.eql(429));"
+          ]}}]
+        },
+        {
+          "name": "Req 5 — no limite",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 5 passou (limite exato)', () => pm.expect(pm.response.code).to.not.eql(429));"
+          ]}}]
+        },
+        {
+          "name": "Req 6 — deve ser bloqueada (429)",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Req 6 bloqueada por rate limit', () => pm.response.to.have.status(429));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "08 · Pub/Sub — Propagação ao Gateway",
+      "description": "Valida que mudança de política no Admin propaga ao gateway sem restart.",
+      "item": [
+        {
+          "name": "Configurar rate limit alto (sem bloqueio)",
+          "request": {
+            "method": "PUT",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requires_auth\": false,\n  \"rate_limit_per_minute\": 1000,\n  \"allowed_roles\": []\n}"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Limite alto configurado', () => pm.response.to.have.status(200));",
+            "// Aguarda propagação pub/sub",
+            "setTimeout(() => {}, 1000);"
+          ]}}]
+        },
+        {
+          "name": "Gateway já refletiu novo limite (não bloqueia)",
+          "request": { "method": "GET", "url": "{{gateway_url}}/test/postman/get" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Gateway com novo limite — requisição passa', () => {",
+            "  pm.expect(pm.response.code).to.not.eql(429);",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "09 · Limpeza",
+      "item": [
+        {
+          "name": "Remover política",
+          "request": {
+            "method": "DELETE",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política removida 204', () => pm.response.to.have.status(204));"
+          ]}}]
+        },
+        {
+          "name": "Confirma que política foi removida",
+          "request": {
+            "method": "GET",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}/policy",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Política removida retorna null', () => {",
+            "  pm.response.to.have.status(200);",
+            "  pm.expect(pm.response.json()).to.be.null;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Remover rota",
+          "request": {
+            "method": "DELETE",
+            "url": "{{admin_url}}/api/v1/routes/{{route_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rota removida 204', () => pm.response.to.have.status(204));"
+          ]}}]
+        },
+        {
+          "name": "Remover tenant",
+          "request": {
+            "method": "DELETE",
+            "url": "{{admin_url}}/api/v1/tenants/{{tenant_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Tenant removido 204', () => pm.response.to.have.status(204));"
+          ]}}]
+        }
+      ]
+    }
+
+  ]
+}

@@ -1,0 +1,128 @@
+services:
+
+  # ── Infraestrutura ────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentra_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT_HOST:-5432}:5432"
+    volumes:
+      - sentra_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentra_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT_HOST:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h 127.0.0.1 -p 6379 ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── Aplicação ─────────────────────────────────────────────────────────────
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.admin
+    container_name: sentra_admin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ADMIN_USE_POSTGRES: "true"
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      SENTRA_POLICY_SECRET_KEY: ${SENTRA_POLICY_SECRET_KEY:-}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_INTERNAL_URL: http://gateway:8000
+      SENTRA_HEALTH_TIMEOUT_SECONDS: ${SENTRA_HEALTH_TIMEOUT_SECONDS:-3}
+      SENTRA_SUPERUSER_EMAIL: ${SENTRA_SUPERUSER_EMAIL:-superuser@sentra.dev}
+      SENTRA_SUPERUSER_PASSWORD: ${SENTRA_SUPERUSER_PASSWORD}
+    ports:
+      - "8001:8001"
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.gateway
+    container_name: sentra_gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      GATEWAY_AUDIT_TO_POSTGRES: "true"
+      GATEWAY_RAW_LOG_RETENTION_DAYS: ${GATEWAY_RAW_LOG_RETENTION_DAYS:-7}
+      GATEWAY_RAW_LOG_MAX_ENTRIES_PER_TENANT_PER_DAY: ${GATEWAY_RAW_LOG_MAX_ENTRIES_PER_TENANT_PER_DAY:-1000}
+      GATEWAY_RAW_LOG_REDACT_HEADERS: ${GATEWAY_RAW_LOG_REDACT_HEADERS:-authorization,cookie,set-cookie,x-api-key}
+      GATEWAY_REDIS_FAIL_OPEN: ${GATEWAY_REDIS_FAIL_OPEN:-true}
+      GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS: ${GATEWAY_REDIS_PUBSUB_IDLE_PING_SECONDS:-20}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      ADMIN_JWT_ALGORITHM: ${ADMIN_JWT_ALGORITHM:-HS256}
+      SENTRA_POLICY_SECRET_KEY: ${SENTRA_POLICY_SECRET_KEY:-}
+    ports:
+      - "8000:8000"
+
+  # ── Ferramentas (profile: tools) ──────────────────────────────────────────
+  # Uso: docker compose --profile tools up
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: sentra_redisinsight
+    restart: unless-stopped
+    profiles: ["tools"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${REDISINSIGHT_PORT:-5540}:5540"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sentra_pgadmin
+    restart: unless-stopped
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sentra.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+
+volumes:
+  sentra_postgres_data:

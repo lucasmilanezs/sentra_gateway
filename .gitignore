@@ -1,6 +1,46 @@
-# Virtual environment
-.venv/
-
-# Python cache
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Distribuição
+dist/
+build/
+*.egg-info/
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic (nunca commitar o banco de dev)
+*.db
+*.sqlite3
+
+# Dados locais de dev (JSON store)
+data/
+
+# Logs
+logs/*.log
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
