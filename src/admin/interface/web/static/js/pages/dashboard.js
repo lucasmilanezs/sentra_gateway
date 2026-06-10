@@ -40,8 +40,18 @@ let _lastGatewayAuditRows = [];
 let _lastGovernanceAuditRows = [];
 let _lastRawLogRows = [];
 
+function _formatTenantLabel(t, fallback = 'Tenant não identificado') {
+  if (!t) return fallback;
+  if (t.name && t.alias) return `${t.name} (${t.alias})`;
+  return t.name || t.alias || fallback;
+}
+
+function _tenantContextLabel(fallback = 'Todos os tenants') {
+  return tenant ? `Tenant: ${_formatTenantLabel(tenant)}` : fallback;
+}
+
 function _tenantLabel() {
-  return tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : 'Todos os tenants';
+  return _tenantContextLabel('Todos os tenants');
 }
 
 function _dateTimeStart(value) {
@@ -303,30 +313,32 @@ function navigate(pageId) {
         return;
       }
 
-  tenant = { id: me.tenant_id };
-  sessionStorage.setItem('sentra_tenant', JSON.stringify(tenant));
-  // Fix: hidratar name/alias para exibir na topbar e no perfil.
-  // Se o endpoint não aceitar a leitura por admin/member, o catch
-  // silencioso preserva o comportamento anterior (sem UUID visível —
-  // o profile-tenant usa o id como último fallback, que é o original).
-  try {
-    const full = await tenantsApi.get(me.tenant_id);
-    if (full?.name || full?.alias) {
-      tenant = { id: full.id, name: full.name, alias: full.alias };
+      if (me.tenant?.id) {
+        tenant = { id: me.tenant.id, name: me.tenant.name, alias: me.tenant.alias };
+      } else {
+        // Fallback defensivo para tokens antigos ou respostas sem tenant hidratado.
+        // Não altera permissões nem escopo: o backend continua usando claims.
+        tenant = { id: me.tenant_id, name: null, alias: null };
+        try {
+          const full = await tenantsApi.get(me.tenant_id);
+          if (full?.name || full?.alias) {
+            tenant = { id: full.id, name: full.name, alias: full.alias };
+          }
+        } catch {}
+      }
+
       sessionStorage.setItem('sentra_tenant', JSON.stringify(tenant));
     }
-  } catch {}
-}
 
     // Topbar
-    document.getElementById('topbar-tenant').textContent = tenant?.name || tenant?.alias || '';
+    document.getElementById('topbar-tenant').textContent = _formatTenantLabel(tenant, '');
     document.getElementById('topbar-user').textContent   = me.email;
 
     // Perfil
     document.getElementById('profile-email').textContent = me.email;
     document.getElementById('profile-role').textContent  = me.role || '—';
     document.getElementById('profile-tenant').textContent =
-      tenant ? (tenant.name || tenant.alias || 'Tenant atual') : 'Superuser — sem tenant fixo';
+      tenant ? _formatTenantLabel(tenant) : 'Superuser — sem tenant fixo';
 
     if (me.role === 'member' && me.permissions?.length) {
       document.getElementById('profile-perms-row').style.display = '';
@@ -716,7 +728,7 @@ async function loadDomains() {
   const tbody  = document.getElementById('tbody-domains');
   const empty  = document.getElementById('domains-empty');
 
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : '';
+  badge.textContent = tenant ? `Tenant: ${_formatTenantLabel(tenant)}` : '';
 
   if (!tenantId) {
     tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Selecione um tenant para ver os domains.</td></tr>';
@@ -826,7 +838,7 @@ async function loadRoutes() {
   const tbody = document.getElementById('tbody-routes');
   const empty = document.getElementById('routes-empty');
   const badge = document.getElementById('routes-tenant-badge');
-  badge.textContent = tenant ? `Tenant: ${tenant.name || tenant.alias || 'atual'}` : '';
+  badge.textContent = tenant ? `Tenant: ${_formatTenantLabel(tenant)}` : '';
   tbody.innerHTML = '<tr><td colspan="5" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
@@ -1055,7 +1067,7 @@ async function loadMembers() {
   const empty = document.getElementById('members-empty');
   const badge = document.getElementById('members-tenant-badge');
 
-  badge.textContent = `Tenant: ${tenant.name || tenant.alias || 'atual'}`;
+  badge.textContent = `Tenant: ${_formatTenantLabel(tenant)}`;
   tbody.innerHTML = '<tr><td colspan="4" style="font-style:italic;color:var(--text-secondary)">Carregando…</td></tr>';
   empty.style.display = 'none';
 
@@ -1097,8 +1109,15 @@ async function loadMembers() {
   }
 }
 
+function _setMemberModalTenantContext() {
+  const el = document.getElementById('m-tenant-context');
+  if (!el) return;
+  el.textContent = `Tenant de cadastro: ${_formatTenantLabel(tenant)}`;
+}
+
 function _openNewMember() {
   document.getElementById('modal-member-title').textContent = 'Novo membro';
+  _setMemberModalTenantContext();
   document.getElementById('member-edit-id').value = '';
   document.getElementById('m-email').value = '';
   document.getElementById('m-email').disabled = false;
@@ -1115,6 +1134,7 @@ function _openNewMember() {
 
 function _openEditMember(id, email, permissions) {
   document.getElementById('modal-member-title').textContent = 'Editar membro';
+  _setMemberModalTenantContext();
   document.getElementById('member-edit-id').value = id;
   document.getElementById('m-email').value = email;
   document.getElementById('m-email').disabled = true;

@@ -6,6 +6,7 @@ class RegisterBody(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     company_name: str = Field(min_length=1, max_length=255)
     company_alias: str = Field(min_length=1, max_length=128)
+    accepted_terms: bool = False
 
 
 class LoginBody(BaseModel):
@@ -18,18 +19,19 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class TenantPublic(BaseModel):
+    id: str
+    name: str
+    alias: str
+
+
 class UserPublic(BaseModel):
     id: str
     email: str
     tenant_id: str | None
     role: str | None = None
     permissions: list[str] = []
-
-
-class TenantPublic(BaseModel):
-    id: str
-    name: str
-    alias: str
+    tenant: TenantPublic | None = None
 
 
 class RegisterResponse(BaseModel):

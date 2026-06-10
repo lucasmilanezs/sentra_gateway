@@ -97,8 +97,16 @@
           <input type="text" id="reg-alias" placeholder="empresa-xyz" />
         </div>
 
+        <div class="terms-consent" id="register-terms-consent">
+          <label class="terms-check-row" for="reg-terms-accepted">
+            <input type="checkbox" id="reg-terms-accepted" />
+            <span>Eu li e aceito os <button type="button" class="terms-link" id="open-terms-modal">termos de uso</button>.</span>
+          </label>
+          <p class="terms-consent-note">O aceite é obrigatório para criar uma conta administrativa na plataforma.</p>
+        </div>
+
         <p class="auth-msg" id="reg-msg"></p>
-        <button class="auth-btn" id="reg-btn" onclick="handleRegister()">Criar conta</button>
+        <button class="auth-btn" id="reg-btn" onclick="handleRegister()" disabled>Criar conta</button>
 
         <p class="auth-note">
           Cadastro cria uma conta de administrador com tenant próprio.<br>
@@ -147,7 +155,218 @@
     <span>Sentra &copy; 2026 &mdash; Plataforma de gateway para segurança de APIs</span>
   </footer>
 
-  <script type="module" src="js/pages/landing.js"></script>
+<div class="terms-modal-backdrop" id="terms-modal" aria-hidden="true">
+  <div class="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+    <div class="terms-modal-header">
+      <div>
+        <p class="terms-kicker">SENTRA</p>
+        <h2 id="terms-modal-title">Termos de uso da plataforma</h2>
+      </div>
+      <button type="button" class="terms-close" id="close-terms-modal" aria-label="Fechar termos">×</button>
+    </div>
+
+    <div class="terms-modal-body">
+      <p>
+        Estes Termos de Uso ("Termos") regulam o acesso e a utilização da plataforma administrativa SENTRA
+        ("Plataforma"), sistema de gateway para configuração, aplicação e observabilidade de políticas de
+        segurança em interfaces de programação de aplicações (APIs). A Plataforma é disponibilizada pela
+        organização responsável por sua operação ("Operador") a organizações contratantes ("Contratante")
+        e seus usuários autorizados ("Usuário"). Ao criar uma conta administrativa ou acessar a Plataforma,
+        o Usuário declara ter lido, compreendido e concordado integralmente com estes Termos, bem como
+        confirma estar devidamente autorizado a operar a Plataforma em nome da organização ou unidade à
+        qual está vinculado.
+      </p>
+
+      <h3>1. Definições</h3>
+      <p>
+        Para os fins destes Termos, aplicam-se as seguintes definições: <strong>"Plataforma"</strong> designa
+        o sistema SENTRA, compreendendo o painel administrativo, o gateway de processamento de requisições,
+        suas interfaces, APIs internas, mecanismos de auditoria, observabilidade e toda a infraestrutura
+        associada. <strong>"Operador"</strong> designa a organização responsável pela disponibilização,
+        manutenção e operação técnica da Plataforma, incluindo o superusuário de plataforma e os
+        macro-gestores do ambiente multi-tenant. <strong>"Contratante"</strong> designa a pessoa jurídica
+        que contratou o acesso à Plataforma e é responsável pelo tenant ou conjunto de tenants a ela
+        vinculados. <strong>"Usuário"</strong> designa qualquer pessoa física que acesse a Plataforma
+        mediante credenciais válidas, incluindo administradores de tenant, membros com permissões delegadas
+        e quaisquer outros operadores autorizados pelo Contratante. <strong>"Tenant"</strong> designa a
+        unidade organizacional isolada dentro da Plataforma, associada ao Contratante, dentro da qual são
+        configurados domínios, rotas, políticas e usuários subordinados.
+      </p>
+
+      <h3>2. Finalidade e escopo da plataforma</h3>
+      <p>
+        O SENTRA atua como camada intermediária de configuração e enforcement técnico, oferecendo as seguintes
+        funcionalidades: cadastro e gerenciamento de tenants e domínios protegidos; definição e aplicação de
+        rotas e políticas de segurança; validação configurável de tokens de autenticação; controle de taxa de
+        requisições (rate limiting); auditoria estruturada de eventos; e registro de logs operacionais para
+        fins de observabilidade e diagnóstico.
+      </p>
+      <p>
+        A Plataforma não substitui, e não deve ser interpretada como substituta de: governança corporativa;
+        controles internos de segurança da informação; mecanismos de autenticação e autorização finais dos
+        sistemas protegidos; regras de negócio próprias dos backends contratados; nem de qualquer obrigação
+        legal, regulatória ou contratual aplicável ao Contratante. A configuração adequada das funcionalidades
+        disponíveis é de exclusiva responsabilidade do Contratante e dos Usuários por ele autorizados.
+      </p>
+
+      <h3>3. Acesso, contas e credenciais</h3>
+      <p>
+        O acesso à Plataforma é concedido mediante credenciais individuais e intransferíveis. Cada Usuário
+        é responsável pela confidencialidade de suas credenciais e por todas as ações realizadas sob sua
+        conta. O Contratante é responsável por criar e gerenciar as contas dos Usuários vinculados ao seu
+        tenant; conceder apenas as permissões estritamente necessárias ao exercício das funções de cada
+        Usuário; revogar imediatamente o acesso de Usuários que deixem de estar autorizados; e notificar
+        o Operador em caso de comprometimento conhecido ou suspeito de credenciais. O compartilhamento de
+        credenciais entre Usuários distintos é expressamente vedado e pode ensejar a suspensão imediata
+        do acesso.
+      </p>
+
+      <h3>4. Extensão dos termos aos usuários dependentes</h3>
+      <p>
+        Ao criar uma conta administrativa de tenant, o Contratante aceita estes Termos em nome próprio e
+        como responsável por todos os Usuários que vier a cadastrar na Plataforma sob o respectivo tenant.
+        Os presentes Termos aplicam-se integralmente a administradores de tenant, membros com permissões
+        delegadas e quaisquer outros operadores vinculados ao Contratante, independentemente de seu nível
+        de acesso.
+      </p>
+      <p>
+        É obrigação expressa do Contratante informar todos os Usuários cadastrados sobre o teor destes
+        Termos antes de conceder-lhes acesso à Plataforma; assegurar que tais Usuários compreendam e
+        observem as condições aqui estabelecidas; e responder perante o Operador por quaisquer violações
+        praticadas por Usuários sob sua responsabilidade, como se fossem violações próprias. O Operador
+        não mantém relação contratual direta com os Usuários individuais cadastrados pelo Contratante,
+        recaindo sobre este a responsabilidade pela comunicação, treinamento e conformidade interna.
+      </p>
+
+      <h3>5. Termos aplicáveis ao operador e ao ambiente multi-tenant</h3>
+      <p>
+        No contexto da operação multi-tenant da Plataforma, o superusuário e os macro-gestores designados
+        pelo Operador possuem acesso privilegiado transversal aos tenants cadastrados, exercido
+        exclusivamente para fins de administração técnica, suporte operacional, aplicação de atualizações
+        e manutenção da integridade da Plataforma. Os presentes Termos são integralmente aplicáveis ao
+        Operador, ao superusuário de plataforma e a todos os macro-gestores, sendo tais condições acordadas
+        no momento da contratação da Plataforma e extensíveis a todos os que venham a exercer funções
+        operacionais em seu âmbito.
+      </p>
+      <p>
+        O acesso privilegiado do Operador é limitado ao necessário para a prestação dos serviços contratados
+        e não autoriza o Operador a acessar, modificar ou exfiltrar dados de negócio dos sistemas protegidos
+        pelos tenants; alterar configurações de tenant sem solicitação ou anuência do Contratante; nem
+        utilizar informações obtidas em razão do acesso privilegiado para finalidades alheias à operação da
+        Plataforma. Toda ação administrativa realizada pelo superusuário e por macro-gestores é registrada
+        nos mecanismos de auditoria da Plataforma, garantindo rastreabilidade das operações privilegiadas.
+      </p>
+
+      <h3>6. Tokens, sessões e autorização</h3>
+      <p>
+        A Plataforma oferece mecanismos configuráveis de validação de tokens de autenticação, incluindo
+        exigência de token Bearer, validação estrutural de JSON Web Tokens (JWT), pré-validação de claims
+        declaradas (emissor, audiência, expiração) e, quando configurado pelo Contratante, validação de
+        assinatura criptográfica com material fornecido e de responsabilidade do próprio Contratante.
+        O SENTRA não emite, renova, revoga nem gerencia sessões, tokens ou identidades dos sistemas
+        protegidos. A autorização fina, o controle de escopos, a revogação de tokens e a gestão de
+        identidades permanecem sob exclusiva responsabilidade do backend do Contratante. O Contratante
+        é responsável pela guarda e renovação periódica dos segredos utilizados para assinatura e
+        validação criptográfica.
+      </p>
+
+      <h3>7. Corpo das requisições e conteúdo trafegado</h3>
+      <p>
+        O gateway do SENTRA encaminha requisições aos serviços configurados pelo Contratante, podendo
+        processar metadados técnicos necessários ao roteamento, à aplicação de políticas, à auditoria
+        e à observabilidade. O conteúdo material do corpo das requisições pertence ao contexto do
+        Contratante e dos sistemas por ele protegidos. O Operador não assume qualquer responsabilidade
+        funcional, legal ou regulatória pelo teor, legalidade, finalidade, origem, tratamento,
+        armazenamento, consequências ou adequação dos dados enviados no corpo das requisições, sendo
+        de exclusiva responsabilidade do Contratante assegurar base legal para o tratamento dos dados;
+        conformidade com a legislação aplicável, incluindo a Lei Geral de Proteção de Dados Pessoais
+        (LGPD) e demais normas pertinentes; obtenção de consentimentos necessários; políticas adequadas
+        de retenção; e tratamento correto e seguro dos dados processados.
+      </p>
+
+      <h3>8. Auditoria, logs e dados operacionais</h3>
+      <p>
+        Eventos de auditoria são mantidos com finalidade de rastreabilidade de decisões de roteamento,
+        aplicação de políticas e ações administrativas, estando disponíveis ao Contratante dentro do
+        escopo do seu tenant. Logs operacionais possuem finalidade técnica e de diagnóstico, com retenção
+        limitada conforme configuração da Plataforma, sendo de acesso restrito ao Operador e destinados
+        exclusivamente à manutenção e observabilidade da infraestrutura.
+      </p>
+      <p>
+        Secrets e materiais criptográficos cadastrados para validação de assinatura são armazenados de
+        forma criptografada e não são exibidos novamente pela interface após o cadastro. O Contratante
+        é responsável por manter cópias seguras de tais materiais fora da Plataforma. O Contratante deve
+        evitar cadastrar no corpo de configurações da Plataforma informações pessoais, sensíveis ou
+        sigilosas que não sejam estritamente necessárias à operação técnica do gateway.
+      </p>
+
+      <h3>9. Uso adequado e condutas vedadas</h3>
+      <p>
+        É expressamente vedado ao Usuário e ao Contratante: utilizar a Plataforma para contornar, burlar
+        ou degradar controles de acesso, mecanismos de autenticação ou políticas de segurança de sistemas
+        de terceiros ou próprios; configurar rotas ou políticas para destinos que não pertençam ao escopo
+        operacional autorizado da organização; operar tenants, domínios ou rotas sem a devida autorização
+        do titular dos sistemas protegidos; expor, transmitir ou facilitar o acesso indevido a dados
+        confidenciais, pessoais ou sensíveis de terceiros; realizar testes de penetração ou varreduras
+        de vulnerabilidade sobre a infraestrutura da Plataforma sem autorização prévia e expressa do
+        Operador; compartilhar ou ceder credenciais de acesso a terceiros não autorizados; e utilizar a
+        Plataforma de forma a sobrecarregar deliberadamente a infraestrutura ou prejudicar a
+        disponibilidade do serviço para outros Contratantes.
+      </p>
+      <p>
+        A violação de qualquer das condutas vedadas pode ensejar, a critério do Operador, suspensão
+        imediata do acesso, encerramento do contrato e comunicação às autoridades competentes quando a
+        conduta constituir ilícito civil ou penal.
+      </p>
+
+      <h3>10. Limitações de responsabilidade</h3>
+      <p>
+        A Plataforma é disponibilizada para reduzir a superfície de ataque, centralizar controles
+        transversais de segurança e facilitar a observabilidade técnica. O Operador não garante segurança
+        absoluta nem a ausência de vulnerabilidades, falhas ou indisponibilidades. A segurança efetiva
+        dos ambientes protegidos pelo SENTRA depende da configuração correta das políticas pelo
+        Contratante, da proteção adequada dos backends, do uso responsável de secrets e da manutenção
+        dos controles de segurança próprios do Contratante.
+      </p>
+      <p>
+        O Operador não se responsabiliza por danos diretos, indiretos, incidentais ou consequenciais
+        decorrentes de configurações inadequadas realizadas pelo Contratante ou por Usuários; falhas ou
+        vulnerabilidades nos sistemas protegidos pelo gateway; uso indevido da Plataforma em
+        desconformidade com estes Termos; eventos de força maior ou falhas de infraestrutura de
+        terceiros; nem por quaisquer consequências decorrentes do conteúdo trafegado nas requisições
+        processadas pelo Gateway.
+      </p>
+
+      <h3>11. Alterações aos termos</h3>
+      <p>
+        O Operador reserva-se o direito de modificar estes Termos a qualquer tempo, mediante notificação
+        aos Contratantes com antecedência mínima razoável. A continuidade de uso da Plataforma após a
+        entrada em vigor das alterações constitui aceitação dos novos Termos. É responsabilidade do
+        Contratante manter seus dados de contato atualizados na Plataforma e comunicar as alterações
+        aos Usuários vinculados ao seu tenant.
+      </p>
+
+      <h3>12. Disposições gerais</h3>
+      <p>
+        Estes Termos constituem o acordo integral entre as partes no que se refere ao uso administrativo
+        da Plataforma e prevalecem sobre quaisquer entendimentos anteriores relacionados ao mesmo objeto,
+        sem prejuízo das disposições do instrumento contratual específico firmado entre o Operador e o
+        Contratante. A eventual invalidade de qualquer disposição não afetará a validade das demais. A
+        tolerância do Operador em relação a qualquer descumprimento não constituirá renúncia ao direito
+        de exigir o cumprimento integral destes Termos em momento posterior. Estes Termos são regidos
+        pelas leis da República Federativa do Brasil, elegendo as partes o foro da comarca de domicílio
+        do Operador para a resolução de quaisquer controvérsias, com renúncia expressa a qualquer outro.
+      </p>
+    </div>
+
+    <div class="terms-modal-footer">
+      <button type="button" class="terms-secondary" id="decline-terms-modal">Voltar</button>
+      <button type="button" class="terms-primary" id="accept-terms-modal">Li e aceito</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/pages/landing.js"></script>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.admin.application.use_cases.authenticate_user import (
     AuthenticateUser,
@@ -44,6 +44,12 @@ async def register(
     O use case é acessado diretamente do wiring para garantir que
     tenant e admin compartilhem exatamente a mesma sessão de banco.
     """
+    if not body.accepted_terms:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="É necessário aceitar os termos de uso para criar a conta.",
+        )
+
     user, tenant = await w.register_admin_with_tenant.execute(
         email=body.email,
         password=body.password,
@@ -58,6 +64,7 @@ async def register(
         user=UserPublic(
             id=user.id, email=user.email, tenant_id=user.tenant_id,
             role=user.role, permissions=user.permissions,
+            tenant=TenantPublic(id=tenant.id, name=tenant.name, alias=tenant.alias),
         ),
         tenant=TenantPublic(id=tenant.id, name=tenant.name, alias=tenant.alias),
         access_token=access,
@@ -81,9 +88,21 @@ async def me(
     user = await w.user_repository.get_by_id(claims.sub)
     if not user:
         raise AuthError("usuário não encontrado")
+
+    tenant = None
+    if user.tenant_id:
+        tenant_entity = await w.tenant_repository.get_by_id(user.tenant_id)
+        if tenant_entity:
+            tenant = TenantPublic(
+                id=tenant_entity.id,
+                name=tenant_entity.name,
+                alias=tenant_entity.alias,
+            )
+
     return UserPublic(
         id=user.id, email=user.email, tenant_id=user.tenant_id,
         role=user.role, permissions=user.permissions,
+        tenant=tenant,
     )
 
 

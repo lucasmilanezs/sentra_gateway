@@ -34,6 +34,50 @@
       document.getElementById('forgot-step2').style.display = step === 2 ? 'block' : 'none';
     };
 
+    // ── Termos de uso no cadastro ─────────────────────────────────────
+    const termsModal = document.getElementById('terms-modal');
+    const termsCheckbox = document.getElementById('reg-terms-accepted');
+    const registerButton = document.getElementById('reg-btn');
+
+    function updateRegisterButtonState() {
+      if (!registerButton || !termsCheckbox) return;
+      registerButton.disabled = !termsCheckbox.checked;
+    }
+
+    function openTermsModal() {
+      if (!termsModal) return;
+      termsModal.classList.add('active');
+      termsModal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('terms-modal-open');
+    }
+
+    function closeTermsModal() {
+      if (!termsModal) return;
+      termsModal.classList.remove('active');
+      termsModal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('terms-modal-open');
+    }
+
+    document.getElementById('open-terms-modal')?.addEventListener('click', openTermsModal);
+    document.getElementById('close-terms-modal')?.addEventListener('click', closeTermsModal);
+    document.getElementById('decline-terms-modal')?.addEventListener('click', closeTermsModal);
+    document.getElementById('accept-terms-modal')?.addEventListener('click', () => {
+      if (termsCheckbox) termsCheckbox.checked = true;
+      updateRegisterButtonState();
+      closeTermsModal();
+      msg('reg-msg', '', '');
+    });
+    termsCheckbox?.addEventListener('change', updateRegisterButtonState);
+    termsModal?.addEventListener('click', (event) => {
+      if (event.target === termsModal) closeTermsModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && termsModal?.classList.contains('active')) {
+        closeTermsModal();
+      }
+    });
+    updateRegisterButtonState();
+
     // ── Login ──────────────────────────────────────────────────────────
     window.handleLogin = async function() {
       const email = document.getElementById('login-email').value.trim();
@@ -117,6 +161,9 @@ window.location.href = '/dashboard.html';
       if (pass.length < 8) {
         msg('reg-msg', 'Senha deve ter ao menos 8 caracteres.', 'error'); return;
       }
+      if (!document.getElementById('reg-terms-accepted')?.checked) {
+        msg('reg-msg', 'É necessário aceitar os termos de uso para criar a conta.', 'error'); return;
+      }
 
       setLoading('reg-btn', true, 'Criando conta…');
       try {
@@ -125,6 +172,7 @@ window.location.href = '/dashboard.html';
           password: pass,
           company_name: company,
           company_alias: alias,
+          accepted_terms: true,
         });
 
         // Backend já retornou user + tenant + token na mesma resposta.

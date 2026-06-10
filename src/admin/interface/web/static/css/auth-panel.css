@@ -244,3 +244,190 @@
       .landing-panel { width: 100%; padding: 28px 28px 48px; }
     }
   
+/* ── Aceite de termos no cadastro ── */
+.terms-consent {
+  margin: 18px 0 4px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgba(180, 200, 240, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 18, 34, 0.32);
+}
+
+.terms-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: rgba(220, 228, 245, 0.82);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0;
+}
+
+.terms-check-row input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin-top: 3px;
+  accent-color: #9ab6ff;
+}
+
+.terms-link {
+  background: none;
+  border: none;
+  color: #b8c9ff;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.terms-link:hover { color: #dce4f5; }
+
+.terms-consent-note {
+  margin: 8px 0 0 25px;
+  color: rgba(180, 200, 240, 0.36);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+body.terms-modal-open { overflow: hidden; }
+
+.terms-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(7px);
+  z-index: 1000;
+}
+
+.terms-modal-backdrop.active { display: flex; }
+
+.terms-modal {
+  width: min(760px, 100%);
+  max-height: min(82vh, 780px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(180, 200, 240, 0.18);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(16, 27, 48, 0.98), rgba(7, 13, 25, 0.98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+  color: #dce4f5;
+  overflow: hidden;
+}
+
+.terms-modal-header,
+.terms-modal-footer {
+  flex: 0 0 auto;
+  padding: 20px 24px;
+  border-color: rgba(180, 200, 240, 0.12);
+}
+
+.terms-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid rgba(180, 200, 240, 0.12);
+}
+
+.terms-kicker {
+  margin: 0 0 6px;
+  color: rgba(180, 200, 240, 0.45);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.terms-modal h2 {
+  margin: 0;
+  font-size: 1.22rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.terms-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(180, 200, 240, 0.18);
+  background: rgba(180, 200, 240, 0.06);
+  color: rgba(220, 228, 245, 0.85);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.terms-close:hover { background: rgba(180, 200, 240, 0.14); }
+
+.terms-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 22px 24px;
+  color: rgba(220, 228, 245, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.terms-modal-body h3 {
+  margin: 22px 0 6px;
+  color: #dce4f5;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.terms-modal-body h3:first-of-type { margin-top: 10px; }
+.terms-modal-body p { margin: 0 0 12px; }
+
+.terms-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid rgba(180, 200, 240, 0.12);
+}
+
+.terms-primary,
+.terms-secondary {
+  min-width: 120px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.terms-primary {
+  border: 1px solid rgba(154, 182, 255, 0.5);
+  background: rgba(154, 182, 255, 0.18);
+  color: #edf3ff;
+}
+
+.terms-primary:hover { background: rgba(154, 182, 255, 0.26); }
+
+.terms-secondary {
+  border: 1px solid rgba(180, 200, 240, 0.16);
+  background: rgba(180, 200, 240, 0.05);
+  color: rgba(220, 228, 245, 0.72);
+}
+
+.terms-secondary:hover { background: rgba(180, 200, 240, 0.12); }
+
+@media (max-width: 720px) {
+  .terms-modal-backdrop { padding: 12px; }
+  .terms-modal { max-height: 88vh; }
+  .terms-modal-header,
+  .terms-modal-footer { padding: 16px; }
+  .terms-modal-body { padding: 18px 16px; }
+  .terms-modal-footer { flex-direction: column-reverse; }
+  .terms-primary,
+  .terms-secondary { width: 100%; }
+}

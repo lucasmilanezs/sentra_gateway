@@ -625,6 +625,18 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+.modal-context {
+  margin-top: -8px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
 .modal-field label {
   display: block;
   font-family: var(--mono);
